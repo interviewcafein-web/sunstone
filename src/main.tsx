@@ -71,4 +71,6 @@ if (!rootElement.innerHTML) {
       </PersistQueryClientProvider>
     </StrictMode>
   );
+  // The intro animation lives in index.html; let it finish and fade once the app has painted.
+  requestAnimationFrame(() => window.__hideSplash?.());
 }

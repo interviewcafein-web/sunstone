@@ -81,7 +81,9 @@ parsing is in `src/lib/coding-profiles/adapters.ts`.
 ## Deploy
 
 Import the repo in Vercel with the Vite preset and set `SHEET_ID` (and optionally
-`SHEET_GID`) in the project's environment variables. The host must be able to run the
+`SHEET_GID`) in the project's environment variables. Link previews (WhatsApp, LinkedIn, Slack) need
+absolute URLs, which the build fills in from Vercel's production domain; set `SITE_URL`
+(e.g. `https://profiles.example.com`) if the site is served from a custom domain. The host must be able to run the
 functions in `api/`: a purely static host cannot serve this app.
 
 ## Known limits

@@ -58,7 +58,11 @@ export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
         </thead>
         <tbody>
           {rows.map(({ student, cells, total, loading }, index) => (
-            <tr key={student.id} className="border-b border-slate-100 last:border-0">
+            <tr
+              key={student.id}
+              className="animate-rise border-b border-slate-100 last:border-0"
+              style={{ animationDelay: `${Math.min(index, 15) * 30}ms` }}
+            >
               <td className="px-3 py-2.5 align-top text-slate-400 tabular-nums">{index + 1}</td>
               <th scope="row" className="px-3 py-2.5 text-left align-top font-normal">
                 <Link

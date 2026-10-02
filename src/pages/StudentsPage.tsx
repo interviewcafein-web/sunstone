@@ -148,7 +148,7 @@ export default function StudentsPage() {
   const loadingProfiles = summaries.settled < summaries.total;
 
   return (
-    <div className="space-y-4">
+    <div className="rise-stagger space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Students</h1>

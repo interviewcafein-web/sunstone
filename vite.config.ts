@@ -42,13 +42,28 @@ function apiPlugin(): Plugin {
   };
 }
 
+// Link-preview crawlers need absolute URLs. SITE_URL wins; otherwise use the production
+// domain Vercel provides at build time, so previews work without any configuration.
+function siteUrlPlugin(siteUrl: string): Plugin {
+  return {
+    name: 'sunstone-site-url',
+    transformIndexHtml: (html) => html.replaceAll('__SITE_URL__', siteUrl),
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   // The api/ handlers read process.env, as they do on Vercel; feed them .env.local in dev.
-  Object.assign(process.env, loadEnv(mode, process.cwd(), 'SHEET_'));
+  const env = loadEnv(mode, process.cwd(), ['SHEET_', 'SITE_']);
+  Object.assign(process.env, env);
+
+  const vercelDomain = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  const siteUrl = (
+    env.SITE_URL || (vercelDomain ? `https://${vercelDomain}` : 'http://localhost:3002')
+  ).replace(/\/+$/, '');
 
   return {
-    plugins: [TanStackRouterVite(), react(), tailwindcss(), apiPlugin()],
+    plugins: [TanStackRouterVite(), react(), tailwindcss(), apiPlugin(), siteUrlPlugin(siteUrl)],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),

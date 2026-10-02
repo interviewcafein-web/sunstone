@@ -22,7 +22,7 @@ export default function ProfilesPage() {
   const submit = (next: Handles) => navigate({ search: next });
 
   return (
-    <div className="space-y-4">
+    <div className="rise-stagger space-y-4">
       <div>
         <Link
           to="/"
@@ -41,7 +41,7 @@ export default function ProfilesPage() {
 
       {loaded.length > 0 && <Summary profiles={loaded} />}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="rise-stagger grid gap-4 lg:grid-cols-2">
         {results.map(({ platform, query }) => (
           <PlatformCard key={platform.id} platform={platform} query={query} />
         ))}
