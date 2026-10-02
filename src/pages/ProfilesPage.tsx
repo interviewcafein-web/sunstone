@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, getRouteApi } from '@tanstack/react-router';
 import { ArrowLeft, Check, Link2 } from 'lucide-react';
 
+import { Avatar } from '@/components/common/Avatar';
 import { HandleForm } from '@/components/profile/HandleForm';
 import { Heatmap, summarizeCalendar } from '@/components/profile/Heatmap';
 import { PlatformCard } from '@/components/profile/PlatformCard';
@@ -22,20 +23,31 @@ export default function ProfilesPage() {
   const submit = (next: Handles) => navigate({ search: next });
 
   return (
-    <div className="rise-stagger space-y-4">
-      <div>
+    <div className="rise-stagger space-y-5">
+      <section className="from-brand-700 to-brand-900 relative overflow-hidden rounded-2xl bg-gradient-to-br p-5 text-white shadow-[0_20px_50px_-20px_rgb(16_38_70/0.6)] sm:p-7">
+        <div
+          aria-hidden
+          className="bg-brand-400/30 pointer-events-none absolute -top-24 right-1/4 size-72 rounded-full blur-3xl"
+        />
         <Link
           to="/"
-          className="hover:text-brand-700 mb-2 inline-flex items-center gap-1 text-sm text-slate-500"
+          className="text-brand-100 relative mb-4 inline-flex items-center gap-1 text-sm hover:text-white"
         >
           <ArrowLeft className="size-4" aria-hidden />
           All students
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight">{name ?? 'Look up a coding profile'}</h1>
-        <p className="text-sm text-slate-600">
-          Problems solved, badges, topics and activity across platforms.
-        </p>
-      </div>
+        <div className="relative flex items-center gap-4">
+          {name && <Avatar name={name} className="size-14 text-base ring-4 ring-white/20" />}
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+              {name ?? 'Look up a coding profile'}
+            </h1>
+            <p className="text-brand-100 mt-1 text-sm">
+              Problems solved, badges, topics and activity across platforms.
+            </p>
+          </div>
+        </div>
+      </section>
 
       <HandleForm handles={handles} onSubmit={submit} />
 

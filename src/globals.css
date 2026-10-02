@@ -71,6 +71,10 @@ html.splash-gone .rise-stagger > * {
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply text-slate-900 antialiased;
+    /* A soft brand glow behind the top of every page. */
+    background:
+      radial-gradient(1100px 380px at 50% -120px, var(--color-brand-100), transparent 70%),
+      var(--color-slate-50);
   }
 }

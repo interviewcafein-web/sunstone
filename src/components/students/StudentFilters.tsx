@@ -23,7 +23,7 @@ export function StudentFilters({ search, options, onChange }: StudentFiltersProp
   const active = FILTERS.some(({ key }) => search[key]) || Boolean(search.q);
 
   return (
-    <div className="shadow-card grid gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1.5fr_auto] lg:items-end">
+    <div className="shadow-card grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1.5fr_auto] lg:items-end">
       {FILTERS.map(({ key, label, all }) => (
         <div key={key}>
           <label
