@@ -1,5 +1,7 @@
 import { Link, Outlet, createRootRoute } from '@tanstack/react-router';
 
+import { BrandLockup } from '@/components/common/BrandLockup';
+
 export const Route = createRootRoute({
   component: RootComponent,
 });
@@ -14,14 +16,8 @@ function RootComponent() {
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <Link to="/" className="flex items-center gap-3">
-            <img
-              src="/sunstone-logo.png"
-              alt="Sunstone"
-              width={886}
-              height={115}
-              className="h-5 w-auto"
-            />
-            <span className="border-l border-slate-300 pl-3 text-sm font-medium text-slate-600">
+            <BrandLockup />
+            <span className="self-stretch border-l border-slate-300 pl-3 text-sm leading-[2.6rem] font-medium text-slate-600">
               Coding Profiles
             </span>
           </Link>
@@ -52,13 +48,7 @@ function RootComponent() {
 
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-slate-500">
-          <img
-            src="/sunstone-logo.png"
-            alt="Sunstone"
-            width={886}
-            height={115}
-            className="h-3.5 w-auto opacity-70"
-          />
+          <BrandLockup logoClassName="h-4 opacity-80" primeClassName="text-[7px]" />
           <span>
             Stats from LeetCode, GeeksforGeeks, HackerRank, Codeforces, CodeChef and GitHub
           </span>
