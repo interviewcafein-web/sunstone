@@ -8,6 +8,7 @@
 
 import type { Handles, PlatformId } from '../src/lib/coding-profiles/types';
 import type { Student, StudentsResponse } from '../src/lib/students/types';
+import { canonicalCampuses, normalizeBatch } from './_normalize';
 
 export const config = { runtime: 'edge' };
 
@@ -157,16 +158,21 @@ export default async function handler(): Promise<Response> {
     byPerson.set(identity, {
       id: await stableId(`${sheetId}:${identity}`),
       name,
-      campus: cell(row, 'campus') || 'Unknown campus',
+      campus: cell(row, 'campus'),
       course: cell(row, 'course'),
-      batch: cell(row, 'batch'),
+      batch: normalizeBatch(cell(row, 'batch')),
       handles,
       invalid,
     });
   }
 
+  // Campus is typed by hand for many rows, so merge spellings across the whole sheet.
+  const students = [...byPerson.values()];
+  const campusName = canonicalCampuses(students.map((student) => student.campus));
+  for (const student of students) student.campus = campusName(student.campus);
+
   const body: StudentsResponse = {
-    students: [...byPerson.values()],
+    students,
     fetchedAt: new Date().toISOString(),
   };
   // Shared-cache for a few seconds so many open dashboards do not each hit Google.
