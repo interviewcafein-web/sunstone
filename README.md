@@ -78,6 +78,22 @@ minutes; "Refresh stats" refetches everything.
 Table fetching is in `src/lib/coding-profiles/summaries.ts`; the detailed per-platform
 parsing is in `src/lib/coding-profiles/adapters.ts`.
 
+## Sharing
+
+Every student in the sheet has a short link, `/s/{name}-{4 characters}`, and a coding card
+at `/s/{slug}/card` (Download PNG, copy link, WhatsApp/LinkedIn/X), modelled on
+InterviewCafe's profile card.
+
+- `api/share.ts` serves `/s/...` on Vercel (see `vercel.json`) and rewrites the page's
+  link-preview tags for that student, so WhatsApp, LinkedIn and X show their name, numbers
+  and image. Only crawlers wait for the numbers; people get the page at once.
+- `api/stats.ts` works the numbers out server-side through the same adapters and relay,
+  cached at the edge for 6 hours (5 minutes if a platform failed to load).
+- `api/og.ts` (1200×630 preview) and `api/card.ts` (1080×1350 card, navy or light) draw
+  the images with `@vercel/og`. They run on the Node.js runtime because the edge runtime
+  will not compile the renderer's WebAssembly; their helpers are in the import-free
+  `api/_render.ts`.
+
 ## Deploy
 
 Import the repo in Vercel with the Vite preset and set `SHEET_ID` (and optionally
