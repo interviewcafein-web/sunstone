@@ -7,9 +7,21 @@ import path from 'path';
 import relay from './api/relay';
 import students from './api/students';
 
-const API_ROUTES: Record<string, (request: Request) => Promise<Response>> = {
+type Handler = (request: Request) => Promise<Response>;
+
+// The share-image functions pull in the image renderer, so load them on first use.
+const lazy =
+  (load: () => Promise<{ default: Handler }>): Handler =>
+  async (request) =>
+    (await load()).default(request);
+
+const API_ROUTES: Record<string, Handler> = {
   '/api/relay': relay,
   '/api/students': students,
+  '/api/stats': lazy(() => import('./api/stats')),
+  '/api/og': lazy(() => import('./api/og')),
+  '/api/card': lazy(() => import('./api/card')),
+  '/api/share': lazy(() => import('./api/share')),
 };
 
 // In production Vercel serves the files in api/ as Edge Functions. Locally there is no
@@ -21,12 +33,19 @@ function apiPlugin(): Plugin {
         const chunks: Buffer[] = [];
         for await (const chunk of req) chunks.push(chunk as Buffer);
 
-        const response = await handler(
-          new Request(`http://localhost${req.originalUrl ?? req.url}`, {
-            method: req.method,
-            body: req.method === 'POST' ? new Uint8Array(Buffer.concat(chunks)) : undefined,
-          })
-        );
+        let response: Response;
+        try {
+          response = await handler(
+            new Request(`http://${req.headers.host ?? 'localhost'}${req.originalUrl ?? req.url}`, {
+              method: req.method,
+              headers: { 'user-agent': req.headers['user-agent'] ?? '' },
+              body: req.method === 'POST' ? new Uint8Array(Buffer.concat(chunks)) : undefined,
+            })
+          );
+        } catch (error) {
+          console.error(`[${route}]`, error);
+          response = new Response(String(error), { status: 500 });
+        }
 
         res.statusCode = response.status;
         response.headers.forEach((value, key) => res.setHeader(key, value));

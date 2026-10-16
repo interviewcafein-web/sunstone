@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { Link, getRouteApi } from '@tanstack/react-router';
 import type { UseQueryResult } from '@tanstack/react-query';
-import { Check, ChevronRight, LayoutGrid, Link2, Loader2, Pencil } from 'lucide-react';
+import { Check, ChevronRight, IdCard, LayoutGrid, Link2, Loader2, Pencil } from 'lucide-react';
 
 import { Avatar } from '@/components/common/Avatar';
 import { CodingOverview } from '@/components/coding/CodingOverview';
@@ -18,6 +18,7 @@ import {
   type Platform,
   type PlatformId,
 } from '@/lib/coding-profiles/types';
+import type { Student } from '@/lib/students/types';
 import { cn } from '@/lib/utils';
 
 const route = getRouteApi('/profile');
@@ -27,19 +28,6 @@ type Tab = 'overview' | PlatformId;
 export default function ProfilesPage() {
   const { name, ...handles } = route.useSearch();
   const navigate = route.useNavigate();
-  const [tab, setTab] = useState<Tab>('overview');
-
-  const results = useCodingProfiles(handles);
-  const loaded = results.flatMap(({ query }) => (query.data ? [query.data] : []));
-  const hasHandles = results.length > 0;
-  const active = results.find(({ platform }) => platform.id === tab);
-
-  // A different person's handles: start again from the overview.
-  const handleKey = JSON.stringify(handles);
-  useEffect(() => setTab('overview'), [handleKey]);
-
-  // Editing the handles turns this into an ad-hoc lookup, so the student's name is dropped.
-  const submit = (next: Handles) => navigate({ search: next });
 
   // Campus and batch are not in the link; find this student in the sheet for the breadcrumb.
   const students = useStudents();
@@ -53,6 +41,40 @@ export default function ProfilesPage() {
           )
       )
     : undefined;
+
+  return (
+    <ProfileView
+      name={name}
+      handles={handles}
+      student={student}
+      // Editing the handles turns this into an ad-hoc lookup, so the student's name is dropped.
+      onSubmit={(next) => navigate({ search: next })}
+    />
+  );
+}
+
+interface ProfileViewProps {
+  name?: string;
+  handles: Handles;
+  /** The sheet row, when known: adds campus and batch, the short link and the coding card. */
+  student?: Student;
+  onSubmit: (handles: Handles) => void;
+}
+
+/** The whole profile: header, usernames, platform tabs and their panels. */
+export function ProfileView({ name, handles, student, onSubmit }: ProfileViewProps) {
+  const [tab, setTab] = useState<Tab>('overview');
+
+  const results = useCodingProfiles(handles);
+  const loaded = results.flatMap(({ query }) => (query.data ? [query.data] : []));
+  const hasHandles = results.length > 0;
+  const active = results.find(({ platform }) => platform.id === tab);
+
+  // A different person's handles: start again from the overview.
+  const handleKey = JSON.stringify(handles);
+  useEffect(() => setTab('overview'), [handleKey]);
+
+  const shareUrl = student ? `${window.location.origin}/s/${student.slug}` : undefined;
 
   return (
     <div className="rise-stagger space-y-5">
@@ -69,7 +91,21 @@ export default function ProfilesPage() {
             platform={active?.platform.name}
             onOverview={() => setTab('overview')}
           />
-          {hasHandles && <CopyLinkButton />}
+          {hasHandles && (
+            <div className="flex flex-wrap gap-2">
+              {student && (
+                <Link
+                  to="/s/$slug/card"
+                  params={{ slug: student.slug }}
+                  className="text-brand-800 hover:bg-brand-50 inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold"
+                >
+                  <IdCard className="size-3.5" aria-hidden />
+                  Coding card
+                </Link>
+              )}
+              <CopyLinkButton url={shareUrl} />
+            </div>
+          )}
         </div>
         <div className="relative flex items-center gap-4">
           {name && <Avatar name={name} className="size-14 text-base ring-4 ring-white/20" />}
@@ -91,11 +127,11 @@ export default function ProfilesPage() {
             Edit usernames
           </summary>
           <div className="border-t border-slate-100 p-1">
-            <HandleForm handles={handles} onSubmit={submit} />
+            <HandleForm handles={handles} onSubmit={onSubmit} />
           </div>
         </details>
       ) : (
-        <HandleForm handles={handles} onSubmit={submit} />
+        <HandleForm handles={handles} onSubmit={onSubmit} />
       )}
 
       {hasHandles && (
@@ -309,7 +345,7 @@ function PlatformTab({
   return <PlatformPanel platform={platform} profile={query.data} />;
 }
 
-function LoadingCard({ label }: { label: string }) {
+export function LoadingCard({ label }: { label: string }) {
   return (
     <Card>
       <p className="flex items-center gap-2 text-sm text-slate-600">
@@ -320,7 +356,8 @@ function LoadingCard({ label }: { label: string }) {
   );
 }
 
-function CopyLinkButton() {
+/** Copies `url` (the short link, when there is one) or else the address bar. */
+function CopyLinkButton({ url }: { url?: string }) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -331,7 +368,7 @@ function CopyLinkButton() {
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(url ?? window.location.href);
       setCopied(true);
     } catch {
       // Clipboard access denied: the link is still in the address bar.

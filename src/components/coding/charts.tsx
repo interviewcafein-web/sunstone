@@ -17,6 +17,7 @@ import {
 import { Card, CardHeader, formatDate, formatNumber } from '@/components/coding/ui';
 import { activityWindows, streaksOf } from '@/lib/coding-profiles/activity';
 import type { ContestPoint, CountItem, DifficultyRow, Kpi } from '@/lib/coding-profiles/types';
+import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const TICK = { fontSize: 11, fill: '#94A3B8' };
@@ -56,33 +57,87 @@ export function KpiGrid({ kpis, color }: { kpis: Kpi[]; color: string }) {
 
 // ----------------------------------------------------------- recent activity
 
-/** Yesterday / last 7 days / last 30 days: shows at a glance who has gone quiet. */
-export function ActivityWindows({ calendar }: { calendar: Record<string, number> }) {
+/**
+ * Yesterday / last 7 days / last 30 days, each with a trend against the period before and a
+ * small bar chart of its days: shows at a glance who has gone quiet or picked up pace.
+ */
+export function ActivityWindows({
+  calendar,
+  color,
+}: {
+  calendar: Record<string, number>;
+  color: string;
+}) {
   const windows = activityWindows(calendar);
-  const items = [
-    { label: 'Yesterday', value: windows.yesterday },
-    { label: 'Last 7 days', value: windows.week },
-    { label: 'Last 30 days', value: windows.month },
-  ];
 
   return (
-    <div className="grid grid-cols-3 divide-x divide-slate-200 rounded-2xl border border-slate-200 bg-white">
-      {items.map((item) => (
-        <div key={item.label} className="px-4 py-3">
-          <p className="text-[11px] font-medium tracking-wide text-slate-500 uppercase">
-            {item.label}
-          </p>
-          <p
-            className={cn(
-              'text-xl font-bold tabular-nums',
-              item.value ? 'text-slate-900' : 'text-slate-400'
-            )}
-          >
-            {formatNumber(item.value)}
-            <span className="ml-1 text-xs font-medium text-slate-500">submissions</span>
-          </p>
-        </div>
-      ))}
+    <div className="grid divide-slate-200 rounded-2xl border border-slate-200 bg-white sm:grid-cols-3 sm:divide-x max-sm:divide-y">
+      {windows.map((item) => {
+        const change = item.value - item.previous;
+        const max = Math.max(...item.series.map((day) => day.count), 1);
+        const last = item.series.length - 1;
+        return (
+          <div key={item.label} className="flex items-end justify-between gap-3 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium tracking-wide text-slate-500 uppercase">
+                {item.label}
+              </p>
+              <p
+                className={cn(
+                  'text-xl font-bold tabular-nums',
+                  item.value ? 'text-slate-900' : 'text-slate-400'
+                )}
+              >
+                {formatNumber(item.value)}
+                <span className="ml-1 text-xs font-medium text-slate-500">submissions</span>
+              </p>
+              <p
+                className={cn(
+                  'mt-0.5 inline-flex items-center gap-0.5 text-xs font-medium',
+                  change > 0 ? 'text-emerald-600' : change < 0 ? 'text-red-600' : 'text-slate-400'
+                )}
+              >
+                {change > 0 ? (
+                  <TrendingUp className="size-3.5" aria-hidden />
+                ) : change < 0 ? (
+                  <TrendingDown className="size-3.5" aria-hidden />
+                ) : (
+                  <Minus className="size-3.5" aria-hidden />
+                )}
+                {change === 0
+                  ? 'same as before'
+                  : `${change > 0 ? '+' : ''}${formatNumber(change)} vs previous`}
+              </p>
+            </div>
+            <svg
+              viewBox={`0 0 ${item.series.length * 6} 36`}
+              className="h-9 w-24 shrink-0"
+              preserveAspectRatio="none"
+              role="img"
+              aria-label={`Daily submissions, ${item.label.toLowerCase()}`}
+            >
+              {item.series.map((day, index) => {
+                const height = day.count ? Math.max(3, (day.count / max) * 36) : 2;
+                const current = item.label === 'Yesterday' ? index === last : true;
+                return (
+                  <rect
+                    key={day.date}
+                    x={index * 6 + 0.75}
+                    y={36 - height}
+                    width={4.5}
+                    height={height}
+                    rx={1}
+                    fill={day.count ? color : '#E2E8F0'}
+                    fillOpacity={day.count ? (current ? 1 : 0.35) : 1}
+                  >
+                    <title>{`${day.date}: ${day.count}`}</title>
+                  </rect>
+                );
+              })}
+            </svg>
+          </div>
+        );
+      })}
     </div>
   );
 }

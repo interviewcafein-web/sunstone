@@ -3,6 +3,8 @@ import type { Handles, PlatformId } from '../coding-profiles/types';
 export interface Student {
   /** Stable across sheet edits; derived server-side so no contact detail reaches the browser. */
   id: string;
+  /** Short, readable URL key: /s/{slug}, e.g. "ankit-vishwakarma-3f2a". */
+  slug: string;
   name: string;
   campus: string;
   course: string;

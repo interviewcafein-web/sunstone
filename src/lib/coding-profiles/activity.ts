@@ -46,19 +46,31 @@ export function streaksOf(calendar: Record<string, number>) {
   return { activeDays: days.length, best, current };
 }
 
-/** Submissions yesterday and in the last 7 and 30 days (each window ends today). */
+/** Daily counts for the `days` days ending `endOffset` days before today, oldest first. */
+export function dailySeries(calendar: Record<string, number>, days: number, endOffset = 0) {
+  const today = todayUtc().getTime();
+  return Array.from({ length: days }, (_, index) => {
+    const date = isoDay(new Date(today - (endOffset + days - 1 - index) * DAY_MS));
+    return { date, count: calendar[date] || 0 };
+  });
+}
+
+const total = (series: { count: number }[]) => series.reduce((sum, day) => sum + day.count, 0);
+
+/**
+ * Yesterday, the last 7 days and the last 30 days, each with the period just before it
+ * for comparison and the daily counts to draw. The 7- and 30-day windows end today.
+ */
 export function activityWindows(calendar: Record<string, number>) {
-  const today = todayUtc();
-  const sumSince = (daysBack: number) => {
-    let total = 0;
-    for (let offset = 0; offset < daysBack; offset++) {
-      total += calendar[isoDay(new Date(today.getTime() - offset * DAY_MS))] || 0;
-    }
-    return total;
+  const window = (label: string, days: number, endOffset: number) => {
+    const series = dailySeries(calendar, days, endOffset);
+    return {
+      label,
+      value: total(series),
+      previous: total(dailySeries(calendar, days, endOffset + days)),
+      // Yesterday alone is one bar, so draw the week leading up to it instead.
+      series: days === 1 ? dailySeries(calendar, 7, endOffset) : series,
+    };
   };
-  return {
-    yesterday: calendar[isoDay(new Date(today.getTime() - DAY_MS))] || 0,
-    week: sumSince(7),
-    month: sumSince(30),
-  };
+  return [window('Yesterday', 1, 1), window('Last 7 days', 7, 0), window('Last 30 days', 30, 0)];
 }

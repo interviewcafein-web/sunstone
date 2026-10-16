@@ -1,3 +1,7 @@
 {
-  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/s/:slug/card", "destination": "/api/share?slug=:slug&card=1" },
+    { "source": "/s/:slug", "destination": "/api/share?slug=:slug" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
 }

@@ -77,7 +77,7 @@ export function PlatformPanel({
 
       <KpiGrid kpis={profile.kpis} color={color} />
 
-      {hasCalendar && <ActivityWindows calendar={profile.calendar} />}
+      {hasCalendar && <ActivityWindows calendar={profile.calendar} color={color} />}
 
       {platform.id === 'leetcode' && profile.difficulty[0] && (
         <DifficultyBreakdown rows={profile.difficulty[0].rows} />

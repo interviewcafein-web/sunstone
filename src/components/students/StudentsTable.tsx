@@ -75,8 +75,8 @@ export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
                   <Avatar name={student.name} />
                   <div className="min-w-0">
                     <Link
-                      to="/profile"
-                      search={{ ...student.handles, name: student.name }}
+                      to="/s/$slug"
+                      params={{ slug: student.slug }}
                       className="text-brand-700 font-semibold hover:underline"
                     >
                       {student.name}

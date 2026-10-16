@@ -21,6 +21,13 @@ type AdapterResult = Omit<CodingProfile, 'platform' | 'username'>;
 
 const RELAY_PATH = '/api/relay';
 
+// In the browser the relay is same-origin. Server-side (the share-image functions) there is
+// no origin, so they set this to the deployment's own URL first.
+let relayOrigin = '';
+export function setRelayOrigin(origin: string) {
+  relayOrigin = origin.replace(/\/+$/, '');
+}
+
 interface RequestOptions {
   direct?: boolean;
   init?: RequestInit;
@@ -30,7 +37,7 @@ interface RequestOptions {
 
 export async function request<T = any>(url: string, options: RequestOptions = {}): Promise<T> {
   const { direct = false, init, as = 'json', notFound = [404] } = options;
-  const target = direct ? url : `${RELAY_PATH}?url=${encodeURIComponent(url)}`;
+  const target = direct ? url : `${relayOrigin}${RELAY_PATH}?url=${encodeURIComponent(url)}`;
 
   let response: Response;
   try {

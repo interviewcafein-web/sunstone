@@ -100,6 +100,15 @@ async function stableId(seed: string): Promise<string> {
     .join('');
 }
 
+/** "Ankit  Vishwakarma " → "ankit-vishwakarma". */
+const slugify = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40) || 'student';
+
 const clean = (value: string | undefined) => (value ?? '').replace(/\s+/g, ' ').trim();
 
 function reply(status: number, body: unknown, cache = 'no-store'): Response {
@@ -155,8 +164,10 @@ export default async function handler(): Promise<Response> {
     }
 
     const identity = cell(row, 'email').toLowerCase() || name.toLowerCase();
+    const id = await stableId(`${sheetId}:${identity}`);
     byPerson.set(identity, {
-      id: await stableId(`${sheetId}:${identity}`),
+      id,
+      slug: `${slugify(name)}-${id.slice(0, 4)}`,
       name,
       campus: cell(row, 'campus'),
       course: cell(row, 'course'),
