@@ -10,6 +10,7 @@ import {
   formatNumber,
   h,
   headline,
+  imageResponse,
   initials,
   loadFonts,
   notFound,
@@ -305,20 +306,19 @@ export default async function handler(request: Request): Promise<Response> {
   );
 
   const headers: Record<string, string> = {
-    'Cache-Control': cacheFor(stats),
+    'cache-control': cacheFor(stats),
   };
   if (url.searchParams.get('download')) {
     const name = stats.name.replace(/[\\/:*?"<>|\r\n]+/g, ' ').trim() || stats.slug;
     const file = `${name} - Sunstone PRIME Coding Card.png`;
     const ascii = file.replace(/[^\x20-\x7e]/g, '').trim() || 'Sunstone PRIME Coding Card.png';
-    headers['Content-Disposition'] =
+    headers['content-disposition'] =
       `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(file)}`;
   }
 
-  return new ImageResponse(image as never, {
-    width: 1080,
-    height: 1350,
-    fonts: await loadFonts(url.origin),
-    headers,
-  });
+  const fonts = await loadFonts(url.origin);
+  return imageResponse(
+    () => new ImageResponse(image as never, { width: 1080, height: 1350, fonts }),
+    headers
+  );
 }

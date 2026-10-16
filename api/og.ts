@@ -11,6 +11,7 @@ import {
   formatNumber,
   h,
   headline,
+  imageResponse,
   initials,
   loadFonts,
   notFound,
@@ -185,12 +186,9 @@ export default async function handler(request: Request): Promise<Response> {
     )
   );
 
-  return new ImageResponse(image as never, {
-    width: 1200,
-    height: 630,
-    fonts: await loadFonts(url.origin),
-    headers: {
-      'Cache-Control': cacheFor(stats),
-    },
-  });
+  const fonts = await loadFonts(url.origin);
+  return imageResponse(
+    () => new ImageResponse(image as never, { width: 1200, height: 630, fonts }),
+    { 'cache-control': cacheFor(stats) }
+  );
 }

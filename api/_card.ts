@@ -176,6 +176,26 @@ export async function loadFonts(origin: string) {
   );
 }
 
+/**
+ * Renders fully before answering. ImageResponse streams, so a rendering error would
+ * otherwise go out as an empty 200 image; this returns a 500 with the message instead.
+ * The header key is lower-case to replace (not add to) the renderer's one-year cache.
+ */
+export async function imageResponse(
+  render: () => Response,
+  headers: Record<string, string>
+): Promise<Response> {
+  try {
+    const png = await render().arrayBuffer();
+    return new Response(png, { headers: { 'content-type': 'image/png', ...headers } });
+  } catch (error) {
+    return new Response(JSON.stringify({ error: String(error) }), {
+      status: 500,
+      headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+    });
+  }
+}
+
 export const notFound = () =>
   new Response(JSON.stringify({ error: 'Student not found' }), {
     status: 404,

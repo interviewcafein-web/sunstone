@@ -39,8 +39,8 @@ export default async function handler(request: Request): Promise<Response> {
     const page = `${origin}/s/${student.slug}${isCard ? '/card' : ''}`;
     // ?v= changes with the design, so apps that cache previews fetch the new image.
     const image = isCard
-      ? `${origin}/api/card?s=${student.slug}&theme=dark&v=1`
-      : `${origin}/api/og?s=${student.slug}&v=1`;
+      ? `${origin}/api/card?s=${student.slug}&theme=dark&v=2`
+      : `${origin}/api/og?s=${student.slug}&v=2`;
 
     html = html.replace(/<title>[^<]*<\/title>/, `<title>${escapeAttribute(title)}</title>`);
     html = setMeta(html, 'name', 'description', description);
