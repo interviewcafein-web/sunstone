@@ -7,6 +7,7 @@ import {
   INK,
   LINE,
   MUTED,
+  NAVY,
   ReportFooter,
   ReportHeader,
   SOFT,
@@ -39,6 +40,8 @@ export interface CampusReportData {
   filters: string[];
   generatedAt: Date;
   rows: CampusReportRow[];
+  /** One report covering every campus: a comparison page, then each campus in turn. */
+  allCampuses?: boolean;
 }
 
 const SHORT: Record<PlatformId, string> = {
@@ -98,6 +101,57 @@ const COLUMNS = {
 };
 
 export function CampusReport({ data }: { data: CampusReportData }) {
+  const label = [data.title, ...data.filters].join(' · ');
+  const document = (children: React.ReactNode) => (
+    <Document
+      title={`Coding Profile Report – ${label}`}
+      author="Sunstone PRIME"
+      subject="Students by coding practice zone"
+    >
+      {children}
+    </Document>
+  );
+
+  if (!data.allCampuses) {
+    return document(<CampusPages data={data} kind="Campus Coding Report" withHeader />);
+  }
+
+  // All campuses: overall summary, campus comparison, then every campus's own pages.
+  const campuses = [...new Set(data.rows.map((row) => row.campus))].sort(
+    (a, b) =>
+      data.rows.filter((row) => row.campus === b).length -
+        data.rows.filter((row) => row.campus === a).length || a.localeCompare(b)
+  );
+  return document(
+    <>
+      <CampusPages data={data} kind="All-Campus Coding Report" withHeader summaryOnly />
+      <ComparisonPage data={data} campuses={campuses} label={label} />
+      {campuses.map((campus) => (
+        <CampusPages
+          key={campus}
+          data={{ ...data, title: campus, rows: data.rows.filter((row) => row.campus === campus) }}
+          kind="Campus Coding Report"
+        />
+      ))}
+    </>
+  );
+}
+
+/**
+ * A campus's summary page and its zone tables. `withHeader` draws the navy branded band
+ * (the first page of the file); later campuses start with a compact title instead.
+ */
+function CampusPages({
+  data,
+  kind,
+  withHeader = false,
+  summaryOnly = false,
+}: {
+  data: CampusReportData;
+  kind: string;
+  withHeader?: boolean;
+  summaryOnly?: boolean;
+}) {
   const { rows } = data;
   const solved = rows.reduce((sum, row) => sum + row.total, 0);
   const linked = rows.filter((row) => row.zone.zone !== 'none');
@@ -112,18 +166,14 @@ export function CampusReport({ data }: { data: CampusReportData }) {
   const label = [data.title, ...data.filters].join(' · ');
 
   return (
-    <Document
-      title={`Coding Profile Report – ${label}`}
-      author="Sunstone PRIME"
-      subject="Students by coding practice zone"
-    >
+    <>
       {/* ── Summary page ── */}
       <Page size="A4" orientation="landscape" style={base.page}>
-        <ReportHeader
-          origin={data.origin}
-          kind="Campus Coding Report"
-          generatedAt={data.generatedAt}
-        />
+        {withHeader ? (
+          <ReportHeader origin={data.origin} kind={kind} generatedAt={data.generatedAt} />
+        ) : (
+          <CampusBand origin={data.origin} kind={kind} />
+        )}
         <View style={{ paddingHorizontal: 32, paddingTop: 18 }}>
           <Text style={{ fontSize: 22, fontWeight: 800 }}>{data.title}</Text>
           <Text style={{ fontSize: 10, color: MUTED, marginTop: 4 }}>
@@ -267,7 +317,9 @@ export function CampusReport({ data }: { data: CampusReportData }) {
                   <View style={{ flexGrow: 1 }}>
                     <Text style={{ fontWeight: 600 }}>{row.name}</Text>
                     <Text style={{ fontSize: 7.5, color: MUTED }}>
-                      {[row.course, row.batch && `Batch ${row.batch}`].filter(Boolean).join(' · ')}
+                      {[summaryOnly && row.campus, row.course, row.batch && `Batch ${row.batch}`]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </Text>
                   </View>
                   <Text style={{ fontWeight: 700, fontSize: 11 }}>{formatNumber(row.total)}</Text>
@@ -281,66 +333,199 @@ export function CampusReport({ data }: { data: CampusReportData }) {
       </Page>
 
       {/* ── One section per zone ── */}
-      <Page
-        size="A4"
-        orientation="landscape"
-        style={[base.page, { paddingTop: 28, paddingHorizontal: 32 }]}
-        wrap
-      >
-        {byZone.map(({ zone, rows: zoneRows }) => (
-          <View key={zone.id} style={{ marginBottom: 18 }}>
-            {/* Heading and column titles stay together, with at least a row after them. */}
-            <View wrap={false} minPresenceAhead={36}>
-              <View
-                style={{
-                  backgroundColor: zone.tint,
-                  borderLeftWidth: 5,
-                  borderLeftColor: zone.color,
-                  borderRadius: 6,
-                  paddingVertical: 8,
-                  paddingHorizontal: 12,
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}
-              >
-                <View>
-                  <Text style={{ fontSize: 13, fontWeight: 800, color: zone.color }}>
-                    {zone.label} · {zoneRows.length}{' '}
-                    {zoneRows.length === 1 ? 'student' : 'students'}
-                  </Text>
-                  <Text style={{ fontSize: 8.5, color: '#334155', marginTop: 2 }}>
-                    {zone.advice}
-                  </Text>
+      {!summaryOnly && (
+        <Page
+          size="A4"
+          orientation="landscape"
+          style={[base.page, { paddingTop: 28, paddingHorizontal: 32 }]}
+          wrap
+        >
+          {byZone.map(({ zone, rows: zoneRows }) => (
+            <View key={zone.id} style={{ marginBottom: 18 }}>
+              {/* Heading and column titles stay together, with at least a row after them. */}
+              <View wrap={false} minPresenceAhead={36}>
+                <View
+                  style={{
+                    backgroundColor: zone.tint,
+                    borderLeftWidth: 5,
+                    borderLeftColor: zone.color,
+                    borderRadius: 6,
+                    paddingVertical: 8,
+                    paddingHorizontal: 12,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <View>
+                    <Text style={{ fontSize: 13, fontWeight: 800, color: zone.color }}>
+                      {zone.label} · {zoneRows.length}{' '}
+                      {zoneRows.length === 1 ? 'student' : 'students'}
+                    </Text>
+                    <Text style={{ fontSize: 8.5, color: '#334155', marginTop: 2 }}>
+                      {zone.advice}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 8.5, fontWeight: 600, color: MUTED }}>{zone.rule}</Text>
                 </View>
-                <Text style={{ fontSize: 8.5, fontWeight: 600, color: MUTED }}>{zone.rule}</Text>
+                {zoneRows.length === 0 ? (
+                  <Text style={{ fontSize: 8.5, color: MUTED, marginTop: 6, marginLeft: 4 }}>
+                    No students in this zone.
+                  </Text>
+                ) : (
+                  <TableHeader origin={data.origin} />
+                )}
               </View>
-              {zoneRows.length === 0 ? (
-                <Text style={{ fontSize: 8.5, color: MUTED, marginTop: 6, marginLeft: 4 }}>
-                  No students in this zone.
-                </Text>
-              ) : (
-                <TableHeader origin={data.origin} />
+
+              {zoneRows.length > 0 && (
+                <>
+                  {zoneRows.map((row, index) => (
+                    <TableRow
+                      key={`${row.name}-${index}`}
+                      row={row}
+                      index={index}
+                      origin={data.origin}
+                    />
+                  ))}
+                </>
               )}
             </View>
+          ))}
+          <ReportFooter label={label} />
+        </Page>
+      )}
+    </>
+  );
+}
 
-            {zoneRows.length > 0 && (
-              <>
-                {zoneRows.map((row, index) => (
-                  <TableRow
-                    key={`${row.name}-${index}`}
-                    row={row}
-                    index={index}
-                    origin={data.origin}
-                  />
-                ))}
-              </>
-            )}
-          </View>
+/** Slim navy strip that opens each campus inside the all-campus report. */
+function CampusBand({ origin, kind }: { origin: string; kind: string }) {
+  return (
+    <View
+      style={{
+        backgroundColor: NAVY,
+        paddingVertical: 9,
+        paddingHorizontal: 32,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+      }}
+    >
+      <Image src={`${origin}/sunstone-logo-white.png`} style={{ width: 100, height: 13 }} />
+      <Text style={{ color: 'white', fontSize: 9, fontWeight: 600 }}>{kind}</Text>
+    </View>
+  );
+}
+
+/** One row per campus: size, zone counts and mix, average solved and recent activity. */
+function ComparisonPage({
+  data,
+  campuses,
+  label,
+}: {
+  data: CampusReportData;
+  campuses: string[];
+  label: string;
+}) {
+  const widths = { campus: 210, students: 50, zone: 54, mix: 120, average: 52, active: 56 };
+  const head = { fontSize: 7, fontWeight: 700, color: MUTED, letterSpacing: 0.4 } as const;
+
+  return (
+    <Page
+      size="A4"
+      orientation="landscape"
+      style={[base.page, { paddingTop: 28, paddingHorizontal: 32 }]}
+      wrap
+    >
+      <Text style={{ fontSize: 16, fontWeight: 800 }}>Campus comparison</Text>
+      <Text style={{ fontSize: 8.5, color: MUTED, marginTop: 3, marginBottom: 10 }}>
+        Every campus at a glance. Each campus has its own summary and zone lists after this page,
+        largest campus first.
+      </Text>
+
+      <View
+        fixed
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 6,
+          paddingHorizontal: 4,
+          borderBottomWidth: 1,
+          borderBottomColor: INK,
+        }}
+      >
+        <Text style={[head, { width: widths.campus }]}>CAMPUS</Text>
+        <Text style={[head, { width: widths.students, textAlign: 'right' }]}>STUDENTS</Text>
+        {ZONES.map((zone) => (
+          <Text
+            key={zone.id}
+            style={[head, { width: widths.zone, textAlign: 'right', color: zone.color }]}
+          >
+            {zone.id === 'none' ? 'NOT LINKED' : zone.label.replace(' zone', '').toUpperCase()}
+          </Text>
         ))}
-        <ReportFooter label={label} />
-      </Page>
-    </Document>
+        <Text style={[head, { width: widths.mix, paddingLeft: 14 }]}>ZONE MIX</Text>
+        <Text style={[head, { width: widths.average, textAlign: 'right' }]}>AVG SOLVED</Text>
+        <Text style={[head, { width: widths.active, textAlign: 'right' }]}>ACTIVE 7D</Text>
+      </View>
+
+      {campuses.map((campus, index) => {
+        const rows = data.rows.filter((row) => row.campus === campus);
+        const counts = ZONES.map((zone) => rows.filter((row) => row.zone.zone === zone.id).length);
+        const solved = rows.reduce((sum, row) => sum + row.total, 0);
+        const active = rows.filter((row) => (daysSince(row.lastActive) ?? 999) <= 7).length;
+        return (
+          <View
+            key={campus}
+            wrap={false}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: 6,
+              paddingHorizontal: 4,
+              borderBottomWidth: 0.75,
+              borderBottomColor: '#cbd5e1',
+              borderBottomStyle: 'dotted',
+              backgroundColor: index % 2 ? '#fbfcfe' : 'white',
+            }}
+          >
+            <Text style={{ width: widths.campus, fontWeight: 600, paddingRight: 8 }}>{campus}</Text>
+            <Text style={{ width: widths.students, textAlign: 'right', fontWeight: 700 }}>
+              {formatNumber(rows.length)}
+            </Text>
+            {counts.map((count, zoneIndex) => (
+              <Text
+                key={ZONES[zoneIndex].id}
+                style={{ width: widths.zone, textAlign: 'right', color: count ? INK : '#cbd5e1' }}
+              >
+                {formatNumber(count)}
+              </Text>
+            ))}
+            <View style={{ width: widths.mix, paddingLeft: 14 }}>
+              <View
+                style={{ flexDirection: 'row', height: 6, borderRadius: 3, overflow: 'hidden' }}
+              >
+                {counts.map((count, zoneIndex) =>
+                  count ? (
+                    <View
+                      key={ZONES[zoneIndex].id}
+                      style={{ flexGrow: count, backgroundColor: ZONES[zoneIndex].color }}
+                    />
+                  ) : null
+                )}
+              </View>
+            </View>
+            <Text style={{ width: widths.average, textAlign: 'right' }}>
+              {formatNumber(rows.length ? Math.round(solved / rows.length) : 0)}
+            </Text>
+            <Text style={{ width: widths.active, textAlign: 'right', color: MUTED }}>
+              {rows.length ? `${Math.round((active / rows.length) * 100)}%` : '—'}
+            </Text>
+          </View>
+        );
+      })}
+      <ReportFooter label={label} />
+    </Page>
   );
 }
 

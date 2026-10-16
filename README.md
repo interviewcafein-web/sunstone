@@ -102,7 +102,9 @@ yellow 50–99, orange 25–49, red under 25, and "Not linked" when no username 
 rules live in `src/lib/students/zones.ts`.
 
 - **Campus report:** choose a campus on the students page and use "Download campus
-  report" once every profile has loaded. It is a landscape PDF with a summary page and one
+  report" once every profile has loaded. With no campus chosen, "Download all-campus
+  report" creates one PDF: an overall summary, a campus comparison page, then each campus's
+  own summary and zone lists (largest campus first). It is a landscape PDF with a summary page and one
   section per zone.
 - **Student report:** "Download PDF" on any profile.
 

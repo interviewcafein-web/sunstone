@@ -14,6 +14,8 @@ interface ZonePanelProps {
     /** Why the report cannot be downloaded yet, if it cannot. */
     blocker?: string;
     state: 'idle' | 'busy' | 'failed';
+    /** Button text, e.g. "Download campus report". */
+    label: string;
     onDownload: () => void;
   };
 }
@@ -69,7 +71,7 @@ export function ZonePanel({ rows, active, onZone, report }: ZonePanelProps) {
             ) : (
               <FileDown className="size-4" aria-hidden />
             )}
-            {report.state === 'busy' ? 'Preparing PDF…' : 'Download campus report'}
+            {report.state === 'busy' ? 'Preparing PDF…' : report.label}
           </button>
           {(report.blocker || report.state === 'failed') && (
             <p

@@ -173,15 +173,14 @@ export default function StudentsPage() {
   const shown = search.zone ? rows.filter((row) => row.zone?.zone === search.zone) : rows;
   const [reportState, setReportState] = useState<'idle' | 'busy' | 'failed'>('idle');
 
-  // A campus report covers every student in the campus (and batch/course filters), so it
-  // waits until every profile has loaded and ignores the name search and zone filter.
-  const reportBlocker = !search.campus
-    ? 'Choose a campus to download its report.'
-    : search.q
-      ? 'Clear the name search so the report includes every student.'
-      : summaries.settled < summaries.total
-        ? `Loading profiles: ${summaries.settled} of ${summaries.total}.`
-        : undefined;
+  // The report covers every student in the chosen campus (or every campus) and batch/course
+  // filters, so it waits until every profile has loaded and ignores the name search and zone
+  // filter. Without a campus it covers all campuses, one after another.
+  const reportBlocker = search.q
+    ? 'Clear the name search so the report includes every student.'
+    : summaries.settled < summaries.total
+      ? `Loading profiles: ${summaries.settled} of ${summaries.total}.`
+      : undefined;
 
   const downloadReport = async () => {
     setReportState('busy');
@@ -195,6 +194,7 @@ export default function StudentsPage() {
         ),
         generatedAt: new Date(),
         rows: rows.map(toReportRow),
+        allCampuses: !search.campus,
       });
       setReportState('idle');
     } catch (error) {
@@ -271,6 +271,7 @@ export default function StudentsPage() {
         report={{
           blocker: reportBlocker,
           state: reportState,
+          label: search.campus ? 'Download campus report' : 'Download all-campus report',
           onDownload: downloadReport,
         }}
       />
