@@ -4,7 +4,7 @@
 
 import { ImageResponse } from '@vercel/og';
 
-import { LOGO_DATA } from './_logos';
+import { LOGO_DATA } from './_logos.js';
 import {
   cacheFor,
   cachedStats,
@@ -15,9 +15,7 @@ import {
   initials,
   loadFonts,
   notFound,
-} from './_card';
-
-export const config = { runtime: 'edge' };
+} from './_render.js';
 
 const NAVY = '#1a3e70';
 const INK = '#0f172a';
@@ -25,7 +23,9 @@ const MUTED = '#64748b';
 const LINE = '#e2e8f0';
 const GOLD = '#d97706';
 
-export default async function handler(request: Request): Promise<Response> {
+// Node.js runtime: the image renderer needs WebAssembly, which Vercel's edge runtime
+// refuses to compile outside Next.js.
+export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const stats = await cachedStats(url.origin, url.searchParams.get('s') ?? '');
   if (!stats) return notFound();

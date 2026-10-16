@@ -11,9 +11,12 @@ type Handler = (request: Request) => Promise<Response>;
 
 // The share-image functions pull in the image renderer, so load them on first use.
 const lazy =
-  (load: () => Promise<{ default: Handler }>): Handler =>
-  async (request) =>
-    (await load()).default(request);
+  (load: () => Promise<{ default?: Handler; GET?: Handler }>): Handler =>
+  async (request) => {
+    const module = await load();
+    // Node.js-runtime functions export GET; edge functions export a default handler.
+    return (module.GET ?? module.default!)(request);
+  };
 
 const API_ROUTES: Record<string, Handler> = {
   '/api/relay': relay,
