@@ -1,7 +1,9 @@
 // Zones group students by how much they have practised, so a campus head can see at a
-// glance who needs attention. One count decides the zone: LeetCode solved if the student
-// has a usable LeetCode, otherwise the next platform in ZONE_BASIS. GitHub never counts,
-// since it measures contributions rather than problems solved.
+// glance who needs attention. One count decides the zone: the student's BEST solved count
+// on any single platform in ZONE_BASIS (LeetCode, GeeksforGeeks, Codeforces, CodeChef).
+// Counts are not added across platforms (easy problems would inflate them), HackerRank is
+// left out (mostly basic problems) and GitHub never counts (contributions, not problems).
+// InterviewCafe's batch reports use the same rule.
 
 import type { PlatformId } from '../coding-profiles/types';
 
@@ -59,21 +61,15 @@ export const ZONES: Zone[] = [
   {
     id: 'none',
     label: 'Not linked',
-    rule: 'No usable username',
-    advice: 'No usable coding profile. Ask them to fix their entry in the form.',
+    rule: 'No LeetCode / GFG / Codeforces / CodeChef',
+    advice: 'No usable DSA profile. Ask them to fix their entry in the form.',
     color: '#64748b',
     tint: '#f1f5f9',
   },
 ];
 
-/** Which platform's solved count decides the zone, in order of preference. */
-export const ZONE_BASIS: PlatformId[] = [
-  'leetcode',
-  'geeksforgeeks',
-  'codeforces',
-  'codechef',
-  'hackerrank',
-];
+/** Platforms whose solved count can decide the zone; the highest one wins. */
+export const ZONE_BASIS: PlatformId[] = ['leetcode', 'geeksforgeeks', 'codeforces', 'codechef'];
 
 export const zoneById = (id: ZoneId) => ZONES.find((zone) => zone.id === id)!;
 
@@ -89,7 +85,13 @@ export interface ZoneResult {
  * linked, not found or has an unusable entry is simply absent.
  */
 export function zoneOf(solved: Partial<Record<PlatformId, number>>): ZoneResult {
-  const basis = ZONE_BASIS.find((platform) => solved[platform] !== undefined);
+  // Best single platform; on a tie the earlier one in ZONE_BASIS (LeetCode first) wins.
+  let basis: PlatformId | undefined;
+  for (const platform of ZONE_BASIS) {
+    const count = solved[platform];
+    if (count === undefined) continue;
+    if (basis === undefined || count > solved[basis]!) basis = platform;
+  }
   if (!basis) return { zone: 'none' };
   const count = solved[basis]!;
   const zone = ZONES.find((item) => item.min !== undefined && count >= item.min)!;

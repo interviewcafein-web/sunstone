@@ -2,6 +2,7 @@ import { FileDown, Info, Loader2 } from 'lucide-react';
 
 import type { StudentRow } from '@/components/students/StudentsTable';
 import { PLATFORMS } from '@/lib/coding-profiles/platforms';
+import { PlatformLogo } from '@/components/profile/PlatformLogo';
 import { ZONE_BASIS, ZONES, type ZoneId } from '@/lib/students/zones';
 import { cn } from '@/lib/utils';
 
@@ -25,7 +26,7 @@ export function ZonePanel({ rows, active, onZone, report }: ZonePanelProps) {
   const pending = rows.filter((row) => !row.zone).length;
   const basisNames = ZONE_BASIS.map(
     (id) => PLATFORMS.find((platform) => platform.id === id)!.name
-  ).join(' → ');
+  ).join(', ');
 
   return (
     <section className="shadow-card bg-surface rounded-2xl border border-slate-200 p-4">
@@ -34,18 +35,25 @@ export function ZonePanel({ rows, active, onZone, report }: ZonePanelProps) {
           <h2 className="flex items-center gap-1.5 text-sm font-semibold">
             Practice zones
             <span
-              title={`Placed by problems solved on the first usable platform: ${basisNames}. GitHub is not used.`}
+              title={`Placed by the best solved count on any one of: ${basisNames}. Platforms are not added together; HackerRank and GitHub are not used.`}
               className="text-slate-400"
             >
               <Info className="size-3.5" aria-hidden />
               <span className="sr-only">
-                Placed by problems solved on the first usable platform: {basisNames}.
+                Placed by the best solved count on any one of: {basisNames}.
               </span>
             </span>
           </h2>
-          <p className="text-xs text-slate-500">
-            By LeetCode solved, or the next platform if there is no LeetCode. Click a zone to list
-            only those students.
+          <p className="flex flex-wrap items-center gap-x-1 gap-y-0.5 text-xs text-slate-500">
+            By the best solved count on one platform:
+            {ZONE_BASIS.map((id, i) => (
+              <span key={id} className="inline-flex items-center gap-1 font-medium text-slate-600">
+                <PlatformLogo platform={id} className="size-3" />
+                {PLATFORMS.find((platform) => platform.id === id)!.name}
+                {i < ZONE_BASIS.length - 1 ? ',' : '.'}
+              </span>
+            ))}
+            Click a zone to list only those students.
           </p>
         </div>
 

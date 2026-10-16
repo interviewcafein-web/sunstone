@@ -400,6 +400,13 @@ function ZonePill({ zone }: { zone: ZoneResult }) {
     >
       <span className="size-1.5 rounded-full" style={{ backgroundColor: info.color }} />
       {info.label}
+      {basis && (
+        <>
+          <span className="opacity-60">·</span>
+          {zone.count}
+          <PlatformLogo platform={basis.id} className="size-2.5" />
+        </>
+      )}
     </span>
   );
 }

@@ -1,4 +1,4 @@
-import { Document, Page, Text, View } from '@react-pdf/renderer';
+import { Document, Image, Page, Text, View } from '@react-pdf/renderer';
 
 import { activityWindows, mergeCalendars, streaksOf } from '@/lib/coding-profiles/activity';
 import { PLATFORMS } from '@/lib/coding-profiles/platforms';
@@ -105,11 +105,24 @@ export function StudentReport({ data }: { data: StudentReportData }) {
               <Text style={{ fontSize: 11, fontWeight: 800, color: zoneInfo.color }}>
                 {zoneInfo.label}
               </Text>
-              <Text style={{ fontSize: 7.5, color: '#334155', marginTop: 2 }}>
-                {zone.basis
-                  ? `${formatNumber(zone.count ?? 0)} solved on ${platformOf(zone.basis).name}`
-                  : 'No usable coding profile'}
-              </Text>
+              {zone.basis ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                  <Text style={{ fontSize: 7.5, color: '#334155', marginRight: 3 }}>
+                    {formatNumber(zone.count ?? 0)} solved on
+                  </Text>
+                  <Image
+                    src={`${data.origin}/reports/platforms/${zone.basis}.png`}
+                    style={{ width: 8, height: 8, marginRight: 2.5, objectFit: 'contain' }}
+                  />
+                  <Text style={{ fontSize: 7.5, color: '#334155' }}>
+                    {platformOf(zone.basis).name}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={{ fontSize: 7.5, color: '#334155', marginTop: 2 }}>
+                  No usable DSA profile
+                </Text>
+              )}
             </View>
           </View>
 
@@ -172,7 +185,7 @@ export function StudentReport({ data }: { data: StudentReportData }) {
 
           <Text style={[base.sectionTitle, { marginTop: 18 }]}>Platforms</Text>
           {profiles.map((profile) => (
-            <PlatformSection key={profile.platform} profile={profile} />
+            <PlatformSection key={profile.platform} profile={profile} origin={data.origin} />
           ))}
         </View>
         <ReportFooter label={data.name} />
@@ -181,7 +194,7 @@ export function StudentReport({ data }: { data: StudentReportData }) {
   );
 }
 
-function PlatformSection({ profile }: { profile: CodingProfile }) {
+function PlatformSection({ profile, origin }: { profile: CodingProfile; origin: string }) {
   const platform = platformOf(profile.platform);
   const rows = profile.difficulty.flatMap((group) => group.rows);
   const maxRow = Math.max(1, ...rows.map((row) => row.total ?? row.solved));
@@ -200,10 +213,16 @@ function PlatformSection({ profile }: { profile: CodingProfile }) {
       }}
     >
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ fontSize: 11, fontWeight: 700 }}>
-          {platform.name}
-          {profile.rankTitle ? `  ·  ${stars(profile.rankTitle)}` : ''}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Image
+            src={`${origin}/reports/platforms/${platform.id}.png`}
+            style={{ width: 13, height: 13, marginRight: 5, objectFit: 'contain' }}
+          />
+          <Text style={{ fontSize: 11, fontWeight: 700 }}>
+            {platform.name}
+            {profile.rankTitle ? `  ·  ${stars(profile.rankTitle)}` : ''}
+          </Text>
+        </View>
         <Text style={{ fontSize: 8, color: MUTED }}>@{profile.username}</Text>
       </View>
 

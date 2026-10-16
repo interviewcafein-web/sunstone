@@ -1,4 +1,4 @@
-import { Document, Page, Text, View } from '@react-pdf/renderer';
+import { Document, Image, Page, Text, View } from '@react-pdf/renderer';
 
 import { PLATFORMS } from '@/lib/coding-profiles/platforms';
 import type { PlatformId } from '@/lib/coding-profiles/types';
@@ -51,6 +51,16 @@ const SHORT: Record<PlatformId, string> = {
 };
 
 const platformName = (id: PlatformId) => PLATFORMS.find((platform) => platform.id === id)!.name;
+
+/** Platform logo for the PDF (PNG; react-pdf cannot draw SVG). */
+function PlatformMark({ origin, id, size = 8 }: { origin: string; id: PlatformId; size?: number }) {
+  return (
+    <Image
+      src={`${origin}/reports/platforms/${id}.png`}
+      style={{ width: size, height: size, marginRight: 2.5, objectFit: 'contain' }}
+    />
+  );
+}
 
 const DAY_MS = 86_400_000;
 function daysSince(day?: string) {
@@ -205,11 +215,11 @@ export function CampusReport({ data }: { data: CampusReportData }) {
                 How zones are decided
               </Text>
               <Text style={{ fontSize: 8.5, lineHeight: 1.5, color: '#334155' }}>
-                Each student is placed by one count: problems solved on LeetCode. Students without a
-                usable LeetCode profile are placed by the next platform in this order:{' '}
-                {ZONE_BASIS.slice(1).map(platformName).join(', ')}. GitHub is not used, since it
-                counts contributions rather than problems solved. Students with no usable username
-                on any of these are listed under Not linked.
+                Each student is placed by one count: their best number of problems solved on any
+                single one of {ZONE_BASIS.map(platformName).join(', ')}. Counts are not added across
+                platforms, so easy problems cannot inflate a zone. HackerRank is not used (mostly
+                basic problems) and nor is GitHub (contributions, not problems). Students with none
+                of these linked are listed under Not linked.
               </Text>
               <View style={{ marginTop: 8, gap: 3 }}>
                 {ZONES.map((zone) => (
@@ -310,14 +320,19 @@ export function CampusReport({ data }: { data: CampusReportData }) {
                   No students in this zone.
                 </Text>
               ) : (
-                <TableHeader />
+                <TableHeader origin={data.origin} />
               )}
             </View>
 
             {zoneRows.length > 0 && (
               <>
                 {zoneRows.map((row, index) => (
-                  <TableRow key={`${row.name}-${index}`} row={row} index={index} />
+                  <TableRow
+                    key={`${row.name}-${index}`}
+                    row={row}
+                    index={index}
+                    origin={data.origin}
+                  />
                 ))}
               </>
             )}
@@ -331,7 +346,7 @@ export function CampusReport({ data }: { data: CampusReportData }) {
 
 const headerCell = { fontSize: 7, fontWeight: 700, color: MUTED, letterSpacing: 0.4 } as const;
 
-function TableHeader() {
+function TableHeader({ origin }: { origin: string }) {
   return (
     <View
       style={{
@@ -347,12 +362,18 @@ function TableHeader() {
       <Text style={[headerCell, { width: COLUMNS.student }]}>STUDENT</Text>
       <Text style={[headerCell, { width: COLUMNS.basis }]}>ZONE BASED ON</Text>
       {PLATFORMS.map((platform) => (
-        <Text
+        <View
           key={platform.id}
-          style={[headerCell, { width: COLUMNS.platform, textAlign: 'right' }]}
+          style={{
+            width: COLUMNS.platform,
+            flexDirection: 'row',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+          }}
         >
-          {SHORT[platform.id]}
-        </Text>
+          <PlatformMark origin={origin} id={platform.id} />
+          <Text style={headerCell}>{SHORT[platform.id]}</Text>
+        </View>
       ))}
       <Text style={[headerCell, { width: COLUMNS.total, textAlign: 'right' }]}>TOTAL</Text>
       <Text style={[headerCell, { width: COLUMNS.active, textAlign: 'right' }]}>LAST ACTIVE</Text>
@@ -360,7 +381,7 @@ function TableHeader() {
   );
 }
 
-function TableRow({ row, index }: { row: CampusReportRow; index: number }) {
+function TableRow({ row, index, origin }: { row: CampusReportRow; index: number; origin: string }) {
   const zone = zoneById(row.zone.zone);
   return (
     <View
@@ -389,10 +410,14 @@ function TableRow({ row, index }: { row: CampusReportRow; index: number }) {
             <Text style={{ fontWeight: 700, color: zone.color }}>
               {formatNumber(row.zone.count ?? 0)} solved
             </Text>
-            <Text style={{ fontSize: 7, color: MUTED }}>on {platformName(row.zone.basis)}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={{ fontSize: 7, color: MUTED, marginRight: 2.5 }}>on</Text>
+              <PlatformMark origin={origin} id={row.zone.basis} size={7} />
+              <Text style={{ fontSize: 7, color: MUTED }}>{platformName(row.zone.basis)}</Text>
+            </View>
           </>
         ) : (
-          <Text style={{ fontSize: 7.5, color: MUTED }}>No usable username</Text>
+          <Text style={{ fontSize: 7.5, color: MUTED }}>No DSA profile</Text>
         )}
       </View>
       {PLATFORMS.map((platform) => {
