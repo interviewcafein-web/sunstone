@@ -11,6 +11,7 @@ export const PLATFORMS: Platform[] = [
     name: 'LeetCode',
     placeholder: 'lee215',
     direct: false,
+    color: '#FFA116',
     profileUrl: at('https://leetcode.com/u/', '/'),
   },
   {
@@ -18,6 +19,7 @@ export const PLATFORMS: Platform[] = [
     name: 'GeeksforGeeks',
     placeholder: 'striver',
     direct: false,
+    color: '#2F8D46',
     profileUrl: at('https://www.geeksforgeeks.org/profile/'),
   },
   {
@@ -25,6 +27,7 @@ export const PLATFORMS: Platform[] = [
     name: 'HackerRank',
     placeholder: 'gennady',
     direct: false,
+    color: '#10B981',
     profileUrl: at('https://www.hackerrank.com/profile/'),
   },
   {
@@ -32,6 +35,7 @@ export const PLATFORMS: Platform[] = [
     name: 'Codeforces',
     placeholder: 'tourist',
     direct: true,
+    color: '#1F8ACB',
     profileUrl: at('https://codeforces.com/profile/'),
   },
   {
@@ -39,6 +43,7 @@ export const PLATFORMS: Platform[] = [
     name: 'CodeChef',
     placeholder: 'gennady.korotkevich',
     direct: false,
+    color: '#5B4638',
     profileUrl: at('https://www.codechef.com/users/'),
   },
   {
@@ -46,6 +51,7 @@ export const PLATFORMS: Platform[] = [
     name: 'GitHub',
     placeholder: 'torvalds',
     direct: true,
+    color: '#6E5494',
     profileUrl: at('https://github.com/'),
   },
 ];

@@ -1,13 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import ProfilesPage from '@/pages/ProfilesPage';
 import { PLATFORM_IDS } from '@/lib/coding-profiles/platforms';
 import type { Handles } from '@/lib/coding-profiles/types';
 
 export type ProfileSearch = Handles & { name?: string };
 
 // Handles live in the URL (/profile?leetcode=lee215&codeforces=tourist) so a profile can
-// be shared as a link: there is no backend to store them.
+// be shared as a link: there is no backend to store them. The page itself, with its chart
+// library, is in profile.lazy.tsx so the students dashboard does not download it.
 export const Route = createFileRoute('/profile')({
   validateSearch: (search: Record<string, unknown>): ProfileSearch => {
     const result: ProfileSearch = {};
@@ -21,5 +21,4 @@ export const Route = createFileRoute('/profile')({
     if (typeof search.name === 'string' && search.name.trim()) result.name = search.name.trim();
     return result;
   },
-  component: ProfilesPage,
 });

@@ -1,0 +1,527 @@
+import { useId, useMemo } from 'react';
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+
+import { Card, CardHeader, formatDate, formatNumber } from '@/components/coding/ui';
+import { activityWindows, streaksOf } from '@/lib/coding-profiles/activity';
+import type { ContestPoint, CountItem, DifficultyRow, Kpi } from '@/lib/coding-profiles/types';
+import { cn } from '@/lib/utils';
+
+const TICK = { fontSize: 11, fill: '#94A3B8' };
+const TOOLTIP_STYLE = { borderRadius: 10, fontSize: 12, borderColor: '#E2E8F0' };
+
+// ------------------------------------------------------------------ KPI tiles
+
+export function KpiGrid({ kpis, color }: { kpis: Kpi[]; color: string }) {
+  return (
+    <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {kpis.map((kpi) => (
+        <div
+          key={kpi.label}
+          className="shadow-card relative flex flex-col-reverse overflow-hidden rounded-2xl border border-slate-200 bg-white p-4"
+        >
+          <span
+            aria-hidden
+            className="absolute inset-x-0 top-0 h-0.5"
+            style={{ background: color }}
+          />
+          {kpi.hint && <p className="mt-0.5 truncate text-xs text-slate-500">{kpi.hint}</p>}
+          <dd className="mt-1 text-2xl font-bold text-slate-900 tabular-nums">
+            {kpi.value === null || kpi.value === undefined
+              ? '—'
+              : typeof kpi.value === 'number'
+                ? formatNumber(kpi.value)
+                : kpi.value}
+          </dd>
+          <dt className="text-[11px] font-medium tracking-wide text-slate-500 uppercase">
+            {kpi.label}
+          </dt>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+// ----------------------------------------------------------- recent activity
+
+/** Yesterday / last 7 days / last 30 days: shows at a glance who has gone quiet. */
+export function ActivityWindows({ calendar }: { calendar: Record<string, number> }) {
+  const windows = activityWindows(calendar);
+  const items = [
+    { label: 'Yesterday', value: windows.yesterday },
+    { label: 'Last 7 days', value: windows.week },
+    { label: 'Last 30 days', value: windows.month },
+  ];
+
+  return (
+    <div className="grid grid-cols-3 divide-x divide-slate-200 rounded-2xl border border-slate-200 bg-white">
+      {items.map((item) => (
+        <div key={item.label} className="px-4 py-3">
+          <p className="text-[11px] font-medium tracking-wide text-slate-500 uppercase">
+            {item.label}
+          </p>
+          <p
+            className={cn(
+              'text-xl font-bold tabular-nums',
+              item.value ? 'text-slate-900' : 'text-slate-400'
+            )}
+          >
+            {formatNumber(item.value)}
+            <span className="ml-1 text-xs font-medium text-slate-500">submissions</span>
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------- heatmap
+
+const CELL = 11;
+const GAP = 3;
+const WEEKS = 53;
+
+export function ActivityHeatmap({
+  calendar,
+  color,
+  noun = 'submissions',
+}: {
+  calendar: Record<string, number>;
+  color: string;
+  noun?: string;
+}) {
+  const { days, total, months } = useMemo(() => {
+    const now = new Date();
+    const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const start = new Date(end);
+    start.setUTCDate(end.getUTCDate() - (WEEKS - 1) * 7 - end.getUTCDay());
+
+    const cells: { date: string; count: number; week: number; weekday: number }[] = [];
+    const labels: { week: number; label: string }[] = [];
+    let sum = 0;
+    for (
+      let day = new Date(start), index = 0;
+      day <= end;
+      day.setUTCDate(day.getUTCDate() + 1), index++
+    ) {
+      const date = day.toISOString().slice(0, 10);
+      const count = calendar[date] || 0;
+      sum += count;
+      const week = Math.floor(index / 7);
+      cells.push({ date, count, week, weekday: day.getUTCDay() });
+      if (day.getUTCDate() <= 7 && day.getUTCDay() === 0) {
+        labels.push({
+          week,
+          label: day.toLocaleString('en-IN', { month: 'short', timeZone: 'UTC' }),
+        });
+      }
+    }
+    return { days: cells, total: sum, months: labels };
+  }, [calendar]);
+
+  const streaks = streaksOf(calendar);
+  const level = (count: number) =>
+    count === 0 ? 0 : count < 3 ? 1 : count < 6 ? 2 : count < 10 ? 3 : 4;
+  const width = WEEKS * (CELL + GAP);
+  const height = 7 * (CELL + GAP) + 16;
+
+  return (
+    <Card>
+      <CardHeader
+        title={
+          <>
+            <b className="tabular-nums">{formatNumber(total)}</b> {noun} in the last year
+          </>
+        }
+        aside={
+          <span className="flex gap-3">
+            <span>
+              Active days <b className="text-slate-900">{streaks.activeDays}</b>
+            </span>
+            <span>
+              Best streak <b className="text-slate-900">{streaks.best}</b>
+            </span>
+            <span>
+              Current <b className="text-slate-900">{streaks.current}</b>
+            </span>
+          </span>
+        }
+      />
+      <div className="overflow-x-auto pb-1">
+        <svg
+          width={width}
+          height={height}
+          role="img"
+          aria-label={`${total} ${noun} on ${streaks.activeDays} days in the last year`}
+        >
+          {months.map((month) => (
+            <text
+              key={`${month.week}-${month.label}`}
+              x={month.week * (CELL + GAP)}
+              y={10}
+              fontSize={10}
+              fill="#94A3B8"
+            >
+              {month.label}
+            </text>
+          ))}
+          {days.map((day) => {
+            const value = level(day.count);
+            return (
+              <rect
+                key={day.date}
+                x={day.week * (CELL + GAP)}
+                y={16 + day.weekday * (CELL + GAP)}
+                width={CELL}
+                height={CELL}
+                rx={2}
+                fill={value ? color : '#EEF2F6'}
+                fillOpacity={value ? 0.25 + value * 0.1875 : 1}
+              >
+                <title>{`${day.date}: ${day.count} ${noun}`}</title>
+              </rect>
+            );
+          })}
+        </svg>
+      </div>
+    </Card>
+  );
+}
+
+// ----------------------------------------------------------------- bar list
+
+export function BarList({
+  items,
+  color,
+  unit,
+}: {
+  items: CountItem[];
+  color: string;
+  unit?: string;
+}) {
+  const max = Math.max(...items.map((item) => item.count), 1);
+  const total = items.reduce((sum, item) => sum + item.count, 0);
+
+  return (
+    <ul className="space-y-2">
+      {items.map((item) => (
+        <li key={item.label}>
+          <div className="mb-1 flex justify-between gap-2 text-xs">
+            <span className="truncate text-slate-700" title={item.label}>
+              {item.label}
+            </span>
+            <span className="text-slate-500 tabular-nums">
+              {unit === '%'
+                ? `${Math.round((item.count / total) * 100)}%`
+                : formatNumber(item.count)}
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-slate-100">
+            <div
+              className="h-full rounded-full"
+              style={{ width: `${(item.count / max) * 100}%`, background: item.color ?? color }}
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// -------------------------------------------------------------------- donut
+
+export function Donut({
+  title,
+  rows,
+  aside,
+}: {
+  title: string;
+  rows: CountItem[];
+  aside?: string;
+}) {
+  const total = rows.reduce((sum, row) => sum + row.count, 0);
+
+  return (
+    <div>
+      <CardHeader title={title} aside={aside} />
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="relative size-36 shrink-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={total ? rows : [{ label: 'None', count: 1 }]}
+                dataKey="count"
+                nameKey="label"
+                innerRadius={46}
+                outerRadius={66}
+                paddingAngle={total ? 2 : 0}
+                stroke="none"
+                isAnimationActive={false}
+              >
+                {(total ? rows : [{ label: 'None', count: 1 }]).map((row) => (
+                  <Cell key={row.label} fill={total ? row.color : '#EEF2F6'} />
+                ))}
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-xl font-bold tabular-nums">{formatNumber(total)}</span>
+            <span className="text-[10px] tracking-wide text-slate-500 uppercase">solved</span>
+          </div>
+        </div>
+        <ul className="min-w-40 flex-1 space-y-1.5">
+          {rows.map((row) => (
+            <li
+              key={row.label}
+              className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-1.5 text-xs"
+            >
+              <span className="flex items-center gap-2 text-slate-700">
+                <span className="size-2 rounded-full" style={{ background: row.color }} />
+                {row.label}
+              </span>
+              <span className="font-semibold tabular-nums">
+                {formatNumber(row.count)}
+                {total > 0 && (
+                  <span className="ml-1.5 font-normal text-slate-400">
+                    {Math.round((row.count / total) * 100)}%
+                  </span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------- attempted vs solved (LC)
+
+export function DifficultyBreakdown({ rows }: { rows: DifficultyRow[] }) {
+  const data = rows.map((row) => ({
+    label: row.label,
+    Attempted: row.attempted ?? row.solved,
+    Solved: row.solved,
+    color: row.color,
+  }));
+
+  return (
+    <Card>
+      <div className="grid gap-5 lg:grid-cols-5">
+        <div className="lg:col-span-3">
+          <CardHeader title="Attempted vs solved" aside="distinct problems" />
+          <div className="h-52">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data} margin={{ top: 4, right: 4, left: -16, bottom: 0 }} barGap={4}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+                <XAxis dataKey="label" tick={TICK} axisLine={false} tickLine={false} />
+                <YAxis tick={TICK} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#F1F5F9' }} />
+                <Bar dataKey="Attempted" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                  {data.map((row) => (
+                    <Cell key={row.label} fill={row.color} fillOpacity={0.28} />
+                  ))}
+                </Bar>
+                <Bar dataKey="Solved" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                  {data.map((row) => (
+                    <Cell key={row.label} fill={row.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <div className="lg:col-span-2">
+          <Donut
+            title="Solved split"
+            rows={rows.map((row) => ({ label: row.label, count: row.solved, color: row.color }))}
+          />
+        </div>
+      </div>
+      <ul className="mt-4 grid gap-2 sm:grid-cols-3">
+        {rows.map((row) => {
+          const unsolved = (row.attempted ?? row.solved) - row.solved;
+          return (
+            <li key={row.label} className="rounded-xl bg-slate-50 px-3 py-2 text-xs">
+              <p className="font-semibold" style={{ color: row.color }}>
+                {row.label}
+              </p>
+              <p className="text-slate-700 tabular-nums">
+                <b>{formatNumber(row.solved)}</b>
+                {row.total ? ` / ${formatNumber(row.total)}` : ''} solved
+                {row.acceptance !== undefined && ` · ${row.acceptance}% accepted`}
+              </p>
+              {unsolved > 0 && (
+                <p className="text-amber-700">{formatNumber(unsolved)} attempted, not solved yet</p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
+  );
+}
+
+// ------------------------------------------------------------- rating chart
+
+export function RatingChart({ history, color }: { history: ContestPoint[]; color: string }) {
+  const gradientId = `rating-${useId().replace(/:/g, '')}`;
+  const sorted = [...history].sort((a, b) => a.time - b.time);
+  const spansYears =
+    sorted.length > 1 && sorted[sorted.length - 1].time - sorted[0].time > 365 * 86400;
+  const tickFormat = (seconds: number) =>
+    new Date(seconds * 1000).toLocaleDateString(
+      'en-IN',
+      spansYears ? { month: 'short', year: '2-digit' } : { day: 'numeric', month: 'short' }
+    );
+
+  return (
+    <div className="h-56">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={sorted} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+          <XAxis
+            dataKey="time"
+            type="number"
+            domain={['dataMin', 'dataMax']}
+            tickFormatter={tickFormat}
+            tick={TICK}
+            axisLine={false}
+            tickLine={false}
+            minTickGap={28}
+          />
+          <YAxis
+            domain={[
+              (min: number) => Math.floor((min - 50) / 50) * 50,
+              (max: number) => Math.ceil((max + 50) / 50) * 50,
+            ]}
+            tick={TICK}
+            axisLine={false}
+            tickLine={false}
+            width={44}
+          />
+          <Tooltip
+            contentStyle={TOOLTIP_STYLE}
+            labelFormatter={(seconds) => formatDate(Number(seconds))}
+            formatter={(value, _name, item) => [
+              `${value}${item.payload.rank ? ` · rank ${formatNumber(item.payload.rank)}` : ''}`,
+              item.payload.title,
+            ]}
+          />
+          <Area
+            type="monotone"
+            dataKey="rating"
+            stroke={color}
+            strokeWidth={2}
+            fill={`url(#${gradientId})`}
+            dot={sorted.length < 30 ? { r: 2.5, fill: color, strokeWidth: 0 } : false}
+            isAnimationActive={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+export function RatingCard({
+  history,
+  color,
+  current,
+}: {
+  history: ContestPoint[];
+  color: string;
+  current: number | null;
+}) {
+  const best = Math.max(...history.map((point) => point.rating));
+  const latest = [...history].sort((a, b) => b.time - a.time)[0];
+
+  return (
+    <Card>
+      <CardHeader
+        title="Contest rating"
+        aside={
+          <>
+            {history.length} contests · best <b className="text-slate-900">{formatNumber(best)}</b>
+          </>
+        }
+      />
+      <RatingChart history={history} color={color} />
+      {latest && (
+        <p className="mt-2 truncate text-xs text-slate-500">
+          Latest: {latest.title} →{' '}
+          <b className="text-slate-900">{formatNumber(current ?? latest.rating)}</b>
+        </p>
+      )}
+    </Card>
+  );
+}
+
+// ------------------------------------------------ Codeforces rating histogram
+
+/** Codeforces rank colours, by problem rating. */
+export function cfColor(rating: number) {
+  if (rating < 1200) return '#9CA3AF';
+  if (rating < 1400) return '#22C55E';
+  if (rating < 1600) return '#14B8A6';
+  if (rating < 1900) return '#3B82F6';
+  if (rating < 2100) return '#A855F7';
+  if (rating < 2400) return '#F59E0B';
+  return '#EF4444';
+}
+
+export function RatingHistogram({ items }: { items: CountItem[] }) {
+  const solved = items.reduce((sum, item) => sum + item.count, 0);
+  const hardest = items.length ? items[items.length - 1].label : '—';
+
+  return (
+    <Card>
+      <CardHeader
+        title="Solved by problem rating"
+        aside={
+          <>
+            {formatNumber(solved)} rated problems · hardest{' '}
+            <b className="text-slate-900">{hardest}</b>
+          </>
+        }
+      />
+      <div className="h-52">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={items} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+            <XAxis dataKey="label" tick={TICK} axisLine={false} tickLine={false} minTickGap={8} />
+            <YAxis tick={TICK} axisLine={false} tickLine={false} allowDecimals={false} />
+            <Tooltip
+              contentStyle={TOOLTIP_STYLE}
+              cursor={{ fill: '#F1F5F9' }}
+              formatter={(value) => [value, 'Solved']}
+              labelFormatter={(label) => `Rating ${label}`}
+            />
+            <Bar dataKey="count" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+              {items.map((item) => (
+                <Cell key={item.label} fill={cfColor(Number(item.label))} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
+  );
+}

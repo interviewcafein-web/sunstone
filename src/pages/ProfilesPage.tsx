@@ -1,23 +1,41 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, getRouteApi } from '@tanstack/react-router';
-import { ArrowLeft, Check, Link2 } from 'lucide-react';
+import type { UseQueryResult } from '@tanstack/react-query';
+import { ArrowLeft, Check, LayoutGrid, Link2, Loader2, Pencil } from 'lucide-react';
 
 import { Avatar } from '@/components/common/Avatar';
+import { CodingOverview } from '@/components/coding/CodingOverview';
+import { PlatformPanel } from '@/components/coding/PlatformPanel';
+import { Card, formatNumber } from '@/components/coding/ui';
 import { HandleForm } from '@/components/profile/HandleForm';
-import { Heatmap, summarizeCalendar } from '@/components/profile/Heatmap';
-import { PlatformCard } from '@/components/profile/PlatformCard';
-import { SectionLabel, StatTiles } from '@/components/profile/StatTiles';
+import { PlatformLogo } from '@/components/profile/PlatformLogo';
 import { useCodingProfiles } from '@/hooks/useCodingProfiles';
-import type { CodingProfile, Handles } from '@/lib/coding-profiles/types';
+import {
+  ProfileError,
+  type CodingProfile,
+  type Handles,
+  type Platform,
+  type PlatformId,
+} from '@/lib/coding-profiles/types';
+import { cn } from '@/lib/utils';
 
 const route = getRouteApi('/profile');
+
+type Tab = 'overview' | PlatformId;
 
 export default function ProfilesPage() {
   const { name, ...handles } = route.useSearch();
   const navigate = route.useNavigate();
+  const [tab, setTab] = useState<Tab>('overview');
 
   const results = useCodingProfiles(handles);
   const loaded = results.flatMap(({ query }) => (query.data ? [query.data] : []));
+  const hasHandles = results.length > 0;
+  const active = results.find(({ platform }) => platform.id === tab);
+
+  // A different person's handles: start again from the overview.
+  const handleKey = JSON.stringify(handles);
+  useEffect(() => setTab('overview'), [handleKey]);
 
   // Editing the handles turns this into an ad-hoc lookup, so the student's name is dropped.
   const submit = (next: Handles) => navigate({ search: next });
@@ -29,13 +47,16 @@ export default function ProfilesPage() {
           aria-hidden
           className="bg-brand-400/30 pointer-events-none absolute -top-24 right-1/4 size-72 rounded-full blur-3xl"
         />
-        <Link
-          to="/"
-          className="text-brand-100 relative mb-4 inline-flex items-center gap-1 text-sm hover:text-white"
-        >
-          <ArrowLeft className="size-4" aria-hidden />
-          All students
-        </Link>
+        <div className="relative flex flex-wrap items-start justify-between gap-3">
+          <Link
+            to="/"
+            className="text-brand-100 mb-4 inline-flex items-center gap-1 text-sm hover:text-white"
+          >
+            <ArrowLeft className="size-4" aria-hidden />
+            All students
+          </Link>
+          {hasHandles && <CopyLinkButton />}
+        </div>
         <div className="relative flex items-center gap-4">
           {name && <Avatar name={name} className="size-14 text-base ring-4 ring-white/20" />}
           <div>
@@ -43,55 +64,159 @@ export default function ProfilesPage() {
               {name ?? 'Look up a coding profile'}
             </h1>
             <p className="text-brand-100 mt-1 text-sm">
-              Problems solved, badges, topics and activity across platforms.
+              Problems solved, contests, badges, topics and activity across platforms.
             </p>
           </div>
         </div>
       </section>
 
-      <HandleForm handles={handles} onSubmit={submit} />
+      {hasHandles ? (
+        <details className="group shadow-card rounded-2xl border border-slate-200 bg-white">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-medium text-slate-600 hover:text-slate-900">
+            <Pencil className="size-4" aria-hidden />
+            Edit usernames
+          </summary>
+          <div className="border-t border-slate-100 p-1">
+            <HandleForm handles={handles} onSubmit={submit} />
+          </div>
+        </details>
+      ) : (
+        <HandleForm handles={handles} onSubmit={submit} />
+      )}
 
-      {loaded.length > 0 && <Summary profiles={loaded} />}
+      {hasHandles && (
+        <>
+          <nav
+            aria-label="Platforms"
+            className="-mx-4 flex gap-1 overflow-x-auto border-b border-slate-200 px-4 scrollbar-none"
+          >
+            <TabButton selected={tab === 'overview'} onClick={() => setTab('overview')}>
+              <LayoutGrid className="text-brand-700 size-4" aria-hidden />
+              Overview
+            </TabButton>
+            {results.map(({ platform, query }) => (
+              <TabButton
+                key={platform.id}
+                selected={tab === platform.id}
+                onClick={() => setTab(platform.id)}
+              >
+                <PlatformLogo platform={platform.id} />
+                {platform.name}
+                <TabCount query={query} />
+              </TabButton>
+            ))}
+          </nav>
 
-      <div className="rise-stagger grid gap-4 lg:grid-cols-2">
-        {results.map(({ platform, query }) => (
-          <PlatformCard key={platform.id} platform={platform} query={query} />
-        ))}
-      </div>
+          {tab === 'overview' || !active ? (
+            loaded.length > 0 ? (
+              <CodingOverview profiles={loaded} />
+            ) : results.some(({ query }) => query.isPending) ? (
+              <LoadingCard label="Loading coding profiles…" />
+            ) : (
+              <Card>
+                <p className="text-sm text-slate-600">None of these profiles could be loaded.</p>
+              </Card>
+            )
+          ) : (
+            <PlatformTab platform={active.platform} query={active.query} />
+          )}
+        </>
+      )}
     </div>
   );
 }
 
-function Summary({ profiles }: { profiles: CodingProfile[] }) {
-  const combined = useMemo(() => {
-    const calendar: Record<string, number> = {};
-    for (const profile of profiles) {
-      for (const [day, count] of Object.entries(profile.calendar)) {
-        calendar[day] = (calendar[day] || 0) + count;
-      }
-    }
-    return calendar;
-  }, [profiles]);
-
-  const stats = [
-    {
-      label: 'Problems solved, all platforms',
-      value: profiles.reduce((sum, profile) => sum + (profile.solved?.total ?? 0), 0),
-    },
-    { label: 'Platforms', value: profiles.length },
-    { label: 'Badges', value: profiles.reduce((sum, profile) => sum + profile.badges.length, 0) },
-    { label: 'Active days (12 mo)', value: summarizeCalendar(combined).activeDays },
-  ];
-
+function TabButton({
+  selected,
+  onClick,
+  children,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="shadow-card rounded-xl border border-slate-200 bg-white p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <StatTiles stats={stats} />
-        <CopyLinkButton />
-      </div>
-      <SectionLabel>Combined activity, last 12 months</SectionLabel>
-      <Heatmap calendar={combined} />
-    </section>
+    <button
+      type="button"
+      aria-current={selected ? 'page' : undefined}
+      onClick={onClick}
+      className={cn(
+        '-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors',
+        selected
+          ? 'border-brand-700 text-brand-800'
+          : 'border-transparent text-slate-500 hover:text-slate-800'
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** Solved count (or contributions for GitHub), a spinner while loading, "!" on failure. */
+function TabCount({ query }: { query: UseQueryResult<CodingProfile, Error> }) {
+  if (query.isPending)
+    return <Loader2 className="size-3.5 animate-spin text-slate-400" aria-label="Loading" />;
+  if (query.isError) {
+    return (
+      <span className="rounded-full bg-red-100 px-1.5 text-[11px] leading-4.5 font-bold text-red-700">
+        !
+      </span>
+    );
+  }
+  const profile = query.data;
+  const value = profile.solved ?? profile.kpis[0]?.value;
+  if (value === null || value === undefined) return null;
+  return (
+    <span className="bg-brand-50 text-brand-800 rounded-full px-1.5 text-[11px] leading-4.5 tabular-nums">
+      {typeof value === 'number' ? formatNumber(value) : value}
+    </span>
+  );
+}
+
+function PlatformTab({
+  platform,
+  query,
+}: {
+  platform: Platform;
+  query: UseQueryResult<CodingProfile, Error>;
+}) {
+  if (query.isPending) return <LoadingCard label={`Loading ${platform.name} stats…`} />;
+  if (query.isError) {
+    const kind = query.error instanceof ProfileError ? query.error.kind : 'upstream';
+    return (
+      <Card className="border-red-200">
+        <p className="flex items-center gap-2 font-semibold">
+          <PlatformLogo platform={platform.id} className="size-5" />
+          {platform.name}
+        </p>
+        <p className="mt-2 text-sm text-red-700">
+          {kind === 'not_found'
+            ? `No ${platform.name} account has this username.`
+            : query.error.message || 'Something went wrong.'}
+        </p>
+        {kind !== 'not_found' && (
+          <button
+            type="button"
+            onClick={() => query.refetch()}
+            className="mt-3 rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium hover:bg-slate-50"
+          >
+            Try again
+          </button>
+        )}
+      </Card>
+    );
+  }
+  return <PlatformPanel platform={platform} profile={query.data} />;
+}
+
+function LoadingCard({ label }: { label: string }) {
+  return (
+    <Card>
+      <p className="flex items-center gap-2 text-sm text-slate-600">
+        <Loader2 className="size-4 animate-spin" aria-hidden />
+        {label}
+      </p>
+    </Card>
   );
 }
 
@@ -117,7 +242,7 @@ function CopyLinkButton() {
     <button
       type="button"
       onClick={copy}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
+      className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-white ring-1 ring-white/20 hover:bg-white/20"
     >
       {copied ? (
         <Check className="size-3.5" aria-hidden />

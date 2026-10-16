@@ -20,7 +20,13 @@ const RULES: Rule[] = [
     path: /^\/rest\/(contests\/master\/)?hackers\/[^/]+\/\w+$/,
     method: 'GET',
   },
+  {
+    host: 'www.hackerrank.com',
+    path: /^\/community\/v1\/test_results\/hacker_certificate$/,
+    method: 'GET',
+  },
   { host: 'www.codechef.com', path: /^\/users\/[^/]+$/, method: 'GET' },
+  { host: 'www.codechef.com', path: /^\/recent\/user$/, method: 'GET' },
   { host: 'github.com', path: /^\/users\/[^/]+\/contributions$/, method: 'GET' },
   { host: 'authapi.geeksforgeeks.org', path: /^\/api-get\/user-profile-info\/$/, method: 'GET' },
   {
