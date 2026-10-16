@@ -9,6 +9,7 @@ import {
 } from 'react-icons/si';
 
 import type { PlatformId } from '@/lib/coding-profiles/types';
+import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
 // Each platform's own brand colour. HackerRank's current green (#00EA64) is too light to
@@ -22,6 +23,12 @@ const LOGOS: Record<PlatformId, { Icon: IconType; color: string }> = {
   github: { Icon: SiGithub, color: '#181717' },
 };
 
+// GitHub's near-black and CodeChef's dark brown vanish on the dark theme; lighten them there.
+const DARK_COLORS: Partial<Record<PlatformId, string>> = {
+  github: '#f0f6fc',
+  codechef: '#c9a27e',
+};
+
 /** Decorative: always rendered next to the platform's name. */
 export function PlatformLogo({
   platform,
@@ -30,6 +37,8 @@ export function PlatformLogo({
   platform: PlatformId;
   className?: string;
 }) {
+  const theme = useTheme();
   const { Icon, color } = LOGOS[platform];
-  return <Icon aria-hidden color={color} className={cn('size-4 shrink-0', className)} />;
+  const shown = (theme === 'dark' && DARK_COLORS[platform]) || color;
+  return <Icon aria-hidden color={shown} className={cn('size-4 shrink-0', className)} />;
 }

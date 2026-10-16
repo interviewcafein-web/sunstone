@@ -46,6 +46,16 @@
 
     <link rel="preload" as="image" href="/sunstone-logo.png" />
 
+    <!-- Saved theme (see src/lib/theme.ts), applied before the first paint so it never flashes. -->
+    <script>
+      try {
+        if (localStorage.getItem('sunstone:theme') === 'dark') {
+          document.documentElement.classList.add('dark');
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0b1426');
+        }
+      } catch (error) {}
+    </script>
+
     <!--
       Intro animation. Inline so it paints before the app's JavaScript loads and covers that
       wait. Plays once per browser session; main.tsx calls window.__hideSplash() once the app

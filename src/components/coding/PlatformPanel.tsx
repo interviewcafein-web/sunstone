@@ -46,7 +46,7 @@ export function PlatformPanel({
   return (
     <div className="rise-stagger space-y-4">
       <header className="flex flex-wrap items-center gap-3">
-        <span className="flex size-11 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+        <span className="flex size-11 items-center justify-center rounded-xl bg-surface shadow-sm ring-1 ring-slate-200">
           <PlatformLogo platform={platform.id} className="size-6" />
         </span>
         <div className="min-w-0">
@@ -66,7 +66,7 @@ export function PlatformPanel({
               href={link}
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:text-brand-700 inline-flex items-center gap-1 text-sm text-slate-500"
+              className="hover:text-brand-700 dark:hover:text-brand-300 inline-flex items-center gap-1 text-sm text-slate-500"
             >
               @{profile.username}
               <ExternalLink className="size-3" aria-hidden />

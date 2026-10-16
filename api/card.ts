@@ -56,6 +56,13 @@ export async function GET(request: Request): Promise<Response> {
     stats.contests ? { label: 'Contests', value: formatNumber(stats.contests) } : null,
   ].filter(Boolean) as { label: string; value: string }[];
 
+  // 1350 fits one row of pills in each panel; each extra row (about two pills) adds 70px,
+  // so the card grows instead of the renderer squeezing the content into itself.
+  const rows = (count: number) => Math.max(1, Math.ceil(count / 2));
+  const extraRows =
+    rows(stats.platforms.length) - 1 + (stats.ratings.length ? rows(stats.ratings.length) - 1 : 0);
+  const height = 1350 + extraRows * 70;
+
   const panel = (title: string, children: ReturnType<typeof h>[]) =>
     h(
       'div',
@@ -318,7 +325,7 @@ export async function GET(request: Request): Promise<Response> {
 
   const fonts = await loadFonts(url.origin);
   return imageResponse(
-    () => new ImageResponse(image as never, { width: 1080, height: 1350, fonts }),
+    () => new ImageResponse(image as never, { width: 1080, height, fonts }),
     headers
   );
 }

@@ -2,13 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link, getRouteApi } from '@tanstack/react-router';
 import { Check, ChevronRight, Download, IdCard, Link2, Share2 } from 'lucide-react';
 
-import { Card, Segmented } from '@/components/coding/ui';
+import { Card } from '@/components/coding/ui';
 import { useStudents } from '@/hooks/useStudents';
+import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
 const route = getRouteApi('/s/$slug_/card');
-
-type Theme = 'dark' | 'light';
 
 /**
  * A student's shareable coding card (/s/{slug}/card), like InterviewCafe's. The card is
@@ -20,7 +19,8 @@ export default function CodingCardPage() {
   const students = useStudents();
   const student = students.data?.students.find((candidate) => candidate.slug === slug);
 
-  const [theme, setTheme] = useState<Theme>('dark');
+  // The card follows the site theme: the light card on the light site, navy on the dark one.
+  const theme = useTheme();
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -101,7 +101,7 @@ export default function CodingCardPage() {
         <div className="mx-auto w-full max-w-[380px]">
           <div className="relative overflow-hidden rounded-[22px] shadow-[0_24px_60px_-20px_rgb(16_38_70/0.55)] ring-1 ring-black/5">
             {!loaded && !failed && (
-              <div className="bg-brand-100 flex aspect-[1080/1350] w-full animate-pulse items-end justify-center p-6 text-center text-xs text-slate-500">
+              <div className="bg-brand-100 dark:bg-brand-900/60 flex aspect-[1080/1350] w-full animate-pulse items-end justify-center p-6 text-center text-xs text-slate-500">
                 Drawing the card. The first time can take a few seconds while every platform is
                 checked.
               </div>
@@ -120,21 +120,14 @@ export default function CodingCardPage() {
               />
             )}
           </div>
-          <div className="mt-3 flex justify-center">
-            <Segmented
-              label="Card style"
-              value={theme}
-              onChange={setTheme}
-              options={[
-                { value: 'dark', label: 'Navy' },
-                { value: 'light', label: 'Light' },
-              ]}
-            />
-          </div>
+          <p className="mt-3 text-center text-xs text-slate-500">
+            {theme === 'dark' ? 'Navy' : 'Light'} card, matching the site theme. Use the{' '}
+            {theme === 'dark' ? 'sun' : 'moon'} button at the top to switch.
+          </p>
         </div>
 
         <div className="md:pt-4">
-          <span className="bg-brand-50 text-brand-700 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold">
+          <span className="bg-brand-50 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold">
             <IdCard className="size-3.5" aria-hidden /> Coding card
           </span>
           <h1 className="mt-3 text-2xl font-bold tracking-tight text-balance sm:text-3xl">
@@ -157,7 +150,7 @@ export default function CodingCardPage() {
               onClick={copyLink}
               className={cn(
                 button,
-                'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                'border border-slate-200 bg-surface text-slate-700 hover:bg-slate-50'
               )}
             >
               {copied ? (
@@ -180,7 +173,7 @@ export default function CodingCardPage() {
                   href={target.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:border-brand-300 hover:text-brand-700 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-sm font-medium text-slate-700"
+                  className="hover:border-brand-300 dark:hover:border-brand-500 hover:text-brand-700 dark:hover:text-brand-300 rounded-full border border-slate-200 bg-surface px-3.5 py-1.5 text-sm font-medium text-slate-700"
                 >
                   {target.label}
                 </a>
@@ -191,7 +184,7 @@ export default function CodingCardPage() {
                   onClick={() =>
                     void navigator.share({ title: text, url: pageUrl }).catch(() => {})
                   }
-                  className="hover:border-brand-300 hover:text-brand-700 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-sm font-medium text-slate-700"
+                  className="hover:border-brand-300 dark:hover:border-brand-500 hover:text-brand-700 dark:hover:text-brand-300 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-surface px-3.5 py-1.5 text-sm font-medium text-slate-700"
                 >
                   <Share2 className="size-3.5" aria-hidden /> More
                 </button>
@@ -204,7 +197,7 @@ export default function CodingCardPage() {
             <Link
               to="/s/$slug"
               params={{ slug }}
-              className="text-brand-700 inline-block font-semibold hover:underline"
+              className="text-brand-700 dark:text-brand-300 inline-block font-semibold hover:underline"
             >
               View the full coding profile
             </Link>

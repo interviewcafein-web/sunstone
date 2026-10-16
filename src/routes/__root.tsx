@@ -1,19 +1,22 @@
 import { Link, Outlet, createRootRoute } from '@tanstack/react-router';
 
 import { BrandLockup } from '@/components/common/BrandLockup';
+import { ThemeToggle } from '@/components/common/ThemeToggle';
 
 export const Route = createRootRoute({
   component: RootComponent,
 });
 
 const navLink =
-  'hover:bg-brand-50 hover:text-brand-700 rounded-md px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors';
-const navLinkActive = { className: 'bg-brand-50 text-brand-700' };
+  'hover:bg-brand-50 dark:hover:bg-brand-900/40 hover:text-brand-700 dark:hover:text-brand-300 rounded-md px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors';
+const navLinkActive = {
+  className: 'bg-brand-50 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300',
+};
 
 function RootComponent() {
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/80 backdrop-blur-md">
+      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-surface/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <Link to="/" className="flex items-center gap-3">
             <BrandLockup />
@@ -38,6 +41,7 @@ function RootComponent() {
             >
               Look up a profile
             </Link>
+            <ThemeToggle />
           </nav>
         </div>
       </header>
@@ -46,7 +50,7 @@ function RootComponent() {
         <Outlet />
       </main>
 
-      <footer className="border-t border-slate-200 bg-white">
+      <footer className="border-t border-slate-200 bg-surface">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-slate-500">
           <BrandLockup logoClassName="h-4 opacity-80" primeClassName="text-[7px]" />
           <span>

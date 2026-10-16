@@ -14,12 +14,20 @@ interface BrandLockupProps {
 export function BrandLockup({ logoClassName, primeClassName, className }: BrandLockupProps) {
   return (
     <span className={cn('inline-flex flex-col gap-1', className)}>
+      {/* Navy logo on the light theme, white on the dark one. */}
       <img
         src="/sunstone-logo.png"
         alt="Sunstone"
         width={886}
         height={115}
-        className={cn('h-5 w-auto', logoClassName)}
+        className={cn('h-5 w-auto dark:hidden', logoClassName)}
+      />
+      <img
+        src="/sunstone-logo-white.png"
+        alt="Sunstone"
+        width={886}
+        height={115}
+        className={cn('hidden h-5 w-auto dark:block', logoClassName)}
       />
       <span className="flex items-center gap-1.5 pl-[21%]">
         <span aria-hidden className="h-px flex-1 bg-gradient-to-r from-transparent to-amber-500" />

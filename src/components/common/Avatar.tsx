@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils';
 
 // Listed in full so Tailwind generates every class.
 const TONES = [
-  'bg-brand-100 text-brand-800',
+  'bg-brand-100 dark:bg-brand-900/60 text-brand-800 dark:text-brand-200',
   'bg-sky-100 text-sky-800',
   'bg-indigo-100 text-indigo-800',
   'bg-teal-100 text-teal-800',

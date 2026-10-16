@@ -28,7 +28,10 @@ export function HandleForm({ handles, onSubmit }: HandleFormProps) {
   };
 
   return (
-    <form onSubmit={submit} className="shadow-card rounded-xl border border-slate-200 bg-white p-4">
+    <form
+      onSubmit={submit}
+      className="shadow-card rounded-xl border border-slate-200 bg-surface p-4"
+    >
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {PLATFORMS.map((platform) => (
           <div key={platform.id}>

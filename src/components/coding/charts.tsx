@@ -18,10 +18,24 @@ import { Card, CardHeader, formatDate, formatNumber } from '@/components/coding/
 import { activityWindows, streaksOf } from '@/lib/coding-profiles/activity';
 import type { ContestPoint, CountItem, DifficultyRow, Kpi } from '@/lib/coding-profiles/types';
 import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
+import { chartColors, useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
-const TICK = { fontSize: 11, fill: '#94A3B8' };
-const TOOLTIP_STYLE = { borderRadius: 10, fontSize: 12, borderColor: '#E2E8F0' };
+/** Chart colours for the current site theme (SVG attributes cannot use CSS variables). */
+function useChart() {
+  const colors = chartColors(useTheme());
+  return {
+    ...colors,
+    tickStyle: { fontSize: 11, fill: colors.tick },
+    tooltipStyle: {
+      borderRadius: 10,
+      fontSize: 12,
+      borderColor: colors.grid,
+      backgroundColor: colors.tooltip,
+      color: colors.text,
+    },
+  };
+}
 
 // ------------------------------------------------------------------ KPI tiles
 
@@ -31,7 +45,7 @@ export function KpiGrid({ kpis, color }: { kpis: Kpi[]; color: string }) {
       {kpis.map((kpi) => (
         <div
           key={kpi.label}
-          className="shadow-card relative flex flex-col-reverse overflow-hidden rounded-2xl border border-slate-200 bg-white p-4"
+          className="shadow-card relative flex flex-col-reverse overflow-hidden rounded-2xl border border-slate-200 bg-surface p-4"
         >
           <span
             aria-hidden
@@ -68,10 +82,11 @@ export function ActivityWindows({
   calendar: Record<string, number>;
   color: string;
 }) {
+  const ui = useChart();
   const windows = activityWindows(calendar);
 
   return (
-    <div className="grid divide-slate-200 rounded-2xl border border-slate-200 bg-white sm:grid-cols-3 sm:divide-x max-sm:divide-y">
+    <div className="grid divide-slate-200 rounded-2xl border border-slate-200 bg-surface sm:grid-cols-3 sm:divide-x max-sm:divide-y">
       {windows.map((item) => {
         const change = item.value - item.previous;
         const max = Math.max(...item.series.map((day) => day.count), 1);
@@ -127,7 +142,7 @@ export function ActivityWindows({
                     width={4.5}
                     height={height}
                     rx={1}
-                    fill={day.count ? color : '#E2E8F0'}
+                    fill={day.count ? color : ui.empty}
                     fillOpacity={day.count ? (current ? 1 : 0.35) : 1}
                   >
                     <title>{`${day.date}: ${day.count}`}</title>
@@ -157,6 +172,7 @@ export function ActivityHeatmap({
   color: string;
   noun?: string;
 }) {
+  const ui = useChart();
   const { days, total, months } = useMemo(() => {
     const now = new Date();
     const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -227,7 +243,7 @@ export function ActivityHeatmap({
               x={month.week * (CELL + GAP)}
               y={10}
               fontSize={10}
-              fill="#94A3B8"
+              fill={ui.tick}
             >
               {month.label}
             </text>
@@ -242,7 +258,7 @@ export function ActivityHeatmap({
                 width={CELL}
                 height={CELL}
                 rx={2}
-                fill={value ? color : '#EEF2F6'}
+                fill={value ? color : ui.empty}
                 fillOpacity={value ? 0.25 + value * 0.1875 : 1}
               >
                 <title>{`${day.date}: ${day.count} ${noun}`}</title>
@@ -306,6 +322,7 @@ export function Donut({
   rows: CountItem[];
   aside?: string;
 }) {
+  const ui = useChart();
   const total = rows.reduce((sum, row) => sum + row.count, 0);
 
   return (
@@ -326,7 +343,7 @@ export function Donut({
                 isAnimationActive={false}
               >
                 {(total ? rows : [{ label: 'None', count: 1 }]).map((row) => (
-                  <Cell key={row.label} fill={total ? row.color : '#EEF2F6'} />
+                  <Cell key={row.label} fill={total ? row.color : ui.empty} />
                 ))}
               </Pie>
             </PieChart>
@@ -365,6 +382,7 @@ export function Donut({
 // ------------------------------------------------- attempted vs solved (LC)
 
 export function DifficultyBreakdown({ rows }: { rows: DifficultyRow[] }) {
+  const ui = useChart();
   const data = rows.map((row) => ({
     label: row.label,
     Attempted: row.attempted ?? row.solved,
@@ -380,10 +398,15 @@ export function DifficultyBreakdown({ rows }: { rows: DifficultyRow[] }) {
           <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data} margin={{ top: 4, right: 4, left: -16, bottom: 0 }} barGap={4}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-                <XAxis dataKey="label" tick={TICK} axisLine={false} tickLine={false} />
-                <YAxis tick={TICK} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: '#F1F5F9' }} />
+                <CartesianGrid strokeDasharray="3 3" stroke={ui.grid} vertical={false} />
+                <XAxis dataKey="label" tick={ui.tickStyle} axisLine={false} tickLine={false} />
+                <YAxis
+                  tick={ui.tickStyle}
+                  axisLine={false}
+                  tickLine={false}
+                  allowDecimals={false}
+                />
+                <Tooltip contentStyle={ui.tooltipStyle} cursor={{ fill: ui.cursor }} />
                 <Bar dataKey="Attempted" radius={[4, 4, 0, 0]} isAnimationActive={false}>
                   {data.map((row) => (
                     <Cell key={row.label} fill={row.color} fillOpacity={0.28} />
@@ -432,6 +455,7 @@ export function DifficultyBreakdown({ rows }: { rows: DifficultyRow[] }) {
 // ------------------------------------------------------------- rating chart
 
 export function RatingChart({ history, color }: { history: ContestPoint[]; color: string }) {
+  const ui = useChart();
   const gradientId = `rating-${useId().replace(/:/g, '')}`;
   const sorted = [...history].sort((a, b) => a.time - b.time);
   const spansYears =
@@ -452,13 +476,13 @@ export function RatingChart({ history, color }: { history: ContestPoint[]; color
               <stop offset="100%" stopColor={color} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke={ui.grid} vertical={false} />
           <XAxis
             dataKey="time"
             type="number"
             domain={['dataMin', 'dataMax']}
             tickFormatter={tickFormat}
-            tick={TICK}
+            tick={ui.tickStyle}
             axisLine={false}
             tickLine={false}
             minTickGap={28}
@@ -468,13 +492,13 @@ export function RatingChart({ history, color }: { history: ContestPoint[]; color
               (min: number) => Math.floor((min - 50) / 50) * 50,
               (max: number) => Math.ceil((max + 50) / 50) * 50,
             ]}
-            tick={TICK}
+            tick={ui.tickStyle}
             axisLine={false}
             tickLine={false}
             width={44}
           />
           <Tooltip
-            contentStyle={TOOLTIP_STYLE}
+            contentStyle={ui.tooltipStyle}
             labelFormatter={(seconds) => formatDate(Number(seconds))}
             formatter={(value, _name, item) => [
               `${value}${item.payload.rank ? ` · rank ${formatNumber(item.payload.rank)}` : ''}`,
@@ -543,6 +567,7 @@ export function cfColor(rating: number) {
 }
 
 export function RatingHistogram({ items }: { items: CountItem[] }) {
+  const ui = useChart();
   const solved = items.reduce((sum, item) => sum + item.count, 0);
   const hardest = items.length ? items[items.length - 1].label : '—';
 
@@ -560,12 +585,18 @@ export function RatingHistogram({ items }: { items: CountItem[] }) {
       <div className="h-52">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={items} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-            <XAxis dataKey="label" tick={TICK} axisLine={false} tickLine={false} minTickGap={8} />
-            <YAxis tick={TICK} axisLine={false} tickLine={false} allowDecimals={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke={ui.grid} vertical={false} />
+            <XAxis
+              dataKey="label"
+              tick={ui.tickStyle}
+              axisLine={false}
+              tickLine={false}
+              minTickGap={8}
+            />
+            <YAxis tick={ui.tickStyle} axisLine={false} tickLine={false} allowDecimals={false} />
             <Tooltip
-              contentStyle={TOOLTIP_STYLE}
-              cursor={{ fill: '#F1F5F9' }}
+              contentStyle={ui.tooltipStyle}
+              cursor={{ fill: ui.cursor }}
               formatter={(value) => [value, 'Solved']}
               labelFormatter={(label) => `Rating ${label}`}
             />

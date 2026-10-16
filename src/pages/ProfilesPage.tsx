@@ -121,7 +121,7 @@ export function ProfileView({ name, handles, student, onSubmit }: ProfileViewPro
       </section>
 
       {hasHandles ? (
-        <details className="group shadow-card rounded-2xl border border-slate-200 bg-white">
+        <details className="group shadow-card rounded-2xl border border-slate-200 bg-surface">
           <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-medium text-slate-600 hover:text-slate-900">
             <Pencil className="size-4" aria-hidden />
             Edit usernames
@@ -141,7 +141,7 @@ export function ProfileView({ name, handles, student, onSubmit }: ProfileViewPro
             className="-mx-4 flex gap-1 overflow-x-auto border-b border-slate-200 px-4 scrollbar-none"
           >
             <TabButton selected={tab === 'overview'} onClick={() => setTab('overview')}>
-              <LayoutGrid className="text-brand-700 size-4" aria-hidden />
+              <LayoutGrid className="text-brand-700 dark:text-brand-300 size-4" aria-hidden />
               Overview
             </TabButton>
             {results.map(({ platform, query }) => (
@@ -279,7 +279,7 @@ function TabButton({
       className={cn(
         '-mb-px inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors',
         selected
-          ? 'border-brand-700 text-brand-800'
+          ? 'border-brand-700 text-brand-800 dark:text-brand-200'
           : 'border-transparent text-slate-500 hover:text-slate-800'
       )}
     >
@@ -303,7 +303,7 @@ function TabCount({ query }: { query: UseQueryResult<CodingProfile, Error> }) {
   const value = profile.solved ?? profile.kpis[0]?.value;
   if (value === null || value === undefined) return null;
   return (
-    <span className="bg-brand-50 text-brand-800 rounded-full px-1.5 text-[11px] leading-4.5 tabular-nums">
+    <span className="bg-brand-50 dark:bg-brand-900/40 text-brand-800 dark:text-brand-200 rounded-full px-1.5 text-[11px] leading-4.5 tabular-nums">
       {typeof value === 'number' ? formatNumber(value) : value}
     </span>
   );

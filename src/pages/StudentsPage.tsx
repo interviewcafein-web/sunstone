@@ -131,7 +131,7 @@ export default function StudentsPage() {
         <button
           type="button"
           onClick={() => students.refetch()}
-          className="mt-3 rounded-md border border-red-300 bg-white px-3 py-1.5 font-medium hover:bg-red-50"
+          className="mt-3 rounded-md border border-red-300 bg-surface px-3 py-1.5 font-medium hover:bg-red-50"
         >
           Try again
         </button>

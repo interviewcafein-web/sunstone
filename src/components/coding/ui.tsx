@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
   return (
     <section
-      className={cn('shadow-card rounded-2xl border border-slate-200 bg-white p-5', className)}
+      className={cn('shadow-card rounded-2xl border border-slate-200 bg-surface p-5', className)}
     >
       {children}
     </section>
@@ -44,7 +44,7 @@ export function Segmented<T extends string>({
           onClick={() => onChange(option.value)}
           className={cn(
             'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-slate-600 transition',
-            option.value === value && 'bg-white text-slate-900 shadow-sm'
+            option.value === value && 'bg-surface text-slate-900 shadow-sm'
           )}
         >
           {option.label}

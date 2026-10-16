@@ -43,7 +43,7 @@ export function TopPerformers({ rows }: { rows: StudentRow[] }) {
                 to="/s/$slug"
                 params={{ slug: row.student.slug }}
                 className={cn(
-                  'group shadow-card relative flex h-full flex-col rounded-2xl border bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-lg',
+                  'group shadow-card relative flex h-full flex-col rounded-2xl border bg-surface p-4 transition hover:-translate-y-0.5 hover:shadow-lg',
                   place === 0 ? 'border-amber-300 ring-1 ring-amber-200' : 'border-slate-200'
                 )}
               >

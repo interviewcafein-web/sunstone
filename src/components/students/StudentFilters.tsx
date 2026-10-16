@@ -17,13 +17,13 @@ const FILTERS: { key: FilterKey; label: string; all: string }[] = [
 ];
 
 const field =
-  'focus-visible:outline-brand-500 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1';
+  'focus-visible:outline-brand-500 w-full rounded-lg border border-slate-300 bg-surface px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1';
 
 export function StudentFilters({ search, options, onChange }: StudentFiltersProps) {
   const active = FILTERS.some(({ key }) => search[key]) || Boolean(search.q);
 
   return (
-    <div className="shadow-card grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1.5fr_auto] lg:items-end">
+    <div className="shadow-card grid gap-3 rounded-2xl border border-slate-200 bg-surface p-4 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1.5fr_auto] lg:items-end">
       {FILTERS.map(({ key, label, all }) => (
         <div key={key}>
           <label

@@ -88,7 +88,7 @@ export function CodingOverview({ profiles }: { profiles: CodingProfile[] }) {
         <div className="grid grid-cols-2 gap-3">
           <OverviewTile
             icon={Target}
-            tone="bg-brand-100 text-brand-700"
+            tone="bg-brand-100 dark:bg-brand-900/60 text-brand-700 dark:text-brand-300"
             label="Total solved"
             value={formatNumber(solved)}
           />
@@ -177,7 +177,7 @@ function OverviewTile({
   value: string;
 }) {
   return (
-    <div className="shadow-card flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="shadow-card flex flex-col justify-between rounded-2xl border border-slate-200 bg-surface p-4">
       <span className={`flex size-9 items-center justify-center rounded-xl ${tone}`}>
         <Icon className="size-4.5" aria-hidden />
       </span>

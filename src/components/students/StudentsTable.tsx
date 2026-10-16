@@ -37,7 +37,7 @@ export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
   const maxTotal = Math.max(...rows.map((row) => row.total), 1);
 
   return (
-    <div className="shadow-card overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+    <div className="shadow-card overflow-x-auto rounded-2xl border border-slate-200 bg-surface">
       <table className="w-full min-w-[60rem] text-sm">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50/80 text-left text-xs text-slate-600">
@@ -77,7 +77,7 @@ export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
                     <Link
                       to="/s/$slug"
                       params={{ slug: student.slug }}
-                      className="text-brand-700 font-semibold hover:underline"
+                      className="text-brand-700 dark:text-brand-300 font-semibold hover:underline"
                     >
                       {student.name}
                     </Link>
@@ -133,8 +133,8 @@ function SortHeader({ label, icon, hint, sortKey, sort, onSort, numeric }: SortH
         type="button"
         onClick={() => onSort(sortKey)}
         className={cn(
-          'hover:text-brand-700 inline-flex items-center gap-1.5',
-          active && 'text-brand-700'
+          'hover:text-brand-700 dark:hover:text-brand-300 inline-flex items-center gap-1.5',
+          active && 'text-brand-700 dark:text-brand-300'
         )}
       >
         {icon}

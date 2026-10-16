@@ -62,7 +62,7 @@ export function RecentTable({ items, kind }: { items: RecentItem[]; kind: 'all' 
                         href={url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-brand-700 hover:underline"
+                        className="text-brand-700 dark:text-brand-300 hover:underline"
                       >
                         {row.title}
                       </a>
@@ -240,7 +240,7 @@ export function CertificateCards({ certificates }: { certificates: Certificate[]
           <button
             type="button"
             onClick={() => setShowAll(!showAll)}
-            className="text-brand-700 text-sm font-semibold hover:underline"
+            className="text-brand-700 dark:text-brand-300 text-sm font-semibold hover:underline"
           >
             {showAll ? 'Show fewer' : `Show all ${certificates.length}`}
           </button>
@@ -263,7 +263,7 @@ export function RepoCards({ repos }: { repos: Repo[] }) {
               href={safeUrl(repo.url)}
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:border-brand-300 flex h-full flex-col rounded-xl border border-slate-200 p-3 transition"
+              className="hover:border-brand-300 dark:hover:border-brand-500 flex h-full flex-col rounded-xl border border-slate-200 p-3 transition"
             >
               <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-slate-900">
                 <GitFork className="size-3.5 text-slate-400" aria-hidden />

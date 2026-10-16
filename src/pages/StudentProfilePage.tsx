@@ -23,7 +23,7 @@ export default function StudentProfilePage() {
         </p>
         <Link
           to="/"
-          className="text-brand-700 mt-3 inline-block text-sm font-semibold hover:underline"
+          className="text-brand-700 dark:text-brand-300 mt-3 inline-block text-sm font-semibold hover:underline"
         >
           Back to all students
         </Link>
