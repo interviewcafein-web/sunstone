@@ -10,7 +10,16 @@ export interface PlatformSummary {
   value: number;
   /** Secondary figure shown under the value, e.g. a contest rating. */
   detail?: string;
+  /**
+   * Latest day with any activity (YYYY-MM-DD, UTC), where the same response already carries
+   * it: LeetCode, Codeforces, CodeChef and GitHub. GeeksforGeeks and HackerRank would each
+   * need an extra request per student, so they report none.
+   */
+  lastActive?: string;
 }
+
+const isoDay = (seconds: number) => new Date(seconds * 1000).toISOString().slice(0, 10);
+const latest = (days: string[]) => (days.length ? days.sort().at(-1) : undefined);
 
 /** Runs at most `concurrency` tasks at once, starting them at least `gapMs` apart. */
 function createLimiter(concurrency: number, gapMs = 0) {
@@ -54,7 +63,7 @@ const LIMITERS: Record<PlatformId, ReturnType<typeof createLimiter>> = {
 
 const LEETCODE_QUERY = `
 query summary($u: String!) {
-  matchedUser(username: $u) { submitStatsGlobal { acSubmissionNum { difficulty count } } }
+  matchedUser(username: $u) { submissionCalendar submitStatsGlobal { acSubmissionNum { difficulty count } } }
   userContestRanking(username: $u) { rating }
 }`;
 
@@ -67,7 +76,13 @@ const SUMMARIES: Record<PlatformId, (handle: string) => Promise<PlatformSummary>
     if (!user) throw new ProfileError('not_found', 'User not found.');
     const all = user.submitStatsGlobal.acSubmissionNum.find((row: any) => row.difficulty === 'All');
     const rating = payload.data.userContestRanking?.rating;
-    return { value: all?.count ?? 0, detail: rating ? `Rating ${Math.round(rating)}` : undefined };
+    const calendar: Record<string, number> = JSON.parse(user.submissionCalendar || '{}');
+    const active = Object.keys(calendar).filter((seconds) => calendar[seconds] > 0);
+    return {
+      value: all?.count ?? 0,
+      detail: rating ? `Rating ${Math.round(rating)}` : undefined,
+      lastActive: active.length ? isoDay(Math.max(...active.map(Number))) : undefined,
+    };
   },
 
   async codeforces(handle) {
@@ -87,7 +102,12 @@ const SUMMARIES: Record<PlatformId, (handle: string) => Promise<PlatformSummary>
         .filter((submission) => submission.verdict === 'OK')
         .map(({ problem }) => `${problem.contestId ?? problem.problemsetName}-${problem.index}`)
     );
-    return { value: solved.size, detail: info.rating ? `Rating ${info.rating}` : undefined };
+    return {
+      value: solved.size,
+      detail: info.rating ? `Rating ${info.rating}` : undefined,
+      // user.status lists the newest submission first.
+      lastActive: submissions[0] ? isoDay(submissions[0].creationTimeSeconds) : undefined,
+    };
   },
 
   // Read from GitHub's own contributions page: api.github.com allows only 60
@@ -99,7 +119,13 @@ const SUMMARIES: Record<PlatformId, (handle: string) => Promise<PlatformSummary>
     );
     const match = html.match(/([\d,]+)\s+contributions?\s+in the last year/);
     if (!match) throw new ProfileError('upstream', 'Could not read the contributions page.');
-    return { value: Number(match[1].replace(/,/g, '')) };
+    const activeDays = [
+      ...html.matchAll(/data-date="(\d{4}-\d{2}-\d{2})"[^>]*data-level="[1-4]"/g),
+    ];
+    return {
+      value: Number(match[1].replace(/,/g, '')),
+      lastActive: latest(activeDays.map((day) => day[1])),
+    };
   },
 
   async geeksforgeeks(handle) {
@@ -134,9 +160,24 @@ const SUMMARIES: Record<PlatformId, (handle: string) => Promise<PlatformSummary>
     if (!html.includes('rating-number')) throw new ProfileError('not_found', 'User not found.');
     const solved = html.match(/Total Problems Solved: (\d+)/);
     const rating = html.match(/class="rating-number">\s*(\d+)/);
+    const daily = html.match(/userDailySubmissionsStats = (\[.*?\]);/s);
+    let activeDays: string[] = [];
+    try {
+      activeDays = (JSON.parse(daily?.[1] ?? '[]') as { date: string; value: number }[])
+        .filter((entry) => Number(entry.value) > 0)
+        .map((entry) =>
+          entry.date
+            .split('-')
+            .map((part, index) => (index ? part.padStart(2, '0') : part))
+            .join('-')
+        );
+    } catch {
+      // Markup changed: no last-active date from CodeChef.
+    }
     return {
       value: solved ? Number(solved[1]) : 0,
       detail: rating && Number(rating[1]) ? `Rating ${rating[1]}` : undefined,
+      lastActive: latest(activeDays),
     };
   },
 };

@@ -60,7 +60,7 @@ if (!rootElement.innerHTML) {
         persistOptions={{
           persister,
           maxAge: DAY,
-          buster: 'v1',
+          buster: 'v2',
           dehydrateOptions: {
             shouldDehydrateQuery: (query) =>
               query.queryKey[0] === SUMMARY_QUERY_KEY && query.state.status === 'success',

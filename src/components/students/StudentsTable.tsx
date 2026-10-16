@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { ArrowDown } from 'lucide-react';
+import { ArrowDown, Crown } from 'lucide-react';
 
 import { Avatar } from '@/components/common/Avatar';
 import { PlatformLogo } from '@/components/profile/PlatformLogo';
@@ -24,6 +24,10 @@ export interface StudentRow {
   cells: Record<PlatformId, Cell>;
   /** Problems solved across the platforms that have loaded so far. */
   total: number;
+  /** The platform with the most solved problems, and its share of the total. */
+  strongest?: { platform: PlatformId; share: number };
+  /** Most recent active day across the platforms that report one. */
+  lastActive?: { day: string; platform: PlatformId };
   loading: boolean;
 }
 
@@ -33,12 +37,32 @@ interface StudentsTableProps {
   onSort: (sort: SortKey) => void;
 }
 
+// Top three rows get a faint medal tint when the table is ranked by total.
+const PODIUM_TINT = [
+  'bg-amber-50/70 dark:bg-amber-50/20',
+  'bg-slate-100/70 dark:bg-slate-100/40',
+  'bg-orange-50/60 dark:bg-orange-50/20',
+];
+
 export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
   const maxTotal = Math.max(...rows.map((row) => row.total), 1);
+  // Best value per platform column in this view: drives the mini bars and the crown.
+  const columnMax = Object.fromEntries(
+    PLATFORMS.map((platform) => [
+      platform.id,
+      Math.max(
+        0,
+        ...rows.map((row) => {
+          const cell = row.cells[platform.id];
+          return cell.kind === 'ok' ? cell.summary.value : 0;
+        })
+      ),
+    ])
+  ) as Record<PlatformId, number>;
 
   return (
-    <div className="shadow-card overflow-x-auto rounded-2xl border border-slate-200 bg-surface">
-      <table className="w-full min-w-[60rem] text-sm">
+    <div className="shadow-card bg-surface overflow-x-auto rounded-2xl border border-slate-200">
+      <table className="w-full min-w-272 text-sm">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50/80 text-left text-xs text-slate-600">
             <th scope="col" className="w-10 px-3 py-2.5 font-semibold">
@@ -55,55 +79,101 @@ export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
                 sort={sort}
                 onSort={onSort}
                 numeric
+                divided
               />
             ))}
-            <SortHeader label="Total solved" sortKey="total" sort={sort} onSort={onSort} numeric />
+            <SortHeader
+              label="Total solved"
+              sortKey="total"
+              sort={sort}
+              onSort={onSort}
+              numeric
+              divided
+            />
+            <SortHeader
+              label="Last active"
+              hint="any platform"
+              sortKey="active"
+              sort={sort}
+              onSort={onSort}
+              divided
+            />
           </tr>
         </thead>
         <tbody>
-          {rows.map(({ student, cells, total, loading }, index) => (
-            <tr
-              key={student.id}
-              className="animate-rise hover:bg-brand-50/50 border-b border-slate-100 transition-colors last:border-0"
-              style={{ animationDelay: `${Math.min(index, 15) * 30}ms` }}
-            >
-              <td className="px-3 py-3 align-middle text-slate-400 tabular-nums">
-                {sort === 'total' && index < 3 && total > 0 ? <Medal place={index} /> : index + 1}
-              </td>
-              <th scope="row" className="px-3 py-3 text-left align-middle font-normal">
-                <div className="flex items-center gap-3">
-                  <Avatar name={student.name} />
-                  <div className="min-w-0">
-                    <Link
-                      to="/s/$slug"
-                      params={{ slug: student.slug }}
-                      className="text-brand-700 dark:text-brand-300 font-semibold hover:underline"
-                    >
-                      {student.name}
-                    </Link>
-                    <div className="text-xs text-slate-500">
-                      {[student.campus, student.course, student.batch].filter(Boolean).join(' · ')}
+          {rows.map(({ student, cells, total, strongest, lastActive, loading }, index) => {
+            const podium = sort === 'total' && index < 3 && total > 0;
+            return (
+              <tr
+                key={student.id}
+                className={cn(
+                  'animate-rise hover:bg-brand-50/50 dark:hover:bg-brand-900/30 border-b border-dotted border-slate-300 transition-colors last:border-0',
+                  podium && PODIUM_TINT[index]
+                )}
+                style={{ animationDelay: `${Math.min(index, 15) * 30}ms` }}
+              >
+                <td className="px-3 py-3 align-middle text-slate-400 tabular-nums">
+                  {podium ? <Medal place={index} /> : index + 1}
+                </td>
+                <th scope="row" className="px-3 py-3 text-left align-middle font-normal">
+                  <div className="flex items-center gap-3">
+                    <Avatar name={student.name} />
+                    <div className="min-w-0">
+                      <Link
+                        to="/s/$slug"
+                        params={{ slug: student.slug }}
+                        className="text-brand-700 dark:text-brand-300 font-semibold hover:underline"
+                      >
+                        {student.name}
+                      </Link>
+                      <div className="text-xs text-slate-500">
+                        {[student.campus, student.course, student.batch]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </th>
-              {PLATFORMS.map((platform) => (
-                <td key={platform.id} className="px-3 py-3 text-right align-middle">
-                  <PlatformCell platform={platform} cell={cells[platform.id]} />
+                </th>
+                {PLATFORMS.map((platform) => (
+                  <td
+                    key={platform.id}
+                    className="border-l border-dotted border-slate-200 px-3 py-3 text-right align-middle"
+                  >
+                    <PlatformCell
+                      platform={platform}
+                      cell={cells[platform.id]}
+                      columnMax={columnMax[platform.id]}
+                    />
+                  </td>
+                ))}
+                <td className="border-l border-dotted border-slate-200 px-3 py-3 text-right align-middle">
+                  <span className="text-base font-bold tabular-nums">{total.toLocaleString()}</span>
+                  <div className="mt-1 ml-auto h-1 w-20 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="from-brand-400 to-brand-700 h-full rounded-full bg-linear-to-r transition-[width] duration-500"
+                      style={{ width: `${(total / maxTotal) * 100}%` }}
+                    />
+                  </div>
+                  {loading ? (
+                    <div className="mt-0.5 text-xs text-slate-400">loading…</div>
+                  ) : (
+                    strongest && (
+                      <div
+                        className="mt-1 inline-flex items-center gap-1 text-[11px] text-slate-500"
+                        title="Share of this student's total solved on their strongest platform"
+                      >
+                        <PlatformLogo platform={strongest.platform} className="size-3" />
+                        {strongest.share}% here
+                      </div>
+                    )
+                  )}
                 </td>
-              ))}
-              <td className="px-3 py-3 text-right align-middle">
-                <span className="text-base font-bold tabular-nums">{total.toLocaleString()}</span>
-                <div className="mt-1 ml-auto h-1 w-20 overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="from-brand-400 to-brand-700 h-full rounded-full bg-gradient-to-r transition-[width] duration-500"
-                    style={{ width: `${(total / maxTotal) * 100}%` }}
-                  />
-                </div>
-                {loading && <div className="mt-0.5 text-xs text-slate-400">loading…</div>}
-              </td>
-            </tr>
-          ))}
+                <td className="border-l border-dotted border-slate-200 px-3 py-3 align-middle">
+                  <LastActive value={lastActive} />
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -118,22 +188,37 @@ interface SortHeaderProps {
   sort: SortKey;
   onSort: (sort: SortKey) => void;
   numeric?: boolean;
+  /** Dotted line on the left, separating this column from the previous one. */
+  divided?: boolean;
 }
 
-function SortHeader({ label, icon, hint, sortKey, sort, onSort, numeric }: SortHeaderProps) {
+function SortHeader({
+  label,
+  icon,
+  hint,
+  sortKey,
+  sort,
+  onSort,
+  numeric,
+  divided,
+}: SortHeaderProps) {
   const active = sort === sortKey;
 
   return (
     <th
       scope="col"
       aria-sort={active ? (sortKey === 'name' ? 'ascending' : 'descending') : undefined}
-      className={cn('px-3 py-2.5 font-semibold', numeric && 'text-right')}
+      className={cn(
+        'px-3 py-2.5 font-semibold',
+        numeric && 'text-right',
+        divided && 'border-l border-dotted border-slate-200'
+      )}
     >
       <button
         type="button"
         onClick={() => onSort(sortKey)}
         className={cn(
-          'hover:text-brand-700 dark:hover:text-brand-300 inline-flex items-center gap-1.5',
+          'hover:text-brand-700 dark:hover:text-brand-300 inline-flex items-center gap-1.5 whitespace-nowrap',
           active && 'text-brand-700 dark:text-brand-300'
         )}
       >
@@ -148,7 +233,17 @@ function SortHeader({ label, icon, hint, sortKey, sort, onSort, numeric }: SortH
   );
 }
 
-function PlatformCell({ platform, cell }: { platform: Platform; cell: Cell }) {
+const pill = 'rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap';
+
+function PlatformCell({
+  platform,
+  cell,
+  columnMax,
+}: {
+  platform: Platform;
+  cell: Cell;
+  columnMax: number;
+}) {
   switch (cell.kind) {
     case 'none':
       return <span className="text-slate-300">—</span>;
@@ -156,7 +251,7 @@ function PlatformCell({ platform, cell }: { platform: Platform; cell: Cell }) {
       return (
         <span
           title={`The sheet entry for ${platform.name} is not a username or a profile link.`}
-          className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900"
+          className={cn(pill, 'bg-amber-100 text-amber-900')}
         >
           Check entry
         </span>
@@ -173,7 +268,7 @@ function PlatformCell({ platform, cell }: { platform: Platform; cell: Cell }) {
       return (
         <span
           title={`No ${platform.name} account named "${cell.handle}".`}
-          className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800"
+          className={cn(pill, 'bg-red-100 text-red-800')}
         >
           Not found
         </span>
@@ -184,27 +279,103 @@ function PlatformCell({ platform, cell }: { platform: Platform; cell: Cell }) {
           type="button"
           onClick={cell.retry}
           title={cell.message}
-          className="rounded-full border border-slate-300 px-2 py-0.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+          className={cn(pill, 'border border-slate-300 text-slate-600 hover:bg-slate-50')}
         >
           Retry
         </button>
       );
-    case 'ok':
+    case 'ok': {
+      const { value, detail } = cell.summary;
+      const best = value > 0 && value === columnMax;
       return (
         <a
           href={platform.profileUrl(cell.handle)}
           target="_blank"
           rel="noopener noreferrer"
-          title={`${cell.handle} on ${platform.name}`}
-          className="group inline-block"
+          title={`${cell.handle} on ${platform.name}${best ? ' · highest in this view' : ''}`}
+          className="group inline-flex flex-col items-end"
         >
-          <span className="font-semibold tabular-nums group-hover:underline">
-            {cell.summary.value.toLocaleString()}
+          <span className="inline-flex items-center gap-1 font-semibold tabular-nums group-hover:underline">
+            {best && (
+              <Crown className="size-3.5 text-amber-500" aria-label="Highest in this view" />
+            )}
+            {value.toLocaleString()}
           </span>
-          {cell.summary.detail && platform.id !== 'github' && (
-            <div className="text-xs text-slate-500">{cell.summary.detail}</div>
+          {detail && platform.id !== 'github' && (
+            <span className="text-xs whitespace-nowrap text-slate-500">{detail}</span>
           )}
+          {/* Compared with the best on this platform in the current view. */}
+          <span className="mt-1 h-1 w-14 overflow-hidden rounded-full bg-slate-100">
+            <span
+              className="block h-full rounded-full"
+              style={{
+                width: `${columnMax ? Math.max(4, (value / columnMax) * 100) : 0}%`,
+                background: platform.color,
+              }}
+            />
+          </span>
         </a>
       );
+    }
   }
+}
+
+const DAY_MS = 86_400_000;
+
+/** "Today", "Yesterday", "5d ago", "3w ago", "4mo ago", with a dot coloured by freshness. */
+function LastActive({ value }: { value?: StudentRow['lastActive'] }) {
+  if (!value) {
+    return (
+      <span
+        className="text-xs text-slate-400"
+        title="None of this student's linked platforms reports activity dates"
+      >
+        —
+      </span>
+    );
+  }
+
+  const now = new Date();
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const days = Math.max(0, Math.round((today - Date.parse(value.day)) / DAY_MS));
+  const label =
+    days === 0
+      ? 'Today'
+      : days === 1
+        ? 'Yesterday'
+        : days < 14
+          ? `${days}d ago`
+          : days < 60
+            ? `${Math.round(days / 7)}w ago`
+            : `${Math.round(days / 30)}mo ago`;
+  const tone =
+    days <= 1
+      ? 'bg-emerald-500'
+      : days <= 7
+        ? 'bg-sky-500'
+        : days <= 30
+          ? 'bg-amber-500'
+          : 'bg-slate-400';
+  const platform = PLATFORMS.find((item) => item.id === value.platform)!;
+
+  return (
+    <span
+      className="inline-flex items-center gap-2 text-xs font-medium whitespace-nowrap text-slate-700"
+      title={`Last activity on ${value.day} (${platform.name})`}
+    >
+      <span className="relative flex size-2">
+        {days <= 1 && (
+          <span
+            className={cn(
+              'absolute inline-flex size-full animate-ping rounded-full opacity-60 motion-reduce:hidden',
+              tone
+            )}
+          />
+        )}
+        <span className={cn('relative inline-flex size-2 rounded-full', tone)} />
+      </span>
+      {label}
+      <PlatformLogo platform={value.platform} className="size-3" />
+    </span>
+  );
 }

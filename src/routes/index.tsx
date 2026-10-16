@@ -4,7 +4,7 @@ import StudentsPage from '@/pages/StudentsPage';
 import { PLATFORM_IDS } from '@/lib/coding-profiles/platforms';
 import type { PlatformId } from '@/lib/coding-profiles/types';
 
-export type SortKey = 'total' | 'name' | PlatformId;
+export type SortKey = 'total' | 'name' | 'active' | PlatformId;
 
 export interface StudentsSearch {
   campus?: string;
@@ -14,7 +14,7 @@ export interface StudentsSearch {
   sort?: SortKey;
 }
 
-const SORT_KEYS: string[] = ['total', 'name', ...PLATFORM_IDS];
+const SORT_KEYS: string[] = ['total', 'name', 'active', ...PLATFORM_IDS];
 
 const text = (value: unknown) =>
   typeof value === 'string' || typeof value === 'number'

@@ -49,14 +49,31 @@ function toRow(student: Student, queries: Map<string, SummaryQuery>): StudentRow
   ) as Record<PlatformId, Cell>;
 
   let total = 0;
+  let strongest: StudentRow['strongest'];
   for (const platform of SOLVING_PLATFORM_IDS) {
     const cell = cells[platform];
-    if (cell.kind === 'ok') total += cell.summary.value;
+    if (cell.kind !== 'ok') continue;
+    total += cell.summary.value;
+    if (cell.summary.value > (strongest?.share ?? 0)) {
+      strongest = { platform, share: cell.summary.value };
+    }
   }
+  // `share` held the raw count while searching; turn it into a percentage of the total.
+  if (strongest) strongest = { ...strongest, share: Math.round((strongest.share / total) * 100) };
+
+  let lastActive: StudentRow['lastActive'];
+  for (const platform of PLATFORM_IDS) {
+    const cell = cells[platform];
+    const day = cell.kind === 'ok' ? cell.summary.lastActive : undefined;
+    if (day && (!lastActive || day > lastActive.day)) lastActive = { day, platform };
+  }
+
   return {
     student,
     cells,
     total,
+    strongest,
+    lastActive,
     loading: PLATFORM_IDS.some((platform) => cells[platform].kind === 'loading'),
   };
 }
@@ -64,6 +81,12 @@ function toRow(student: Student, queries: Map<string, SummaryQuery>): StudentRow
 function compareRows(sort: SortKey) {
   const byName = (a: StudentRow, b: StudentRow) => a.student.name.localeCompare(b.student.name);
   if (sort === 'name') return byName;
+
+  if (sort === 'active') {
+    // Most recently active first; students with no activity date go last.
+    return (a: StudentRow, b: StudentRow) =>
+      (b.lastActive?.day ?? '').localeCompare(a.lastActive?.day ?? '') || byName(a, b);
+  }
 
   const score = (row: StudentRow) => {
     if (sort === 'total') return row.total;
