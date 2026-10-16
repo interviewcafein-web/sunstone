@@ -8,6 +8,7 @@ import { PLATFORMS } from '@/lib/coding-profiles/platforms';
 import type { PlatformSummary } from '@/lib/coding-profiles/summaries';
 import type { Platform, PlatformId } from '@/lib/coding-profiles/types';
 import type { Student } from '@/lib/students/types';
+import { zoneById, type ZoneResult } from '@/lib/students/zones';
 import type { SortKey } from '@/routes/index';
 import { cn } from '@/lib/utils';
 
@@ -26,6 +27,8 @@ export interface StudentRow {
   total: number;
   /** The platform with the most solved problems, and its share of the total. */
   strongest?: { platform: PlatformId; share: number };
+  /** Practice zone; null while the platform that decides it is still loading. */
+  zone: ZoneResult | null;
   /** Most recent active day across the platforms that report one. */
   lastActive?: { day: string; platform: PlatformId };
   loading: boolean;
@@ -101,7 +104,7 @@ export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
           </tr>
         </thead>
         <tbody>
-          {rows.map(({ student, cells, total, strongest, lastActive, loading }, index) => {
+          {rows.map(({ student, cells, total, strongest, lastActive, zone, loading }, index) => {
             const podium = sort === 'total' && index < 3 && total > 0;
             return (
               <tr
@@ -131,6 +134,7 @@ export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
                           .filter(Boolean)
                           .join(' · ')}
                       </div>
+                      {zone && <ZonePill zone={zone} />}
                     </div>
                   </div>
                 </th>
@@ -376,6 +380,26 @@ function LastActive({ value }: { value?: StudentRow['lastActive'] }) {
       </span>
       {label}
       <PlatformLogo platform={value.platform} className="size-3" />
+    </span>
+  );
+}
+
+/** Small coloured tag under the student's name: which zone, and what decided it. */
+function ZonePill({ zone }: { zone: ZoneResult }) {
+  const info = zoneById(zone.zone);
+  const basis = zone.basis && PLATFORMS.find((platform) => platform.id === zone.basis)!;
+  return (
+    <span
+      className="mt-1 inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[10px] font-semibold"
+      style={{ color: info.color, backgroundColor: `${info.color}1a` }}
+      title={
+        basis
+          ? `${info.label}: ${zone.count} solved on ${basis.name}`
+          : `${info.label}: no usable username on any problem-solving platform`
+      }
+    >
+      <span className="size-1.5 rounded-full" style={{ backgroundColor: info.color }} />
+      {info.label}
     </span>
   );
 }

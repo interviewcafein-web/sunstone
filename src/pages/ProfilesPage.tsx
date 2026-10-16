@@ -1,7 +1,16 @@
 import { Fragment, useEffect, useState } from 'react';
 import { Link, getRouteApi } from '@tanstack/react-router';
 import type { UseQueryResult } from '@tanstack/react-query';
-import { Check, ChevronRight, IdCard, LayoutGrid, Link2, Loader2, Pencil } from 'lucide-react';
+import {
+  Check,
+  ChevronRight,
+  FileDown,
+  IdCard,
+  LayoutGrid,
+  Link2,
+  Loader2,
+  Pencil,
+} from 'lucide-react';
 
 import { Avatar } from '@/components/common/Avatar';
 import { CodingOverview } from '@/components/coding/CodingOverview';
@@ -76,6 +85,29 @@ export function ProfileView({ name, handles, student, onSubmit }: ProfileViewPro
 
   const shareUrl = student ? `${window.location.origin}/s/${student.slug}` : undefined;
 
+  // The PDF is drawn from what this page has loaded, so it waits for every platform.
+  const stillLoading = results.some(({ query }) => query.isPending);
+  const [pdfState, setPdfState] = useState<'idle' | 'busy' | 'failed'>('idle');
+  const downloadPdf = async () => {
+    setPdfState('busy');
+    try {
+      const { downloadStudentReport } = await import('@/reports');
+      await downloadStudentReport({
+        origin: window.location.origin,
+        name: name ?? student?.name ?? 'Coding profile',
+        campus: student?.campus,
+        course: student?.course,
+        batch: student?.batch && student.batch !== 'Not specified' ? student.batch : undefined,
+        generatedAt: new Date(),
+        profiles: loaded,
+      });
+      setPdfState('idle');
+    } catch (error) {
+      console.error(error);
+      setPdfState('failed');
+    }
+  };
+
   return (
     <div className="rise-stagger space-y-5">
       <section className="from-brand-700 to-brand-900 relative overflow-hidden rounded-2xl bg-gradient-to-br p-5 text-white shadow-[0_20px_50px_-20px_rgb(16_38_70/0.6)] sm:p-7">
@@ -103,6 +135,26 @@ export function ProfileView({ name, handles, student, onSubmit }: ProfileViewPro
                   Coding card
                 </Link>
               )}
+              <button
+                type="button"
+                onClick={downloadPdf}
+                disabled={stillLoading || loaded.length === 0 || pdfState === 'busy'}
+                title={
+                  pdfState === 'failed'
+                    ? 'The PDF could not be created. Try again.'
+                    : stillLoading
+                      ? 'Available once every platform has loaded'
+                      : 'Download this profile as a PDF report'
+                }
+                className="text-brand-800 hover:bg-brand-50 inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
+              >
+                {pdfState === 'busy' || stillLoading ? (
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                ) : (
+                  <FileDown className="size-3.5" aria-hidden />
+                )}
+                {pdfState === 'failed' ? 'Retry PDF' : 'Download PDF'}
+              </button>
               <CopyLinkButton url={shareUrl} />
             </div>
           )}

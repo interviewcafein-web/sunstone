@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { getRouteApi } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
@@ -7,6 +7,7 @@ import { StudentFilters } from '@/components/students/StudentFilters';
 import { StudentsHero } from '@/components/students/StudentsHero';
 import { StudentsTable, type Cell, type StudentRow } from '@/components/students/StudentsTable';
 import { TopPerformers } from '@/components/students/TopPerformers';
+import { ZonePanel } from '@/components/students/ZonePanel';
 import {
   SUMMARY_QUERY_KEY,
   summaryKey,
@@ -17,6 +18,8 @@ import { useStudents } from '@/hooks/useStudents';
 import { PLATFORM_IDS, SOLVING_PLATFORM_IDS } from '@/lib/coding-profiles/platforms';
 import { ProfileError, type PlatformId } from '@/lib/coding-profiles/types';
 import type { Student } from '@/lib/students/types';
+import { ZONE_BASIS, zoneOf, type ZoneResult } from '@/lib/students/zones';
+import type { CampusReportRow, ReportValue } from '@/reports';
 import type { SortKey, StudentsSearch } from '@/routes/index';
 
 const route = getRouteApi('/');
@@ -74,7 +77,45 @@ function toRow(student: Student, queries: Map<string, SummaryQuery>): StudentRow
     total,
     strongest,
     lastActive,
+    zone: rowZone(cells),
     loading: PLATFORM_IDS.some((platform) => cells[platform].kind === 'loading'),
+  };
+}
+
+/**
+ * The zone comes from the first platform in ZONE_BASIS that loaded. If a platform ahead of
+ * it is still loading, the zone is not known yet (null) rather than decided by a fallback.
+ */
+function rowZone(cells: Record<PlatformId, Cell>): ZoneResult | null {
+  const solved: Partial<Record<PlatformId, number>> = {};
+  for (const platform of ZONE_BASIS) {
+    const cell = cells[platform];
+    if (cell.kind === 'loading') return null;
+    if (cell.kind === 'ok') solved[platform] = cell.summary.value;
+  }
+  return zoneOf(solved);
+}
+
+function toReportRow(row: StudentRow): CampusReportRow {
+  const values = Object.fromEntries(
+    PLATFORM_IDS.map((platform): [PlatformId, ReportValue] => {
+      const cell = row.cells[platform];
+      if (cell.kind === 'ok') return [platform, cell.summary.value];
+      if (cell.kind === 'none' || cell.kind === 'invalid' || cell.kind === 'not_found') {
+        return [platform, cell.kind];
+      }
+      return [platform, 'error'];
+    })
+  ) as Record<PlatformId, ReportValue>;
+  return {
+    name: row.student.name,
+    campus: row.student.campus,
+    course: row.student.course,
+    batch: row.student.batch,
+    values,
+    total: row.total,
+    zone: row.zone ?? { zone: 'none' },
+    lastActive: row.lastActive?.day,
   };
 }
 
@@ -128,6 +169,39 @@ export default function StudentsPage() {
   // Only the students on screen are fetched, so a campus or batch view loads faster.
   const summaries = useStudentSummaries(filtered);
   const rows = filtered.map((student) => toRow(student, summaries.byKey)).sort(compareRows(sort));
+
+  const shown = search.zone ? rows.filter((row) => row.zone?.zone === search.zone) : rows;
+  const [reportState, setReportState] = useState<'idle' | 'busy' | 'failed'>('idle');
+
+  // A campus report covers every student in the campus (and batch/course filters), so it
+  // waits until every profile has loaded and ignores the name search and zone filter.
+  const reportBlocker = !search.campus
+    ? 'Choose a campus to download its report.'
+    : search.q
+      ? 'Clear the name search so the report includes every student.'
+      : summaries.settled < summaries.total
+        ? `Loading profiles: ${summaries.settled} of ${summaries.total}.`
+        : undefined;
+
+  const downloadReport = async () => {
+    setReportState('busy');
+    try {
+      const { downloadCampusReport } = await import('@/reports');
+      await downloadCampusReport({
+        origin: window.location.origin,
+        title: search.campus ?? 'All campuses',
+        filters: [search.batch && `Batch ${search.batch}`, search.course].filter(
+          (value): value is string => Boolean(value)
+        ),
+        generatedAt: new Date(),
+        rows: rows.map(toReportRow),
+      });
+      setReportState('idle');
+    } catch (error) {
+      console.error(error);
+      setReportState('failed');
+    }
+  };
 
   const setSearch = (patch: Partial<StudentsSearch>) =>
     navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true });
@@ -190,10 +264,21 @@ export default function StudentsPage() {
 
       <StudentFilters search={search} options={options} onChange={setSearch} />
 
-      {!search.q && <TopPerformers rows={rows} />}
+      <ZonePanel
+        rows={rows}
+        active={search.zone}
+        onZone={(zone) => setSearch({ zone })}
+        report={{
+          blocker: reportBlocker,
+          state: reportState,
+          onDownload: downloadReport,
+        }}
+      />
 
-      {rows.length > 0 ? (
-        <StudentsTable rows={rows} sort={sort} onSort={(next) => setSearch({ sort: next })} />
+      {!search.q && <TopPerformers rows={shown} />}
+
+      {shown.length > 0 ? (
+        <StudentsTable rows={shown} sort={sort} onSort={(next) => setSearch({ sort: next })} />
       ) : (
         <p className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-10 text-center text-sm text-slate-600">
           No students match these filters.

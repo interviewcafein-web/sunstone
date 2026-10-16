@@ -94,6 +94,21 @@ InterviewCafe's profile card.
   will not compile the renderer's WebAssembly; their helpers are in the import-free
   `api/_render.ts`.
 
+## Zones and PDF reports
+
+Students are placed in practice zones by problems solved on LeetCode, or on the next usable
+platform (GeeksforGeeks, Codeforces, CodeChef, HackerRank; never GitHub): green 100+,
+yellow 50–99, orange 25–49, red under 25, and "Not linked" when no username is usable. The
+rules live in `src/lib/students/zones.ts`.
+
+- **Campus report:** choose a campus on the students page and use "Download campus
+  report" once every profile has loaded. It is a landscape PDF with a summary page and one
+  section per zone.
+- **Student report:** "Download PDF" on any profile.
+
+The PDFs are drawn in the browser with `@react-pdf/renderer` (`src/reports/`), loaded only
+when a report is downloaded.
+
 ## Deploy
 
 Import the repo in Vercel with the Vite preset and set `SHEET_ID` (and optionally
