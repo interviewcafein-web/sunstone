@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Link, getRouteApi } from '@tanstack/react-router';
 import type { UseQueryResult } from '@tanstack/react-query';
-import { ArrowLeft, Check, LayoutGrid, Link2, Loader2, Pencil } from 'lucide-react';
+import { Check, ChevronRight, LayoutGrid, Link2, Loader2, Pencil } from 'lucide-react';
 
 import { Avatar } from '@/components/common/Avatar';
 import { CodingOverview } from '@/components/coding/CodingOverview';
@@ -10,6 +10,7 @@ import { Card, formatNumber } from '@/components/coding/ui';
 import { HandleForm } from '@/components/profile/HandleForm';
 import { PlatformLogo } from '@/components/profile/PlatformLogo';
 import { useCodingProfiles } from '@/hooks/useCodingProfiles';
+import { useStudents } from '@/hooks/useStudents';
 import {
   ProfileError,
   type CodingProfile,
@@ -40,6 +41,19 @@ export default function ProfilesPage() {
   // Editing the handles turns this into an ad-hoc lookup, so the student's name is dropped.
   const submit = (next: Handles) => navigate({ search: next });
 
+  // Campus and batch are not in the link; find this student in the sheet for the breadcrumb.
+  const students = useStudents();
+  const student = name
+    ? students.data?.students.find(
+        (candidate) =>
+          candidate.name.toLowerCase() === name.toLowerCase() &&
+          Object.entries(handles).some(
+            ([platform, handle]) =>
+              candidate.handles[platform as PlatformId]?.toLowerCase() === handle?.toLowerCase()
+          )
+      )
+    : undefined;
+
   return (
     <div className="rise-stagger space-y-5">
       <section className="from-brand-700 to-brand-900 relative overflow-hidden rounded-2xl bg-gradient-to-br p-5 text-white shadow-[0_20px_50px_-20px_rgb(16_38_70/0.6)] sm:p-7">
@@ -48,13 +62,13 @@ export default function ProfilesPage() {
           className="bg-brand-400/30 pointer-events-none absolute -top-24 right-1/4 size-72 rounded-full blur-3xl"
         />
         <div className="relative flex flex-wrap items-start justify-between gap-3">
-          <Link
-            to="/"
-            className="text-brand-100 mb-4 inline-flex items-center gap-1 text-sm hover:text-white"
-          >
-            <ArrowLeft className="size-4" aria-hidden />
-            All students
-          </Link>
+          <Breadcrumbs
+            name={name}
+            campus={student?.campus}
+            batch={student?.batch}
+            platform={active?.platform.name}
+            onOverview={() => setTab('overview')}
+          />
           {hasHandles && <CopyLinkButton />}
         </div>
         <div className="relative flex items-center gap-4">
@@ -123,6 +137,92 @@ export default function ProfilesPage() {
         </>
       )}
     </div>
+  );
+}
+
+interface BreadcrumbsProps {
+  name?: string;
+  campus?: string;
+  batch?: string;
+  /** The open platform tab, if any; the student's name then leads back to the overview. */
+  platform?: string;
+  onOverview: () => void;
+}
+
+const crumbLink = 'text-brand-100 rounded hover:text-white hover:underline';
+
+/** Students › Campus › Batch › Student › Platform; the last crumb is the current page. */
+function Breadcrumbs({ name, campus, batch, platform, onOverview }: BreadcrumbsProps) {
+  const known = (value?: string) => value && value !== 'Not specified';
+  const crumbs: { key: string; node: React.ReactNode }[] = [
+    {
+      key: 'students',
+      node: (
+        <Link to="/" className={crumbLink}>
+          Students
+        </Link>
+      ),
+    },
+  ];
+  if (known(campus)) {
+    crumbs.push({
+      key: 'campus',
+      node: (
+        <Link to="/" search={{ campus }} className={crumbLink}>
+          {campus}
+        </Link>
+      ),
+    });
+  }
+  if (known(campus) && known(batch)) {
+    crumbs.push({
+      key: 'batch',
+      node: (
+        <Link to="/" search={{ campus, batch }} className={crumbLink}>
+          Batch {batch}
+        </Link>
+      ),
+    });
+  }
+  const person = name ?? 'Look up a profile';
+  crumbs.push({
+    key: 'person',
+    node: platform ? (
+      <button type="button" onClick={onOverview} className={crumbLink}>
+        {person}
+      </button>
+    ) : (
+      <span aria-current="page" className="font-medium text-white">
+        {person}
+      </span>
+    ),
+  });
+  if (platform) {
+    crumbs.push({
+      key: 'platform',
+      node: (
+        <span aria-current="page" className="font-medium text-white">
+          {platform}
+        </span>
+      ),
+    });
+  }
+
+  return (
+    <nav aria-label="Breadcrumb" className="mb-4 min-w-0">
+      <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
+        {crumbs.map((crumb, index) => (
+          <Fragment key={crumb.key}>
+            {index > 0 && (
+              <li aria-hidden className="text-brand-300">
+                <ChevronRight className="size-3.5" />
+              </li>
+            )}
+            <li className="min-w-0 truncate">{crumb.node}</li>
+          </Fragment>
+        ))}
+      </ol>
+    </nav>
   );
 }
 
