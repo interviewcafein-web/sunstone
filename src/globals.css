@@ -77,4 +77,19 @@ html.splash-gone .rise-stagger > * {
       radial-gradient(1100px 380px at 50% -120px, var(--color-brand-100), transparent 70%),
       var(--color-slate-50);
   }
+
+  /* Tailwind v4 leaves buttons with the default arrow; show a hand on anything clickable. */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  select:not(:disabled),
+  summary,
+  input[type='checkbox']:not(:disabled),
+  input[type='radio']:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  select:disabled {
+    cursor: not-allowed;
+  }
 }
