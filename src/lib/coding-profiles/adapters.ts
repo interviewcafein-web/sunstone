@@ -703,6 +703,7 @@ async function hackerrank(username: string): Promise<AdapterResult> {
       name:
         entry.attributes.certificates?.[0] ??
         `${entry.attributes.certificate?.label} (${entry.attributes.certificate?.level})`,
+      kind: entry.attributes.type === 'role' ? 'role' : 'skill',
       url: `https://www.hackerrank.com/certificates/${entry.id}`,
       completedAt: entry.attributes.completed_at
         ? Math.floor(Date.parse(entry.attributes.completed_at) / 1000)

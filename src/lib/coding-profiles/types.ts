@@ -77,6 +77,8 @@ export interface Award {
 
 export interface Certificate {
   name: string;
+  /** HackerRank's two kinds: a skill test ("SQL (Advanced)") or a role ("Software Engineer"). */
+  kind?: 'skill' | 'role';
   url?: string;
   /** Unix seconds. */
   completedAt?: number;

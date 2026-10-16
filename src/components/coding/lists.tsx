@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BadgeCheck, ExternalLink, GitFork, Star } from 'lucide-react';
+import { Award as AwardIcon, ExternalLink, GitFork, Star } from 'lucide-react';
 
 import { Card, CardHeader, formatDate, formatNumber } from '@/components/coding/ui';
 import type { Award, Certificate, RecentItem, Repo } from '@/lib/coding-profiles/types';
@@ -173,47 +173,78 @@ export function HexBadge({ stars }: { stars: number }) {
 
 // -------------------------------------------------------------- certificates
 
+/** HackerRank's certificate tile: green card, folded corner, "Verified" and a type ribbon. */
+function CertificateTile({ certificate }: { certificate: Certificate }) {
+  const role = certificate.kind === 'role';
+  const url = safeUrl(certificate.url);
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={
+        certificate.completedAt
+          ? `Verified on ${formatDate(certificate.completedAt)}`
+          : 'Verified certificate'
+      }
+      className={cn(
+        'group relative flex aspect-[3/2] flex-col justify-between overflow-hidden p-4 text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md',
+        role ? 'bg-[#3b82c4]' : 'bg-[#52a858]'
+      )}
+      // The folded top-right corner is cut out of the card; the triangle below fills it.
+      style={{ clipPath: 'polygon(0 0, calc(100% - 22%) 0, 100% 34%, 100% 100%, 0 100%)' }}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          'absolute top-0 right-0 h-[34%] w-[22%]',
+          role ? 'bg-[#9cc8ef]' : 'bg-[#98e39b]'
+        )}
+        style={{ clipPath: 'polygon(0 0, 0 100%, 100% 100%)' }}
+      />
+      <AwardIcon className="size-7 stroke-[1.5]" aria-hidden />
+      <p className="pr-6 text-sm leading-snug font-medium">{certificate.name}</p>
+      <div className="-mr-4 flex items-end justify-between">
+        <span className="pb-0.5 text-sm font-semibold">Verified</span>
+        <span
+          className={cn(
+            'py-1 pr-4 pl-6 text-xs font-bold tracking-wide uppercase',
+            role ? 'bg-[#9cc8ef] text-[#2c6aa3]' : 'bg-[#98e39b] text-[#3d8a45]'
+          )}
+          style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0 100%, 14px 50%)' }}
+        >
+          {role ? 'Role' : 'Skill'}
+        </span>
+      </div>
+    </a>
+  );
+}
+
 export function CertificateCards({ certificates }: { certificates: Certificate[] }) {
   const [showAll, setShowAll] = useState(false);
   const shown = showAll ? certificates : certificates.slice(0, 4);
 
   return (
     <Card>
-      <CardHeader title="Certificates" aside={`${certificates.length} verified`} />
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {shown.map((certificate) => {
-          const url = safeUrl(certificate.url);
-          return (
-            <li key={certificate.name + certificate.completedAt}>
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex h-full items-center gap-3 rounded-xl bg-gradient-to-br from-emerald-50 to-white p-3 ring-1 ring-emerald-200 transition hover:ring-emerald-400"
-              >
-                <BadgeCheck className="size-8 shrink-0 text-emerald-600" aria-hidden />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-900">
-                    {certificate.name}
-                  </p>
-                  <p className="text-xs text-emerald-700">
-                    Verified
-                    {certificate.completedAt ? ` · ${formatDate(certificate.completedAt)}` : ''}
-                  </p>
-                </div>
-              </a>
-            </li>
-          );
-        })}
+      <CardHeader title="Certifications" aside={`${certificates.length} verified`} />
+      <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        {shown.map((certificate) => (
+          <li key={certificate.name + certificate.completedAt}>
+            <CertificateTile certificate={certificate} />
+          </li>
+        ))}
       </ul>
       {certificates.length > 4 && (
-        <button
-          type="button"
-          onClick={() => setShowAll(!showAll)}
-          className="text-brand-700 mt-3 text-xs font-semibold hover:underline"
-        >
-          {showAll ? 'Show fewer' : `Show all ${certificates.length}`}
-        </button>
+        <div className="mt-4 text-center">
+          <button
+            type="button"
+            onClick={() => setShowAll(!showAll)}
+            className="text-brand-700 text-sm font-semibold hover:underline"
+          >
+            {showAll ? 'Show fewer' : `Show all ${certificates.length}`}
+          </button>
+        </div>
       )}
     </Card>
   );
