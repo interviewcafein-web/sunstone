@@ -12,7 +12,7 @@ import type { CardStats } from './_render';
 export * from './_render';
 
 export async function findStudent(origin: string, slug: string): Promise<Student | undefined> {
-  // The public one-student endpoint: the full list needs a login (see middleware.ts).
+  // The public one-student endpoint: the full list needs a login (see api/students.ts).
   const response = await fetch(`${origin}/api/student?s=${encodeURIComponent(slug)}`);
   if (!response.ok) return undefined;
   return ((await response.json()) as { student?: Student }).student;

@@ -1,6 +1,6 @@
 // Login without a backend: accounts live in the AUTH_USERS environment variable (username +
-// PBKDF2 password hash), and a signed cookie proves who is logged in. Used by middleware.ts
-// and the login functions. It imports nothing at runtime, so it works on every runtime.
+// PBKDF2 password hash), and a signed cookie proves who is logged in. Used by the login functions
+// and api/students.ts. It imports nothing at runtime, so it works on every runtime.
 //
 // AUTH_USERS:  "admin:pbkdf2.100000.<salt>.<hash>,sarvesh:pbkdf2...."
 //              (dots, not $: env loaders and shells treat $ as the start of a variable)

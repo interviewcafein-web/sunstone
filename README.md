@@ -113,10 +113,15 @@ when a report is downloaded.
 
 ## Staff login
 
-Everything needs a login except students' own share links and coding cards (`/s/...`) and
-what those pages and link previews need. `middleware.ts` enforces this on Vercel before
-every request (and on the Vite dev server); `api/login.ts` checks passwords and sets a
-signed, HttpOnly session cookie valid for 7 days.
+The students table, zones, reports and profile lookup need a login; students' own share
+links and coding cards (`/s/...`) stay public. The data is what is protected: the full
+student list (`api/students.ts`) answers only a valid session cookie and is never cached by
+the CDN, while the public pages use `api/student.ts`, which returns a single student. In the
+browser, `RequireLogin` sends signed-out visitors from staff pages to `/login`.
+`api/login.ts` checks passwords and sets a signed, HttpOnly session cookie valid for 7 days.
+
+There is deliberately no Vercel Routing Middleware: on this project it failed every request
+(`MIDDLEWARE_INVOCATION_FAILED`), taking the whole site down.
 
 Accounts live in two environment variables (Vercel → Settings → Environment Variables):
 

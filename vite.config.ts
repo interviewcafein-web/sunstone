@@ -10,7 +10,6 @@ import me from './api/me';
 import relay from './api/relay';
 import student from './api/student';
 import students from './api/students';
-import gate from './middleware';
 
 type Handler = (request: Request) => Promise<Response>;
 
@@ -56,20 +55,8 @@ async function send(res: import('http').ServerResponse, response: Response) {
   res.end(Buffer.from(await response.arrayBuffer()));
 }
 
-// Vite's own module requests during development; never seen on Vercel.
-const DEV_INTERNAL = /^\/(@vite|@react-refresh|@id|@fs|src\/|node_modules\/|__)/;
-
 function apiPlugin(): Plugin {
   const mount = (middlewares: Connect.Server) => {
-    // The login gate (middleware.ts), as Vercel runs it before everything else.
-    middlewares.use(async (req, res, next) => {
-      const pathname = (req.originalUrl ?? req.url ?? '/').split('?')[0];
-      if (DEV_INTERNAL.test(pathname)) return next();
-      const response = await gate(toRequest(req));
-      if (response.headers.get('x-middleware-next')) return next();
-      await send(res, response);
-    });
-
     for (const [route, handler] of Object.entries(API_ROUTES)) {
       middlewares.use(route, async (req, res) => {
         const chunks: Buffer[] = [];

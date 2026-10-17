@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
+import { RequireLogin } from '@/components/common/RequireLogin';
 import StudentsPage from '@/pages/StudentsPage';
 import { PLATFORM_IDS } from '@/lib/coding-profiles/platforms';
 import type { PlatformId } from '@/lib/coding-profiles/types';
@@ -38,5 +39,9 @@ export const Route = createFileRoute('/')({
       zone: ZONES.find((zone) => zone.id === text(search.zone))?.id,
     };
   },
-  component: StudentsPage,
+  component: () => (
+    <RequireLogin>
+      <StudentsPage />
+    </RequireLogin>
+  ),
 });

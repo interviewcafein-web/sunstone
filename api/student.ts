@@ -2,13 +2,13 @@
 // The full list (/api/students) needs a login; a student's own share link does not, so it
 // gets exactly one row and nothing about anyone else.
 
-import students from './students';
+import { loadStudents } from './students';
 
 export const config = { runtime: 'edge' };
 
 export default async function handler(request: Request): Promise<Response> {
   const slug = new URL(request.url).searchParams.get('s') ?? '';
-  const response = await students();
+  const response = await loadStudents();
   if (!response.ok) return response;
 
   const body = (await response.json()) as { students: { slug: string }[] };

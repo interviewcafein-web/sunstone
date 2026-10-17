@@ -9,6 +9,7 @@
 import type { Handles, PlatformId } from '../src/lib/coding-profiles/types';
 import type { Student, StudentsResponse } from '../src/lib/students/types';
 import { canonicalCampuses, normalizeBatch } from './_normalize';
+import { sessionUser } from './_auth';
 
 export const config = { runtime: 'edge' };
 
@@ -118,7 +119,8 @@ function reply(status: number, body: unknown, cache = 'no-store'): Response {
   });
 }
 
-export default async function handler(): Promise<Response> {
+/** The parsed sheet as a Response; callers decide who may see it. */
+export async function loadStudents(): Promise<Response> {
   const sheetId = process.env.SHEET_ID;
   if (!sheetId) return reply(500, { error: 'SHEET_ID is not configured.' });
 
@@ -187,5 +189,12 @@ export default async function handler(): Promise<Response> {
     fetchedAt: new Date().toISOString(),
   };
   // Shared-cache for a few seconds so many open dashboards do not each hit Google.
-  return reply(200, body, 'public, max-age=0, s-maxage=20, stale-while-revalidate=40');
+  return reply(200, body);
+}
+
+// GET /api/students: the whole list, for signed-in staff only. Never cached by the CDN, so a
+// signed-in response can never be served to someone else.
+export default async function handler(request: Request): Promise<Response> {
+  if (!(await sessionUser(request))) return reply(401, { error: 'Login required' });
+  return loadStudents();
 }
