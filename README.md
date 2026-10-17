@@ -111,6 +111,22 @@ rules live in `src/lib/students/zones.ts`.
 The PDFs are drawn in the browser with `@react-pdf/renderer` (`src/reports/`), loaded only
 when a report is downloaded.
 
+## Staff login
+
+Everything needs a login except students' own share links and coding cards (`/s/...`) and
+what those pages and link previews need. `middleware.ts` enforces this on Vercel before
+every request (and on the Vite dev server); `api/login.ts` checks passwords and sets a
+signed, HttpOnly session cookie valid for 7 days.
+
+Accounts live in two environment variables (Vercel → Settings → Environment Variables):
+
+- `AUTH_USERS`: comma-separated entries, one per person, each made with
+  `npm run hash-password -- <username> <password>` (the password itself is never stored).
+- `AUTH_SECRET`: a long random string that signs the cookie. Changing it logs everyone out.
+
+To add or remove someone, edit `AUTH_USERS` and redeploy. Removing an entry ends that
+person's access at once, even with a live cookie.
+
 ## Deploy
 
 Import the repo in Vercel with the Vite preset and set `SHEET_ID` (and optionally

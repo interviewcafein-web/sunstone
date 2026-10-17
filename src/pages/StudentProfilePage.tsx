@@ -1,7 +1,7 @@
 import { Link, getRouteApi, useNavigate } from '@tanstack/react-router';
 
 import { Card } from '@/components/coding/ui';
-import { useStudents } from '@/hooks/useStudents';
+import { useStudent } from '@/hooks/useStudents';
 import { LoadingCard, ProfileView } from '@/pages/ProfilesPage';
 
 const route = getRouteApi('/s/$slug');
@@ -10,11 +10,11 @@ const route = getRouteApi('/s/$slug');
 export default function StudentProfilePage() {
   const { slug } = route.useParams();
   const navigate = useNavigate();
-  const students = useStudents();
-  const student = students.data?.students.find((candidate) => candidate.slug === slug);
+  const lookup = useStudent(slug);
+  const student = lookup.data ?? undefined;
 
   if (!student) {
-    if (students.isPending) return <LoadingCard label="Loading profile…" />;
+    if (lookup.isPending) return <LoadingCard label="Loading profile…" />;
     return (
       <Card>
         <p className="font-semibold">This profile could not be found.</p>

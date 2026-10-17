@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "hash-password": "node scripts/hash-password.mjs"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.9.0",
@@ -18,6 +19,7 @@
     "@tanstack/react-query": "^5.71.5",
     "@tanstack/react-query-persist-client": "^5.104.1",
     "@tanstack/react-router": "^1.130.12",
+    "@vercel/functions": "^2.2.13",
     "@vercel/og": "^0.8.6",
     "clsx": "^2.1.1",
     "lucide-react": "^0.487.0",

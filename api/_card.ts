@@ -6,16 +6,16 @@
 import { mergeCalendars, streaksOf } from '../src/lib/coding-profiles/activity';
 import { fetchCodingProfile, setRelayOrigin } from '../src/lib/coding-profiles/adapters';
 import { PLATFORMS } from '../src/lib/coding-profiles/platforms';
-import type { Student, StudentsResponse } from '../src/lib/students/types';
+import type { Student } from '../src/lib/students/types';
 import type { CardStats } from './_render';
 
 export * from './_render';
 
 export async function findStudent(origin: string, slug: string): Promise<Student | undefined> {
-  const response = await fetch(`${origin}/api/students`);
+  // The public one-student endpoint: the full list needs a login (see middleware.ts).
+  const response = await fetch(`${origin}/api/student?s=${encodeURIComponent(slug)}`);
   if (!response.ok) return undefined;
-  const body = (await response.json()) as StudentsResponse;
-  return body.students.find((student) => student.slug === slug);
+  return ((await response.json()) as { student?: Student }).student;
 }
 
 export async function cardStats(origin: string, student: Student): Promise<CardStats> {

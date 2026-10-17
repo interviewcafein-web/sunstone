@@ -20,6 +20,7 @@ import { HandleForm } from '@/components/profile/HandleForm';
 import { PlatformLogo } from '@/components/profile/PlatformLogo';
 import { useCodingProfiles } from '@/hooks/useCodingProfiles';
 import { useStudents } from '@/hooks/useStudents';
+import { useSession } from '@/lib/session';
 import {
   ProfileError,
   type CodingProfile,
@@ -73,6 +74,7 @@ interface ProfileViewProps {
 /** The whole profile: header, usernames, platform tabs and their panels. */
 export function ProfileView({ name, handles, student, onSubmit }: ProfileViewProps) {
   const [tab, setTab] = useState<Tab>('overview');
+  const signedIn = Boolean(useSession().data);
 
   const results = useCodingProfiles(handles);
   const loaded = results.flatMap(({ query }) => (query.data ? [query.data] : []));
@@ -172,16 +174,19 @@ export function ProfileView({ name, handles, student, onSubmit }: ProfileViewPro
         </div>
       </section>
 
+      {/* Editing leads to the staff-only lookup page, so visitors without a login don't see it. */}
       {hasHandles ? (
-        <details className="group shadow-card rounded-2xl border border-slate-200 bg-surface">
-          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-medium text-slate-600 hover:text-slate-900">
-            <Pencil className="size-4" aria-hidden />
-            Edit usernames
-          </summary>
-          <div className="border-t border-slate-100 p-1">
-            <HandleForm handles={handles} onSubmit={onSubmit} />
-          </div>
-        </details>
+        signedIn && (
+          <details className="group shadow-card rounded-2xl border border-slate-200 bg-surface">
+            <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-medium text-slate-600 hover:text-slate-900">
+              <Pencil className="size-4" aria-hidden />
+              Edit usernames
+            </summary>
+            <div className="border-t border-slate-100 p-1">
+              <HandleForm handles={handles} onSubmit={onSubmit} />
+            </div>
+          </details>
+        )
       ) : (
         <HandleForm handles={handles} onSubmit={onSubmit} />
       )}

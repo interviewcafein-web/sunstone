@@ -1,7 +1,9 @@
 import { Link, Outlet, createRootRoute } from '@tanstack/react-router';
+import { LogIn, LogOut, UserRound } from 'lucide-react';
 
 import { BrandLockup } from '@/components/common/BrandLockup';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
+import { useLogOut, useSession } from '@/lib/session';
 
 export const Route = createRootRoute({
   component: RootComponent,
@@ -14,6 +16,10 @@ const navLinkActive = {
 };
 
 function RootComponent() {
+  const session = useSession();
+  const logOut = useLogOut();
+  const user = session.data;
+
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-surface/80 backdrop-blur-md">
@@ -25,23 +31,54 @@ function RootComponent() {
             </span>
           </Link>
           <nav className="ml-auto flex items-center gap-1">
-            <Link
-              to="/"
-              className={navLink}
-              activeProps={navLinkActive}
-              activeOptions={{ exact: true, includeSearch: false }}
-            >
-              Students
-            </Link>
-            <Link
-              to="/profile"
-              className={navLink}
-              activeProps={navLinkActive}
-              activeOptions={{ includeSearch: false }}
-            >
-              Look up a profile
-            </Link>
+            {user ? (
+              <>
+                <Link
+                  to="/"
+                  className={navLink}
+                  activeProps={navLinkActive}
+                  activeOptions={{ exact: true, includeSearch: false }}
+                >
+                  Students
+                </Link>
+                <Link
+                  to="/profile"
+                  className={navLink}
+                  activeProps={navLinkActive}
+                  activeOptions={{ includeSearch: false }}
+                >
+                  Look up a profile
+                </Link>
+              </>
+            ) : (
+              !session.isPending && (
+                <Link to="/login" className={`${navLink} inline-flex items-center gap-1.5`}>
+                  <LogIn className="size-4" aria-hidden />
+                  Staff login
+                </Link>
+              )
+            )}
             <ThemeToggle />
+            {user && (
+              <span className="ml-1 flex items-center gap-1 border-l border-slate-200 pl-2">
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-slate-700"
+                  title={`Signed in as ${user}`}
+                >
+                  <UserRound className="size-4 text-slate-500" aria-hidden />
+                  {user}
+                </span>
+                <button
+                  type="button"
+                  onClick={logOut}
+                  aria-label="Log out"
+                  title="Log out"
+                  className="inline-flex size-9 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-red-50 hover:text-red-700"
+                >
+                  <LogOut className="size-4" aria-hidden />
+                </button>
+              </span>
+            )}
           </nav>
         </div>
       </header>

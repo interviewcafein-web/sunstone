@@ -3,7 +3,7 @@ import { Link, getRouteApi } from '@tanstack/react-router';
 import { Check, ChevronRight, Download, IdCard, Link2, Share2 } from 'lucide-react';
 
 import { Card } from '@/components/coding/ui';
-import { useStudents } from '@/hooks/useStudents';
+import { useStudent } from '@/hooks/useStudents';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
@@ -16,8 +16,7 @@ const route = getRouteApi('/s/$slug_/card');
  */
 export default function CodingCardPage() {
   const { slug } = route.useParams();
-  const students = useStudents();
-  const student = students.data?.students.find((candidate) => candidate.slug === slug);
+  const student = useStudent(slug).data ?? undefined;
 
   // The card follows the site theme: the light card on the light site, navy on the dark one.
   const theme = useTheme();
