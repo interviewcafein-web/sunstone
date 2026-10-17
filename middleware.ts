@@ -2,9 +2,14 @@
 // Vite dev server (see vite.config.ts). Everything needs a login except the login itself,
 // the files the pages need to load, and students' own share links and coding cards.
 
-import { next } from '@vercel/functions';
-
 import { sessionUser } from './api/_auth';
+
+/**
+ * "Carry on to the page or function". This is all @vercel/functions' next() does, but that
+ * package's entry point also loads database and cache modules that break Vercel's
+ * middleware runtime, so the header is set here directly.
+ */
+const next = () => new Response(null, { headers: { 'x-middleware-next': '1' } });
 
 /** Open to everyone: page assets, the login flow, and a student's public link and card. */
 const PUBLIC_PREFIXES = ['/assets/', '/fonts/', '/reports/', '/s/'];
