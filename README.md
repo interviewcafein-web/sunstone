@@ -132,6 +132,15 @@ Accounts live in two environment variables (Vercel → Settings → Environment 
 To add or remove someone, edit `AUTH_USERS` and redeploy. Removing an entry ends that
 person's access at once, even with a live cookie.
 
+## Resources tab
+
+Books, PDFs and premium material, listed in `src/data/resources.ts`. To add one, copy an
+entry and set its `link` to the Google Drive share link (shared as "Anyone with the link
+can view"). Preview opens Drive's own PDF viewer inside the page; Download uses Drive's
+direct-download address. A plain PDF URL also works. Without a `link` the card shows "Link
+coming soon". Each entry also picks an `icon`, a colour `theme`, `tags`, an optional
+`badge` and `premium: true` for the gold ribbon.
+
 ## Deploy
 
 Import the repo in Vercel with the Vite preset and set `SHEET_ID` (and optionally

@@ -30,7 +30,7 @@ function RootComponent() {
               Coding Profiles
             </span>
           </Link>
-          <nav className="ml-auto flex items-center gap-1">
+          <nav className="ml-auto flex flex-wrap items-center justify-end gap-1">
             {user ? (
               <>
                 <Link
@@ -49,6 +49,14 @@ function RootComponent() {
                 >
                   Look up a profile
                 </Link>
+                <Link
+                  to="/resources"
+                  className={navLink}
+                  activeProps={navLinkActive}
+                  activeOptions={{ includeSearch: false }}
+                >
+                  Resources
+                </Link>
               </>
             ) : (
               !session.isPending && (
@@ -66,7 +74,9 @@ function RootComponent() {
                   title={`Signed in as ${user}`}
                 >
                   <UserRound className="size-4 text-slate-500" aria-hidden />
-                  {user}
+                  {/* Phones show just the icon (name on hover) so the header fits. */}
+                  <span className="hidden sm:inline">{user}</span>
+                  <span className="sr-only sm:hidden">{user}</span>
                 </span>
                 <button
                   type="button"
