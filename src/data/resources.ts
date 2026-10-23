@@ -50,6 +50,7 @@ export const RESOURCES: Resource[] = [
     date: '2026-03-05',
     icon: 'dsa',
     theme: 'blue',
+    premium: true,
   },
   {
     id: 'java',
