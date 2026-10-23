@@ -23,17 +23,16 @@ export default function ResourcesPage() {
 
   const shown = useMemo(() => {
     const needle = q?.toLowerCase().trim();
-    return [...RESOURCES]
-      .filter(
-        (resource) =>
-          (!tag || resource.tags.includes(tag)) &&
-          (!needle ||
-            [resource.title, resource.description, ...resource.tags, resource.badge ?? '']
-              .join(' ')
-              .toLowerCase()
-              .includes(needle))
-      )
-      .sort((a, b) => b.date.localeCompare(a.date) || a.title.localeCompare(b.title));
+    // Shown in the order of src/data/resources.ts.
+    return RESOURCES.filter(
+      (resource) =>
+        (!tag || resource.tags.includes(tag)) &&
+        (!needle ||
+          [resource.title, resource.description, ...resource.tags, resource.badge ?? '']
+            .join(' ')
+            .toLowerCase()
+            .includes(needle))
+    );
   }, [q, tag]);
 
   // The open preview lives in the URL (?view=<id>), so a preview can be linked to directly.

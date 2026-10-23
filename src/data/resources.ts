@@ -1,4 +1,5 @@
 // The Resources tab. To add a book or PDF, copy an entry below and change it.
+// Cards appear in the order of this list.
 //
 // link: the Google Drive share link ("Anyone with the link can view"), e.g.
 //   https://drive.google.com/file/d/<file id>/view?usp=sharing
@@ -28,7 +29,7 @@ export interface Resource {
   description: string;
   link?: string;
   tags: string[];
-  /** YYYY-MM-DD, shown on the card and used for "newest first". */
+  /** YYYY-MM-DD, shown on the card. */
   date: string;
   icon: ResourceIcon;
   theme: ResourceTheme;
@@ -40,65 +41,60 @@ export interface Resource {
 
 export const RESOURCES: Resource[] = [
   {
-    id: 'computer-networks',
-    title: 'The Art of Computer Networks',
+    id: 'java',
+    title: 'Sunstone PRIME - Java',
     description:
-      'From sending a WhatsApp message to streaming Netflix, everything runs on networks. OSI and TCP/IP models, routing, DNS, HTTP and the networking questions interviewers ask most.',
-    tags: ['Interview Prep'],
-    date: '2026-03-05',
-    icon: 'network',
-    theme: 'green',
-  },
-  {
-    id: 'oops-concepts',
-    title: 'The Art of OOPs Concepts',
-    description:
-      'OOPs is the DNA of modern programming – the foundation of every large codebase. Classes, objects, inheritance, polymorphism, abstraction and encapsulation with interview-style examples.',
-    tags: ['Interview Prep'],
-    date: '2026-03-05',
-    icon: 'oops',
-    theme: 'purple',
-  },
-  {
-    id: 'dbms',
-    title: 'The Art of DBMS',
-    description:
-      'Databases are the backbone of every modern application. Normalisation, transactions, indexing, SQL queries and the DBMS concepts that come up in every placement interview.',
-    tags: ['Interview Prep'],
-    date: '2026-03-05',
-    icon: 'database',
-    theme: 'green',
-  },
-  {
-    id: 'operating-systems',
-    title: 'The Art of Operating Systems',
-    description:
-      'Operating Systems power every computer, from your smartphone to cloud servers. Processes, threads, scheduling, memory management, deadlocks and file systems explained simply.',
-    tags: ['Interview Prep'],
-    date: '2026-03-05',
-    icon: 'os',
-    theme: 'green',
-  },
-  {
-    id: 'data-structures-and-algorithms',
-    title: 'The Art of Data Structures and Algorithms',
-    description:
-      'The Art of Data Structures and Algorithms – the ultimate guide from arrays to graphs and dynamic programming, with patterns and practice problems for coding rounds.',
-    tags: ['DSA', 'Interview Prep'],
-    date: '2026-03-05',
-    icon: 'dsa',
-    theme: 'blue',
-  },
-  {
-    id: 'cracking-java-interviews',
-    title: 'The Art of Cracking Java Interviews',
-    description:
-      'This book is your complete guide to cracking Java interviews: core Java, collections, multithreading, JVM internals and the questions top companies ask.',
+      'Your complete guide to cracking Java interviews: core Java, collections, multithreading, JVM internals and the questions top companies ask.',
+    link: 'https://drive.google.com/file/d/1jfa8wdAz8xhBhUGdXQV6b3py5usmYsa_/view?usp=sharing',
     tags: ['Java', 'Interview Prep'],
     date: '2026-03-05',
     icon: 'document',
     theme: 'purple',
     badge: 'Java',
     premium: true,
+  },
+  {
+    id: 'data-structures-and-algorithms',
+    title: 'Sunstone PRIME - Data Structures and Algorithms',
+    description:
+      'The ultimate guide to Data Structures and Algorithms, from arrays to graphs and dynamic programming, with patterns and practice problems for coding rounds.',
+    link: 'https://drive.google.com/file/d/1x72oxbFoFvuPh-sYZUdDfPVmm2RTfzTv/view?usp=sharing',
+    tags: ['DSA', 'Interview Prep'],
+    date: '2026-03-05',
+    icon: 'dsa',
+    theme: 'blue',
+  },
+  {
+    id: 'operating-systems',
+    title: 'Sunstone PRIME - Operating Systems',
+    description:
+      'Operating Systems power every computer, from your smartphone to cloud servers. Processes, threads, scheduling, memory management, deadlocks and file systems explained simply.',
+    link: 'https://drive.google.com/file/d/1ND7Y7P6BscPv2utPsPb9t8rjd4MQyFnu/view?usp=sharing',
+    tags: ['Interview Prep'],
+    date: '2026-03-05',
+    icon: 'os',
+    theme: 'green',
+  },
+  {
+    id: 'dbms',
+    title: 'Sunstone PRIME - DBMS',
+    description:
+      'Databases are the backbone of every modern application. Normalisation, transactions, indexing, SQL queries and the DBMS concepts that come up in every placement interview.',
+    link: 'https://drive.google.com/file/d/1jrcoSy6rYV21uJa2sxQKj3r7Xg6SZ6Xv/view?usp=sharing',
+    tags: ['Interview Prep'],
+    date: '2026-03-05',
+    icon: 'database',
+    theme: 'green',
+  },
+  {
+    id: 'computer-networks',
+    title: 'Sunstone PRIME - Computer Networks',
+    description:
+      'From sending a WhatsApp message to streaming Netflix, everything runs on networks. OSI and TCP/IP models, routing, DNS, HTTP and the networking questions interviewers ask most.',
+    link: 'https://drive.google.com/file/d/1Nh3s5xUxoUVOxp8D3VDS5SQ_t-WJdZQg/view?usp=sharing',
+    tags: ['Interview Prep'],
+    date: '2026-03-05',
+    icon: 'network',
+    theme: 'green',
   },
 ];
