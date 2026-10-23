@@ -41,6 +41,17 @@ export interface Resource {
 
 export const RESOURCES: Resource[] = [
   {
+    id: 'data-structures-and-algorithms',
+    title: 'Sunstone PRIME - Data Structures and Algorithms',
+    description:
+      'The ultimate guide to Data Structures and Algorithms, from arrays to graphs and dynamic programming, with patterns and practice problems for coding rounds.',
+    link: 'https://drive.google.com/file/d/1x72oxbFoFvuPh-sYZUdDfPVmm2RTfzTv/view?usp=sharing',
+    tags: ['DSA', 'Interview Prep'],
+    date: '2026-03-05',
+    icon: 'dsa',
+    theme: 'blue',
+  },
+  {
     id: 'java',
     title: 'Sunstone PRIME - Java',
     description:
@@ -52,17 +63,6 @@ export const RESOURCES: Resource[] = [
     theme: 'purple',
     badge: 'Java',
     premium: true,
-  },
-  {
-    id: 'data-structures-and-algorithms',
-    title: 'Sunstone PRIME - Data Structures and Algorithms',
-    description:
-      'The ultimate guide to Data Structures and Algorithms, from arrays to graphs and dynamic programming, with patterns and practice problems for coding rounds.',
-    link: 'https://drive.google.com/file/d/1x72oxbFoFvuPh-sYZUdDfPVmm2RTfzTv/view?usp=sharing',
-    tags: ['DSA', 'Interview Prep'],
-    date: '2026-03-05',
-    icon: 'dsa',
-    theme: 'blue',
   },
   {
     id: 'operating-systems',
