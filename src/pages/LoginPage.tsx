@@ -3,6 +3,7 @@ import { getRouteApi } from '@tanstack/react-router';
 import { Eye, EyeOff, Loader2, LockKeyhole } from 'lucide-react';
 
 import { BrandLockup } from '@/components/common/BrandLockup';
+import { VertexLogo } from '@/components/common/VertexLogo';
 import { logIn } from '@/lib/session';
 
 const route = getRouteApi('/login');
@@ -37,13 +38,17 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="shadow-card bg-surface overflow-hidden rounded-2xl border border-slate-200">
           <div className="from-brand-700 to-brand-900 bg-gradient-to-br px-6 py-6 text-white">
-            <BrandLockup
-              logoClassName="h-6 brightness-0 invert dark:filter-none"
-              primeClassName="text-[10px]"
-            />
+            <div className="flex items-center gap-4">
+              <BrandLockup
+                logoClassName="h-5 brightness-0 invert dark:filter-none"
+                primeClassName="text-[9px]"
+              />
+              <span className="h-9 border-l border-white/25" aria-hidden />
+              <VertexLogo onDark className="h-10" />
+            </div>
             <h1 className="mt-5 flex items-center gap-2 text-xl font-bold">
               <LockKeyhole className="size-5" aria-hidden />
-              Sign in to Vantage
+              Sign in to Vertex
             </h1>
             <p className="text-brand-100 mt-1 text-sm">
               Student progress, zones and campus reports for the Sunstone PRIME team.

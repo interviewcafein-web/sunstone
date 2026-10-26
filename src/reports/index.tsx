@@ -21,11 +21,11 @@ async function save(document: ReactElement, fileName: string) {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
-/** "Sunstone PRIME Vantage - Coding Report - SAGE University, Indore - Batch 2027 - 16 Oct 2026.pdf" */
+/** "Sunstone PRIME Vertex - Coding Report - SAGE University, Indore - Batch 2027 - 16 Oct 2026.pdf" */
 export async function downloadCampusReport(data: CampusReportData) {
   registerFonts(data.origin);
   const parts = [
-    'Sunstone PRIME Vantage',
+    'Sunstone PRIME Vertex',
     'Coding Report',
     data.title,
     ...data.filters,
@@ -34,10 +34,10 @@ export async function downloadCampusReport(data: CampusReportData) {
   await save(<CampusReport data={data} />, `${safeFileName(parts.join(' - '))}.pdf`);
 }
 
-/** "Sunstone PRIME Vantage - Rakesh Kumar - Coding Report (SAGE University, Indore) - 16 Oct 2026.pdf" */
+/** "Sunstone PRIME Vertex - Rakesh Kumar - Coding Report (SAGE University, Indore) - 16 Oct 2026.pdf" */
 export async function downloadStudentReport(data: StudentReportData) {
   registerFonts(data.origin);
   const where = data.campus ? ` (${data.campus})` : '';
-  const name = `Sunstone PRIME Vantage - ${data.name} - Coding Report${where} - ${formatDate(data.generatedAt)}`;
+  const name = `Sunstone PRIME Vertex - ${data.name} - Coding Report${where} - ${formatDate(data.generatedAt)}`;
   await save(<StudentReport data={data} />, `${safeFileName(name)}.pdf`);
 }

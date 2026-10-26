@@ -32,8 +32,8 @@ export default async function handler(request: Request): Promise<Response> {
     const stats = isCrawler ? await cachedStats(origin, slug).catch(() => null) : null;
     const title = isCard
       ? `${student.name}'s coding card · Sunstone PRIME`
-      : `${student.name} · Sunstone PRIME Vantage`;
-    const description = stats ? describe(stats) : headline(student) || 'On Sunstone PRIME Vantage';
+      : `${student.name} · Sunstone PRIME Vertex`;
+    const description = stats ? describe(stats) : headline(student) || 'On Sunstone PRIME Vertex';
     const page = `${origin}/s/${student.slug}${isCard ? '/card' : ''}`;
     // ?v= changes with the design, so apps that cache previews fetch the new image.
     const image = isCard

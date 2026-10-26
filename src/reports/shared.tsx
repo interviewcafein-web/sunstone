@@ -69,20 +69,31 @@ export function ReportHeader({
         alignItems: 'center',
       }}
     >
-      <View>
-        <Image src={`${origin}/sunstone-logo-white.png`} style={{ width: 150, height: 19.5 }} />
-        <Text
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View>
+          <Image src={`${origin}/sunstone-logo-white.png`} style={{ width: 150, height: 19.5 }} />
+          <Text
+            style={{
+              color: GOLD,
+              fontSize: 7.5,
+              fontWeight: 800,
+              letterSpacing: 4,
+              marginTop: 5,
+              marginLeft: 33,
+            }}
+          >
+            PRIME
+          </Text>
+        </View>
+        <View
           style={{
-            color: GOLD,
-            fontSize: 7.5,
-            fontWeight: 800,
-            letterSpacing: 4,
-            marginTop: 5,
-            marginLeft: 33,
+            width: 0.75,
+            height: 30,
+            backgroundColor: 'rgba(255,255,255,0.3)',
+            marginHorizontal: 14,
           }}
-        >
-          PRIME
-        </Text>
+        />
+        <Image src={`${origin}/vertex-logo-white.png`} style={{ width: 98, height: 35 }} />
       </View>
       <View style={{ alignItems: 'flex-end' }}>
         <Text style={{ color: 'white', fontSize: 13, fontWeight: 700 }}>{kind}</Text>
@@ -113,7 +124,7 @@ export function ReportFooter({ label }: { label: string }) {
         color: MUTED,
       }}
     >
-      <Text>Sunstone PRIME Vantage · {label}</Text>
+      <Text>Sunstone PRIME Vertex · {label}</Text>
       <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
     </View>
   );

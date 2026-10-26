@@ -70,7 +70,7 @@ export function StudentReport({ data }: { data: StudentReportData }) {
   }
 
   return (
-    <Document title={`Sunstone PRIME Vantage – ${data.name}`} author="Sunstone PRIME">
+    <Document title={`Sunstone PRIME Vertex – ${data.name}`} author="Sunstone PRIME">
       <Page size="A4" style={base.page}>
         <ReportHeader
           origin={data.origin}

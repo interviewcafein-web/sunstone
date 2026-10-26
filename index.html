@@ -2,12 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/sunstone-mark.png" />
+    <link rel="icon" type="image/png" href="/vertex-mark.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1a3e70" />
     <!-- Internal dashboard listing students by name: keep it out of search results. -->
     <meta name="robots" content="noindex, nofollow" />
-    <title>Sunstone PRIME Vantage</title>
+    <title>Sunstone PRIME Vertex</title>
     <meta
       name="description"
       content="Student progress intelligence for Sunstone PRIME: coding practice, zones, campus reports and resources across every campus."
@@ -20,31 +20,32 @@
     -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Sunstone" />
-    <meta property="og:title" content="Sunstone PRIME Vantage" />
+    <meta property="og:title" content="Sunstone PRIME Vertex" />
     <meta
       property="og:description"
       content="Student progress intelligence for Sunstone PRIME: coding practice, zones, campus reports and resources across every campus."
     />
     <meta property="og:url" content="__SITE_URL__/" />
-    <meta property="og:image" content="__SITE_URL__/og-image-vantage.jpg" />
-    <meta property="og:image:secure_url" content="__SITE_URL__/og-image-vantage.jpg" />
+    <meta property="og:image" content="__SITE_URL__/og-image-vertex.jpg" />
+    <meta property="og:image:secure_url" content="__SITE_URL__/og-image-vertex.jpg" />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="Sunstone PRIME Vantage: student progress intelligence for Sunstone PRIME"
+      content="Sunstone PRIME Vertex: student progress intelligence for Sunstone PRIME"
     />
     <meta property="og:locale" content="en_IN" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Sunstone PRIME Vantage" />
+    <meta name="twitter:title" content="Sunstone PRIME Vertex" />
     <meta
       name="twitter:description"
       content="Student progress intelligence for Sunstone PRIME, across every campus."
     />
-    <meta name="twitter:image" content="__SITE_URL__/og-image-vantage.jpg" />
+    <meta name="twitter:image" content="__SITE_URL__/og-image-vertex.jpg" />
 
     <link rel="preload" as="image" href="/sunstone-logo.png" />
+    <link rel="preload" as="image" href="/vertex-logo-white.png" />
 
     <!-- Saved theme (see src/lib/theme.ts), applied before the first paint so it never flashes. -->
     <script>
@@ -139,12 +140,11 @@
         opacity: 0;
         animation: splash-prime 0.7s cubic-bezier(0.22, 1, 0.36, 1) 1s forwards;
       }
+      /* The Vertex product logo, rising in under the Sunstone PRIME lockup. */
       .splash-tagline {
-        font-size: 16px;
-        font-weight: 600;
-        letter-spacing: 0.32em;
-        text-transform: uppercase;
-        color: #ffffff;
+        width: min(190px, 46vw);
+        height: auto;
+        margin-top: 6px;
         opacity: 0;
         animation: splash-rise 0.5s ease-out 1.35s forwards;
       }
@@ -289,7 +289,7 @@
         <img class="splash-logo" src="/sunstone-logo.png" alt="" width="886" height="115" />
         <div class="splash-prime"><span></span><b>PRIME</b><span></span></div>
       </div>
-      <div class="splash-tagline">Vantage</div>
+      <img class="splash-tagline" src="/vertex-logo-white.png" alt="" width="1247" height="445" />
       <div class="splash-bar"></div>
     </div>
     <div id="root"></div>
