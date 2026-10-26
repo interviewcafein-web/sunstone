@@ -1,4 +1,4 @@
-# Sunstone Coding Profiles
+# Sunstone PRIME Vantage
 
 A dashboard of Sunstone students' coding profiles across LeetCode, GeeksforGeeks,
 HackerRank, Codeforces, CodeChef and GitHub, filterable by campus, batch and course.

@@ -43,10 +43,10 @@ export default function LoginPage() {
             />
             <h1 className="mt-5 flex items-center gap-2 text-xl font-bold">
               <LockKeyhole className="size-5" aria-hidden />
-              Sign in
+              Sign in to Vantage
             </h1>
             <p className="text-brand-100 mt-1 text-sm">
-              Student coding profiles, zones and reports are for Sunstone staff.
+              Student progress, zones and campus reports for the Sunstone PRIME team.
             </p>
           </div>
 

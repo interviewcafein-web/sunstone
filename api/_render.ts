@@ -51,7 +51,7 @@ export function describe(stats: CardStats): string {
     .filter(Boolean)
     .join(' · ');
   const lead = parts.join(' · ');
-  return lead ? `${lead}. ${tail || 'Coding profile on Sunstone PRIME'}` : tail;
+  return lead ? `${lead}. ${tail || 'On Sunstone PRIME Vantage'}` : tail;
 }
 
 export const headline = (stats: Pick<CardStats, 'campus' | 'batch'>) =>

@@ -113,7 +113,7 @@ export function ReportFooter({ label }: { label: string }) {
         color: MUTED,
       }}
     >
-      <Text>Sunstone PRIME · Coding Profiles · {label}</Text>
+      <Text>Sunstone PRIME Vantage · {label}</Text>
       <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
     </View>
   );

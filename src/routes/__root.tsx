@@ -26,8 +26,8 @@ function RootComponent() {
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <Link to="/" className="flex items-center gap-3">
             <BrandLockup />
-            <span className="self-stretch border-l border-slate-300 pl-3 text-sm leading-[2.6rem] font-medium text-slate-600">
-              Coding Profiles
+            <span className="text-brand-700 dark:text-brand-200 self-stretch border-l border-slate-300 pl-3 text-lg leading-[2.6rem] font-extrabold tracking-tight">
+              Vantage
             </span>
           </Link>
           <nav className="ml-auto flex flex-wrap items-center justify-end gap-1">

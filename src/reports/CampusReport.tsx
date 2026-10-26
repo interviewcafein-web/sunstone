@@ -104,7 +104,7 @@ export function CampusReport({ data }: { data: CampusReportData }) {
   const label = [data.title, ...data.filters].join(' · ');
   const document = (children: React.ReactNode) => (
     <Document
-      title={`Coding Profile Report – ${label}`}
+      title={`Sunstone PRIME Vantage – Coding Report – ${label}`}
       author="Sunstone PRIME"
       subject="Students by coding practice zone"
     >

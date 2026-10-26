@@ -124,7 +124,7 @@ export async function GET(request: Request): Promise<Response> {
         h(
           'div',
           { style: { fontSize: 22, color: NAVY, fontWeight: 600, marginTop: 8 } },
-          'Coding profile on Sunstone PRIME'
+          'On Sunstone PRIME Vantage'
         )
       )
     ),
