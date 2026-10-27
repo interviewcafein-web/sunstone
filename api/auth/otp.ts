@@ -9,9 +9,9 @@
 
 import {
   SESSION_DAYS,
-  canSignSessions,
   createSession,
   digest,
+  emailCodesConfigured,
   isEmail,
   isStaff,
   json,
@@ -20,7 +20,7 @@ import {
   sessionCookie,
 } from '../_auth';
 import { db } from '../_db';
-import { canSendEmail, sendEmail, signInCodeEmail } from '../_email';
+import { sendEmail, signInCodeEmail } from '../_email';
 
 export const config = { runtime: 'edge' };
 
@@ -112,7 +112,7 @@ async function verify(request: Request, email: string, code: string): Promise<Re
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') return json(405, { error: 'Method not allowed' });
-  if (!canSignSessions() || !process.env.DATABASE_URL || !canSendEmail()) {
+  if (!emailCodesConfigured()) {
     return json(503, { error: 'Sign-in by email is not set up yet.' });
   }
 

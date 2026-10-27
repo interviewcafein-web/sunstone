@@ -1,9 +1,12 @@
-// Staff login. A signed cookie proves who is logged in; it is made by any of three ways in:
-//  - username + password: accounts in the AUTH_USERS environment variable (PBKDF2 hashes);
-//  - Google sign-in (api/auth/google*.ts) and emailed one-time codes (api/auth/otp.ts): the
-//    email must be an active row in the staff table (npm run staff) or in STAFF_EMAILS.
-// Removing a password account or deactivating a staff email ends their access, even with a
-// valid cookie. Used by the edge functions only (the Node.js image functions never import it).
+// Staff login. A signed cookie proves who is logged in. Staff sign in without a password:
+// with Google (api/auth/google*.ts) or an emailed one-time code (api/auth/otp.ts); the email
+// must be an active row in the staff table (npm run staff) or in STAFF_EMAILS. Deactivating
+// a staff email ends their access, even with a valid cookie. Used by the edge functions only
+// (the Node.js image functions never import it).
+//
+// Username + password (AUTH_USERS) is only the bootstrap: it works until Google or emailed
+// codes are configured AND at least one staff email exists. From then on password sign-in is
+// refused and password sessions stop working, so AUTH_USERS can be deleted.
 //
 // AUTH_USERS:   "admin:pbkdf2.100000.<salt>.<hash>,sarvesh:pbkdf2...."
 //               (dots, not $: env loaders and shells treat $ as the start of a variable)
@@ -12,6 +15,8 @@
 // STAFF_EMAILS: optional comma-separated emails allowed in addition to the staff table.
 
 import { db } from './_db';
+import { canSendEmail } from './_email';
+import { googleConfigured } from './auth/_google';
 
 export const SESSION_COOKIE = 'sunstone_session';
 export const SESSION_DAYS = 7;
@@ -59,11 +64,37 @@ function accounts(): Map<string, string> {
   return map;
 }
 
-/** Password login is available. */
-export const isConfigured = () => Boolean(process.env.AUTH_SECRET) && accounts().size > 0;
-
 /** Sessions can be signed at all (needed by every way of logging in). */
 export const canSignSessions = () => Boolean(process.env.AUTH_SECRET);
+
+/** Emailed sign-in codes can be sent (locally they are printed instead; see _email.ts). */
+export const emailCodesConfigured = () =>
+  canSignSessions() && Boolean(process.env.DATABASE_URL) && canSendEmail();
+
+export const googleSignInConfigured = () => canSignSessions() && googleConfigured();
+
+let staffCount: { count: number; at: number } | undefined;
+
+/**
+ * Whether username + password sign-in still works: only until a passwordless way in is set
+ * up and someone can use it (at least one active staff email), so nobody is ever locked out.
+ */
+export async function passwordLoginEnabled(): Promise<boolean> {
+  if (!canSignSessions() || accounts().size === 0) return false;
+  if (!googleSignInConfigured() && !emailCodesConfigured()) return true;
+  if ((process.env.STAFF_EMAILS ?? '').split(',').some((email) => email.trim())) return false;
+  if (!process.env.DATABASE_URL) return true;
+  try {
+    if (!staffCount || Date.now() - staffCount.at > 60_000) {
+      const [row] = await db()`select count(*)::int as count from staff where active`;
+      staffCount = { count: Number(row.count), at: Date.now() };
+    }
+    return staffCount.count === 0;
+  } catch {
+    // Cannot tell whether staff exist: keep passwords off rather than reopen them.
+    return false;
+  }
+}
 
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -171,7 +202,7 @@ export async function sessionUser(request: Request): Promise<string | null> {
     if (session.m === 'google' || session.m === 'otp') {
       return (await isStaff(session.u)) ? session.u : null;
     }
-    return accounts().has(session.u) ? session.u : null;
+    return accounts().has(session.u) && (await passwordLoginEnabled()) ? session.u : null;
   } catch {
     // The staff list could not be read (database down): treat as logged out, not as an error.
     return null;

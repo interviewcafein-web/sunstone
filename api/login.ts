@@ -1,10 +1,12 @@
-// POST /api/login { username, password } -> sets the session cookie.
+// POST /api/login { username, password } -> sets the session cookie. Only while password
+// sign-in is still enabled (see passwordLoginEnabled in _auth.ts); afterwards staff sign in
+// with Google or an emailed code.
 
 import {
   SESSION_DAYS,
   checkPassword,
   createSession,
-  isConfigured,
+  passwordLoginEnabled,
   json,
   sessionCookie,
 } from './_auth';
@@ -13,8 +15,10 @@ export const config = { runtime: 'edge' };
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') return json(405, { error: 'Method not allowed' });
-  if (!isConfigured()) {
-    return json(503, { error: 'Login is not set up yet (AUTH_USERS / AUTH_SECRET).' });
+  if (!(await passwordLoginEnabled())) {
+    return json(403, {
+      error: 'Password sign-in is turned off. Sign in with Google or an emailed code.',
+    });
   }
 
   const body = (await request.json().catch(() => null)) as {
