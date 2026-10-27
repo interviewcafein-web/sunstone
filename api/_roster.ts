@@ -3,6 +3,7 @@
 
 import type { Handles, PlatformId } from '../src/lib/coding-profiles/types';
 import type { Student } from '../src/lib/students/types';
+import { type Viewer, seesCampus } from './_auth';
 import { db } from './_db';
 
 const PLATFORMS: PlatformId[] = [
@@ -14,7 +15,7 @@ const PLATFORMS: PlatformId[] = [
   'github',
 ];
 
-const COLUMNS = `id, username, name, campus, program, admission_year, invalid_handles,
+const COLUMNS = `id, username, campus_id, name, campus, program, admission_year, invalid_handles,
   leetcode, geeksforgeeks, hackerrank, codeforces, codechef, github,
   is_debarred, debarred_reason, debarred_until::text as debarred_until, is_inactive, inactive_reason`;
 
@@ -50,25 +51,34 @@ function toStudent(row: Row, staff: boolean): Student {
   return student;
 }
 
-/** Everyone on the platform, for signed-in staff. */
-export async function listStudents(): Promise<Student[]> {
-  const rows = await db().query(`select ${COLUMNS} from students where on_platform order by name`);
+/** Everyone on the platform that this staff member may see (campus staff: their campuses). */
+export async function listStudents(viewer: Viewer): Promise<Student[]> {
+  const rows = await db().query(
+    `select ${COLUMNS} from students
+     where on_platform and ($1::int[] is null or campus_id = any($1::int[]))
+     order by name`,
+    [viewer.campusIds]
+  );
   return rows.map((row) => toStudent(row, true));
 }
 
 /**
- * One student by username or an old profile address. The public sees only students who
- * linked a coding profile through the form, and nothing about their LMS standing.
+ * One student by username or an old profile address. Staff who may see the student's campus
+ * get the staff view (LMS standing, students without coding profiles). Everyone else gets the
+ * public view: only students who linked a coding profile, and nothing about LMS standing.
  */
-export async function findStudent(slug: string, staff: boolean): Promise<Student | null> {
+export async function findStudent(slug: string, viewer: Viewer | null): Promise<Student | null> {
   const [row] = await db().query(
-    `select ${COLUMNS} from students
+    `select ${COLUMNS}, form_submitted_at is not null as linked from students
      where on_platform and (lower(username) = lower($1) or $1 = any(legacy_slugs))
-       and ($2 or form_submitted_at is not null)
      limit 1`,
-    [slug, staff]
+    [slug]
   );
-  return row ? toStudent(row, staff) : null;
+  if (!row) return null;
+  const staff =
+    viewer !== null && seesCampus(viewer, row.campus_id == null ? null : Number(row.campus_id));
+  if (!staff && !row.linked) return null;
+  return toStudent(row, staff);
 }
 
 export const hasDatabase = () => Boolean(process.env.DATABASE_URL);

@@ -17,6 +17,7 @@ import {
 import { useStudents } from '@/hooks/useStudents';
 import { PLATFORM_IDS, SOLVING_PLATFORM_IDS } from '@/lib/coding-profiles/platforms';
 import { ProfileError, type PlatformId } from '@/lib/coding-profiles/types';
+import { useSession } from '@/lib/session';
 import type { Student } from '@/lib/students/types';
 import { ZONE_BASIS, zoneOf, type ZoneResult } from '@/lib/students/zones';
 import type { CampusReportRow, ReportValue } from '@/reports';
@@ -141,6 +142,8 @@ export default function StudentsPage() {
   const search = route.useSearch();
   const navigate = route.useNavigate();
   const queryClient = useQueryClient();
+  // Campus staff only ever get their own campuses from the API; name them in the header.
+  const ownCampuses = useSession().data?.campuses;
   const sort = search.sort ?? 'total';
 
   const students = useStudents();
@@ -246,7 +249,10 @@ export default function StudentsPage() {
   const scope =
     [search.campus, search.batch && `Batch ${search.batch}`, search.course]
       .filter(Boolean)
-      .join(' · ') || 'All campuses';
+      .join(' · ') ||
+    (ownCampuses
+      ? ownCampuses.map((campus) => campus.name).join(', ') || 'No campus assigned'
+      : 'All campuses');
 
   return (
     <div className="rise-stagger space-y-5">

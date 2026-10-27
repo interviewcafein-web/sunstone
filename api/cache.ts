@@ -2,15 +2,16 @@
 // refresh them from the platforms in the background; fresh results are saved back here, so
 // the next visitor, on any device, sees them instantly too.
 //
-//   GET  /api/cache?kind=summaries        every saved table summary (staff)
+//   GET  /api/cache?kind=summaries        saved table summaries for the students the staff
+//                                         member may see
 //   GET  /api/cache?kind=profiles&s=user  one student's saved profile pages (public for
 //                                         students with a public profile, like /api/student)
 //   POST /api/cache                       save fresh results (staff only, and only for
-//                                         usernames that belong to a student on the platform,
-//                                         so the public cannot plant numbers)
+//                                         usernames of students they may see, so nobody can
+//                                         plant numbers)
 
 import type { PlatformId } from '../src/lib/coding-profiles/types';
-import { json, sessionUser } from './_auth';
+import { json, sessionViewer } from './_auth';
 import { db } from './_db';
 import { findStudent, hasDatabase } from './_roster';
 
@@ -27,8 +28,10 @@ const PLATFORMS: PlatformId[] = [
 const MAX_BODY = 3_000_000;
 const MAX_PROFILE = 400_000;
 
-// True when (x.platform, x.handle) is a username of a student on the platform.
-const OWNED = `exists (select 1 from students s where s.on_platform and case x.platform
+// True when (x.platform, x.handle) is a username of a student on the platform whom the
+// viewer may see: $2 is their campus ids, or null for every campus.
+const OWNED = `exists (select 1 from students s
+  where s.on_platform and ($2::int[] is null or s.campus_id = any($2::int[])) and case x.platform
   ${PLATFORMS.map((platform) => `when '${platform}' then s.${platform}`).join(' ')} end = x.handle)`;
 
 interface Item {
@@ -47,19 +50,20 @@ const validItem = (item: Item) =>
 
 async function read(request: Request): Promise<Response> {
   const url = new URL(request.url);
-  const staff = Boolean(await sessionUser(request));
+  const viewer = await sessionViewer(request);
 
   if (url.searchParams.get('kind') === 'summaries') {
-    if (!staff) return json(401, { error: 'Login required' });
+    if (!viewer) return json(401, { error: 'Login required' });
     const rows = await db().query(
-      `select platform, handle, summary, (extract(epoch from summary_at) * 1000)::float8 as at
-       from platform_stats where summary is not null`
+      `select x.platform, x.handle, x.summary, (extract(epoch from x.summary_at) * 1000)::float8 as at
+       from platform_stats x where x.summary is not null and ($1::int[] is null or ${OWNED.replace(/\$2/g, '$1')})`,
+      [viewer.campusIds]
     );
     return json(200, { summaries: rows });
   }
 
   if (url.searchParams.get('kind') === 'profiles') {
-    const student = await findStudent(url.searchParams.get('s') ?? '', staff);
+    const student = await findStudent(url.searchParams.get('s') ?? '', viewer);
     if (!student) return json(404, { error: 'Student not found' });
     const pairs = PLATFORMS.filter((platform) => student.handles[platform]).map((platform) => [
       platform,
@@ -81,7 +85,8 @@ async function read(request: Request): Promise<Response> {
 }
 
 async function write(request: Request): Promise<Response> {
-  if (!(await sessionUser(request))) return json(401, { error: 'Login required' });
+  const viewer = await sessionViewer(request);
+  if (!viewer) return json(401, { error: 'Login required' });
   const raw = await request.text();
   if (raw.length > MAX_BODY) return json(413, { error: 'Too large' });
 
@@ -113,7 +118,7 @@ async function write(request: Request): Promise<Response> {
        on conflict (platform, handle)
        do update set summary = excluded.summary, summary_at = excluded.summary_at
        returning 1`,
-      [JSON.stringify(summaries)]
+      [JSON.stringify(summaries), viewer.campusIds]
     );
     saved += result.length;
   }
@@ -126,7 +131,7 @@ async function write(request: Request): Promise<Response> {
        on conflict (platform, handle)
        do update set profile = excluded.profile, profile_at = excluded.profile_at
        returning 1`,
-      [JSON.stringify(profiles)]
+      [JSON.stringify(profiles), viewer.campusIds]
     );
     saved += result.length;
   }

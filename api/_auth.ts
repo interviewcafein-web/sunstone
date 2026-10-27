@@ -73,51 +73,78 @@ export const emailCodesConfigured = () =>
 
 export const googleSignInConfigured = () => canSignSessions() && googleConfigured();
 
-let staffCount: { count: number; at: number } | undefined;
-
 /**
- * Whether username + password sign-in still works: only until a passwordless way in is set
- * up and someone can use it (at least one active staff email), so nobody is ever locked out.
+ * Whether username + password sign-in still works: only until Google or emailed codes are set
+ * up. A built-in super admin (BUILT_IN_SUPER_ADMINS) always exists, so someone can always
+ * sign in once passwords are off.
  */
 export async function passwordLoginEnabled(): Promise<boolean> {
-  if (!canSignSessions() || accounts().size === 0) return false;
-  if (!googleSignInConfigured() && !emailCodesConfigured()) return true;
-  if ((process.env.STAFF_EMAILS ?? '').split(',').some((email) => email.trim())) return false;
-  if (!process.env.DATABASE_URL) return true;
-  try {
-    if (!staffCount || Date.now() - staffCount.at > 60_000) {
-      const [row] = await db()`select count(*)::int as count from staff where active`;
-      staffCount = { count: Number(row.count), at: Date.now() };
-    }
-    return staffCount.count === 0;
-  } catch {
-    // Cannot tell whether staff exist: keep passwords off rather than reopen them.
-    return false;
-  }
+  return (
+    canSignSessions() && accounts().size > 0 && !googleSignInConfigured() && !emailCodesConfigured()
+  );
 }
 
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const isEmail = (value: string) => EMAIL.test(value);
 
+// --- Roles -----------------------------------------------------------------------------
+//   super_admin  every campus; manages HQ and campus staff. Built in, see below.
+//   hq           every campus; manages HQ and campus staff (not super admins).
+//   campus       only the campuses in its campus_ids; manages nobody.
+
+export type Role = 'super_admin' | 'hq' | 'campus';
+
+/** Always super admins, whatever the staff table says; they cannot be removed in the app. */
+export const BUILT_IN_SUPER_ADMINS = ['93mishra@gmail.com'];
+
+export interface StaffAccess {
+  role: Role;
+  name: string | null;
+  /** LMS campus ids (students.campus_id); used only for the campus role. */
+  campusIds: number[];
+}
+
 // Staff lookups are cached briefly per server instance: every API call checks the session,
-// and a one-minute delay before a removed staff member loses access is acceptable.
+// and a one-minute delay before a change of access takes effect is acceptable.
 const STAFF_CACHE_MS = 60_000;
-const staffCache = new Map<string, { active: boolean; at: number }>();
+const staffCache = new Map<string, { access: StaffAccess | null; at: number }>();
+
+/** Forget cached access (after the team page changes someone). */
+export const forgetStaff = (email: string) => staffCache.delete(normalizeEmail(email));
+
+/** What this email may do, or null when it has no access. */
+export async function staffAccess(email: string): Promise<StaffAccess | null> {
+  const address = normalizeEmail(email);
+  const cached = staffCache.get(address);
+  if (cached && Date.now() - cached.at < STAFF_CACHE_MS) return cached.access;
+
+  let access: StaffAccess | null = null;
+  if (process.env.DATABASE_URL) {
+    const [row] = await db()`
+      select name, role, campus_ids from staff where email = ${address} and active`;
+    if (row) {
+      access = {
+        role: row.role as Role,
+        name: row.name ? String(row.name) : null,
+        campusIds: (row.campus_ids as number[]) ?? [],
+      };
+    }
+  }
+  if (BUILT_IN_SUPER_ADMINS.includes(address)) {
+    access = { role: 'super_admin', name: access?.name ?? null, campusIds: [] };
+  } else if (
+    !access &&
+    (process.env.STAFF_EMAILS ?? '').split(',').map(normalizeEmail).includes(address)
+  ) {
+    access = { role: 'hq', name: null, campusIds: [] };
+  }
+  staffCache.set(address, { access, at: Date.now() });
+  return access;
+}
 
 /** Whether this email may sign in with Google or an emailed code. */
-export async function isStaff(email: string): Promise<boolean> {
-  const address = normalizeEmail(email);
-  const fromEnv = (process.env.STAFF_EMAILS ?? '').split(',').map(normalizeEmail);
-  if (fromEnv.includes(address)) return true;
-  if (!process.env.DATABASE_URL) return false;
-
-  const cached = staffCache.get(address);
-  if (cached && Date.now() - cached.at < STAFF_CACHE_MS) return cached.active;
-  const rows = await db()`select 1 from staff where email = ${address} and active`;
-  staffCache.set(address, { active: rows.length > 0, at: Date.now() });
-  return rows.length > 0;
-}
+export const isStaff = async (email: string) => Boolean(await staffAccess(email));
 
 /** The canonical username when the password is right, otherwise null. */
 export async function checkPassword(username: string, password: string): Promise<string | null> {
@@ -192,22 +219,55 @@ export function readCookie(request: Request, name: string): string | undefined {
     ?.slice(name.length + 1);
 }
 
-/** The logged-in user (username or staff email) from the request's cookie, if it is genuine,
- *  not expired, and the account still has access. */
-export async function sessionUser(request: Request): Promise<string | null> {
+/** Who is signed in, and what they may see. */
+export interface Viewer {
+  /** Username (password accounts) or email. */
+  user: string;
+  name: string | null;
+  role: Role;
+  /** The campuses they may see; null means every campus. */
+  campusIds: number[] | null;
+}
+
+/** The signed-in person from the request's cookie, if it is genuine, not expired, and the
+ *  account still has access. Password accounts (the bootstrap logins) count as HQ. */
+export async function sessionViewer(request: Request): Promise<Viewer | null> {
   if (!canSignSessions()) return null;
   const session = await unsign<Session>(readCookie(request, SESSION_COOKIE));
   if (!session || typeof session.u !== 'string' || !(session.e > Date.now())) return null;
   try {
     if (session.m === 'google' || session.m === 'otp') {
-      return (await isStaff(session.u)) ? session.u : null;
+      const access = await staffAccess(session.u);
+      if (!access) return null;
+      return {
+        user: session.u,
+        name: access.name,
+        role: access.role,
+        campusIds: access.role === 'campus' ? access.campusIds : null,
+      };
     }
-    return accounts().has(session.u) && (await passwordLoginEnabled()) ? session.u : null;
+    if (accounts().has(session.u) && (await passwordLoginEnabled())) {
+      return { user: session.u, name: null, role: 'hq', campusIds: null };
+    }
+    return null;
   } catch {
     // The staff list could not be read (database down): treat as logged out, not as an error.
     return null;
   }
 }
+
+/** The signed-in username or email, for endpoints that only need "is this staff". */
+export async function sessionUser(request: Request): Promise<string | null> {
+  return (await sessionViewer(request))?.user ?? null;
+}
+
+/** Super admins and HQ manage the team. */
+export const managesTeam = (viewer: Viewer | null) =>
+  viewer?.role === 'super_admin' || viewer?.role === 'hq';
+
+/** Whether the viewer may see students of this campus. */
+export const seesCampus = (viewer: Viewer, campusId: number | null) =>
+  viewer.campusIds === null || (campusId !== null && viewer.campusIds.includes(campusId));
 
 export function sessionCookie(request: Request, value: string, maxAgeSeconds: number) {
   const secure = new URL(request.url).protocol === 'https:' ? '; Secure' : '';

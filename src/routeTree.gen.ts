@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ResourcesRouteImport } from './routes/resources'
+import { Route as TeamRouteImport } from './routes/team'
 import { Route as SSlugRouteImport } from './routes/s.$slug'
 import { Route as SSlugCardRouteImport } from './routes/s.$slug_.card'
 
@@ -36,6 +37,11 @@ const ResourcesRoute = ResourcesRouteImport.update({
   path: '/resources',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TeamRoute = TeamRouteImport.update({
+  id: '/team',
+  path: '/team',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SSlugRoute = SSlugRouteImport.update({
   id: '/s/$slug',
   path: '/s/$slug',
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
+  '/team': typeof TeamRoute
   '/s/$slug': typeof SSlugRoute
   '/s/$slug/card': typeof SSlugCardRoute
 }
@@ -60,6 +67,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
+  '/team': typeof TeamRoute
   '/s/$slug': typeof SSlugRoute
   '/s/$slug/card': typeof SSlugCardRoute
 }
@@ -69,21 +77,36 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
+  '/team': typeof TeamRoute
   '/s/$slug': typeof SSlugRoute
   '/s/$slug_/card': typeof SSlugCardRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/login' | '/profile' | '/resources' | '/s/$slug' | '/s/$slug/card'
+    | '/'
+    | '/login'
+    | '/profile'
+    | '/resources'
+    | '/team'
+    | '/s/$slug'
+    | '/s/$slug/card'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/profile' | '/resources' | '/s/$slug' | '/s/$slug/card'
+  to:
+    | '/'
+    | '/login'
+    | '/profile'
+    | '/resources'
+    | '/team'
+    | '/s/$slug'
+    | '/s/$slug/card'
   id:
     | '__root__'
     | '/'
     | '/login'
     | '/profile'
     | '/resources'
+    | '/team'
     | '/s/$slug'
     | '/s/$slug_/card'
   fileRoutesById: FileRoutesById
@@ -93,6 +116,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ProfileRoute: typeof ProfileRoute
   ResourcesRoute: typeof ResourcesRoute
+  TeamRoute: typeof TeamRoute
   SSlugRoute: typeof SSlugRoute
   SSlugCardRoute: typeof SSlugCardRoute
 }
@@ -127,6 +151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResourcesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/team': {
+      id: '/team'
+      path: '/team'
+      fullPath: '/team'
+      preLoaderRoute: typeof TeamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/s/$slug': {
       id: '/s/$slug'
       path: '/s/$slug'
@@ -149,6 +180,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ProfileRoute: ProfileRoute,
   ResourcesRoute: ResourcesRoute,
+  TeamRoute: TeamRoute,
   SSlugRoute: SSlugRoute,
   SSlugCardRoute: SSlugCardRoute,
 }

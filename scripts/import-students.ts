@@ -7,7 +7,7 @@
 //   REDASH_KEY=... npm run db:import            (DATABASE_URL and SHEET_ID from .env.local)
 //   REDASH_KEY=... npm run db:import -- --dry   (match and report, write nothing)
 
-import { Pool } from '@neondatabase/serverless';
+import { neon } from '@neondatabase/serverless';
 
 import { syncSheet } from '../api/_sheet-sync';
 
@@ -140,15 +140,14 @@ console.log(`  ${all.length} PRIME tech students, ${lms.length} FLAGSHIP.`);
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error('DATABASE_URL is not set (add it to .env.local).');
-const pool = new Pool({ connectionString: url });
+const sql = neon(url);
 
 const existing = new Map<number, { username: string; legacy_slugs: string[] }>();
-for (const row of (
-  await pool.query<{ lms_user_id: number; username: string; legacy_slugs: string[] }>(
-    'select lms_user_id, username, legacy_slugs from students'
-  )
-).rows) {
-  existing.set(row.lms_user_id, row);
+for (const row of await sql`select lms_user_id, username, legacy_slugs from students`) {
+  existing.set(Number(row.lms_user_id), {
+    username: String(row.username),
+    legacy_slugs: row.legacy_slugs as string[],
+  });
 }
 const taken = new Set<string>();
 for (const row of existing.values()) {
@@ -224,7 +223,6 @@ if (DRY_RUN) {
   const sheet = await syncSheet({ dryRun: true });
   console.log(`Sheet entries matched by email: ${sheet.matched} of ${sheet.sheetEntries}`);
   console.log('\nDry run: nothing written.');
-  await pool.end();
   process.exit(0);
 }
 
@@ -237,42 +235,38 @@ const updates = columns
   .concat('updated_at = now()')
   .join(', ');
 
-const client = await pool.connect();
-try {
-  await client.query('begin');
-  const BATCH = 300;
-  for (let start = 0; start < rows.length; start += BATCH) {
-    const batch = rows.slice(start, start + BATCH);
-    const values: unknown[] = [];
-    const tuples = batch.map((row) => {
-      const placeholders = columns.map((column) => {
-        values.push(row[column]);
-        return `$${values.length}`;
-      });
-      return `(${placeholders.join(', ')})`;
+// One transaction over Neon's HTTP driver: every batch is written, or none is.
+const BATCH = 300;
+const queries = [];
+for (let start = 0; start < rows.length; start += BATCH) {
+  const batch = rows.slice(start, start + BATCH);
+  const values: unknown[] = [];
+  const tuples = batch.map((row) => {
+    const placeholders = columns.map((column) => {
+      values.push(row[column]);
+      return `$${values.length}`;
     });
-    await client.query(
+    return `(${placeholders.join(', ')})`;
+  });
+  queries.push(
+    sql.query(
       `insert into students (${columns.join(', ')}) values ${tuples.join(', ')}
        on conflict (lms_user_id) do update set ${updates}`,
       values
-    );
-  }
-  const hidden = await client.query(
-    `update students set on_platform = false, updated_at = now()
-     where on_platform and not (lms_user_id = any($1::int[]))`,
-    [rows.map((row) => row.lms_user_id)]
+    )
   );
-  await client.query('commit');
-  console.log(
-    `\nWrote ${rows.length} students; ${hidden.rowCount ?? 0} no longer eligible were hidden.`
-  );
-} catch (error) {
-  await client.query('rollback');
-  throw error;
-} finally {
-  client.release();
-  await pool.end();
 }
+queries.push(
+  sql.query(
+    `update students set on_platform = false, updated_at = now()
+     where on_platform and not (lms_user_id = any($1::int[])) returning 1`,
+    [rows.map((row) => row.lms_user_id)]
+  )
+);
+const results = await sql.transaction(queries);
+console.log(
+  `\nWrote ${rows.length} students; ${results.at(-1)!.length} no longer eligible were hidden.`
+);
 
 // --- 5. Coding usernames from the form sheet, by email --------------------------------------
 

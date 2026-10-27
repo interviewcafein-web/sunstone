@@ -1,14 +1,27 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
+import type { Role } from './roles';
+
 // Who is logged in, from the session cookie that api/login.ts sets. The cookie itself is
 // HttpOnly, so the app asks /api/me rather than reading it.
 
 export const SESSION_KEY = ['session'];
 
-async function fetchSession(): Promise<string | null> {
+export interface SessionInfo {
+  /** Email (or a bootstrap password username). */
+  user: string;
+  name: string | null;
+  role: Role;
+  /** Campus staff: the campuses they see. Null for HQ and super admins (every campus). */
+  campuses: { id: number; name: string }[] | null;
+  /** Super admins and HQ: may open the Team page. */
+  managesTeam: boolean;
+}
+
+async function fetchSession(): Promise<SessionInfo | null> {
   const response = await fetch('/api/me');
   if (!response.ok) return null;
-  return ((await response.json()) as { user: string }).user;
+  return (await response.json()) as SessionInfo;
 }
 
 export function useSession() {
