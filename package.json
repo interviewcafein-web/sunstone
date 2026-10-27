@@ -13,7 +13,8 @@
     "hash-password": "node scripts/hash-password.mjs",
     "db:migrate": "tsx --env-file=.env.local scripts/migrate.ts",
     "db:import": "tsx --env-file=.env.local scripts/import-students.ts",
-    "db:sync-sheet": "tsx --env-file=.env.local scripts/sync-sheet.ts"
+    "db:sync-sheet": "tsx --env-file=.env.local scripts/sync-sheet.ts",
+    "staff": "tsx --env-file=.env.local scripts/staff.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
