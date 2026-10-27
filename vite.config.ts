@@ -33,6 +33,7 @@ const API_ROUTES: Record<string, Handler> = {
   '/api/og': lazy(() => import('./api/og')),
   '/api/card': lazy(() => import('./api/card')),
   '/api/share': lazy(() => import('./api/share')),
+  '/api/health': lazy(() => import('./api/health')),
 };
 
 // In production Vercel serves the files in api/ as Edge Functions. Locally there is no
@@ -93,7 +94,7 @@ function siteUrlPlugin(siteUrl: string): Plugin {
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   // The api/ handlers read process.env, as they do on Vercel; feed them .env.local in dev.
-  const env = loadEnv(mode, process.cwd(), ['SHEET_', 'SITE_', 'AUTH_']);
+  const env = loadEnv(mode, process.cwd(), ['SHEET_', 'SITE_', 'AUTH_', 'DATABASE_']);
   Object.assign(process.env, env);
 
   const vercelDomain = process.env.VERCEL_PROJECT_PRODUCTION_URL;
