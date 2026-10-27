@@ -57,7 +57,7 @@ export function StatusTags({
       )}
       {inactive && (
         <span
-          className={cn(pill, 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200')}
+          className={cn(pill, 'bg-slate-200 text-slate-700')}
           title={['Inactive in the LMS', inactive.reason].filter(Boolean).join(' · ')}
         >
           <CircleSlash className={icon} aria-hidden />

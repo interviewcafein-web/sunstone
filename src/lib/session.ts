@@ -11,6 +11,8 @@ export interface SessionInfo {
   /** Email (or a bootstrap password username). */
   user: string;
   name: string | null;
+  /** Google profile photo, for staff who signed in with Google. */
+  picture: string | null;
   role: Role;
   /** Campus staff: the campuses they see. Null for HQ and super admins (every campus). */
   campuses: { id: number; name: string }[] | null;

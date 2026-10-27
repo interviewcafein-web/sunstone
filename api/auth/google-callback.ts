@@ -15,6 +15,7 @@ import {
 import {
   SESSION_DAYS,
   createSession,
+  forgetStaff,
   isStaff,
   normalizeEmail,
   readCookie,
@@ -31,6 +32,8 @@ interface IdToken {
   exp: number;
   email?: string;
   email_verified?: boolean;
+  name?: string;
+  picture?: string;
 }
 
 function decodeIdToken(token: string): IdToken | null {
@@ -89,7 +92,16 @@ export default async function handler(request: Request): Promise<Response> {
   if (!(await isStaff(email).catch(() => false))) {
     return loginError('not_staff', next, [clearState]);
   }
-  await db()`update staff set last_login_at = now() where email = ${email}`.catch(() => undefined);
+  // Their Google photo for the header menu, and their Google name unless one was set on the
+  // Team page. Only Google's own image host is accepted.
+  const picture = token!.picture?.startsWith('https://lh3.googleusercontent.com/')
+    ? token!.picture
+    : null;
+  const name = token!.name?.trim().slice(0, 100) || null;
+  await db()`
+    update staff set last_login_at = now(), picture = ${picture}, name = coalesce(name, ${name})
+    where email = ${email}`.catch(() => undefined);
+  forgetStaff(email);
 
   return redirect(next, [
     clearState,

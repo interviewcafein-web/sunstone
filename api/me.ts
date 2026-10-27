@@ -24,6 +24,7 @@ export default async function handler(request: Request): Promise<Response> {
   return json(200, {
     user: viewer.user,
     name: viewer.name,
+    picture: viewer.picture,
     role: viewer.role,
     campuses,
     managesTeam: managesTeam(viewer),

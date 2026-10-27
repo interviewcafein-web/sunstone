@@ -70,12 +70,12 @@ const post = (body: object) =>
 const ROLE_STYLES: Record<Role, string> = {
   super_admin: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',
   hq: 'bg-brand-100 text-brand-800 dark:bg-brand-900/60 dark:text-brand-200',
-  campus: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
+  campus: 'bg-slate-100 text-slate-700',
 };
 const ROLE_ICONS = { super_admin: Crown, hq: Globe2, campus: Building2 };
 
 const field =
-  'focus-visible:outline-brand-500 w-full rounded-lg border border-slate-300 bg-surface px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 disabled:bg-slate-50 disabled:text-slate-500 dark:disabled:bg-slate-800';
+  'focus-visible:outline-brand-500 w-full rounded-lg border border-slate-300 bg-surface px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 disabled:bg-slate-50 disabled:text-slate-500';
 
 function when(ms: number | null) {
   if (!ms) return 'Never';
@@ -274,10 +274,7 @@ export default function TeamPage() {
                   {member.role === 'campus' ? (
                     <span className="flex flex-wrap gap-1">
                       {member.campusIds.map((id) => (
-                        <span
-                          key={id}
-                          className="rounded-md border border-slate-200 px-1.5 py-0.5 dark:border-slate-700"
-                        >
+                        <span key={id} className="rounded-md border border-slate-200 px-1.5 py-0.5">
                           {campusName.get(id) ?? `Campus ${id}`}
                         </span>
                       ))}
@@ -407,7 +404,7 @@ function MemberForm({
           type="button"
           onClick={onCancel}
           aria-label="Close"
-          className="inline-flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+          className="inline-flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
         >
           <X className="size-4" aria-hidden />
         </button>
@@ -512,9 +509,7 @@ function MemberForm({
                   key={campus.id}
                   className={cn(
                     'flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm',
-                    checked
-                      ? 'bg-brand-50 dark:bg-brand-900/30'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                    checked ? 'bg-brand-50 dark:bg-brand-900/30' : 'hover:bg-slate-50'
                   )}
                 >
                   <input
@@ -543,7 +538,7 @@ function MemberForm({
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+          className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
         >
           Cancel
         </button>

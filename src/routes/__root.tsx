@@ -1,10 +1,10 @@
 import { Link, Outlet, createRootRoute } from '@tanstack/react-router';
-import { LogIn, LogOut, UserRound } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 
 import { BrandLockup } from '@/components/common/BrandLockup';
+import { ProfileMenu } from '@/components/common/ProfileMenu';
 import { VertexLogo } from '@/components/common/VertexLogo';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
-import { ROLE_LABELS } from '@/lib/roles';
 import { useLogOut, useSession } from '@/lib/session';
 
 export const Route = createRootRoute({
@@ -59,11 +59,6 @@ function RootComponent() {
                 >
                   Resources
                 </Link>
-                {user.managesTeam && (
-                  <Link to="/team" className={navLink} activeProps={navLinkActive}>
-                    Team
-                  </Link>
-                )}
               </>
             ) : (
               !session.isPending && (
@@ -74,37 +69,7 @@ function RootComponent() {
               )
             )}
             <ThemeToggle />
-            {user && (
-              <span className="ml-1 flex items-center gap-1 border-l border-slate-200 pl-2">
-                <span
-                  className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-slate-700"
-                  title={`Signed in as ${user.user} · ${ROLE_LABELS[user.role]}${
-                    user.campuses
-                      ? ` · ${user.campuses.map((campus) => campus.name).join(', ')}`
-                      : ''
-                  }`}
-                >
-                  <UserRound className="size-4 text-slate-500" aria-hidden />
-                  {/* Phones show just the icon (name on hover) so the header fits. */}
-                  <span className="hidden max-w-[14rem] truncate sm:inline">
-                    {user.name ?? user.user}
-                  </span>
-                  <span className="sr-only sm:hidden">{user.name ?? user.user}</span>
-                  <span className="bg-brand-50 text-brand-700 dark:bg-brand-900/50 dark:text-brand-200 hidden rounded-full px-2 py-0.5 text-[10px] font-semibold md:inline">
-                    {ROLE_LABELS[user.role]}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  onClick={logOut}
-                  aria-label="Log out"
-                  title="Log out"
-                  className="inline-flex size-9 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-red-50 hover:text-red-700"
-                >
-                  <LogOut className="size-4" aria-hidden />
-                </button>
-              </span>
-            )}
+            {user && <ProfileMenu user={user} onLogOut={logOut} />}
           </nav>
         </div>
       </header>

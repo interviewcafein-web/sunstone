@@ -123,7 +123,7 @@ function GoogleButton({ next }: { next?: string }) {
   return (
     <a
       href={href}
-      className="bg-surface focus-visible:outline-brand-500 flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 dark:hover:bg-slate-800"
+      className="bg-surface focus-visible:outline-brand-500 flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2"
     >
       <GoogleLogo className="size-4.5" />
       Continue with Google

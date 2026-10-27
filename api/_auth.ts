@@ -101,6 +101,8 @@ export const BUILT_IN_SUPER_ADMINS = ['93mishra@gmail.com'];
 export interface StaffAccess {
   role: Role;
   name: string | null;
+  /** Google profile photo (staff who signed in with Google). */
+  picture: string | null;
   /** LMS campus ids (students.campus_id); used only for the campus role. */
   campusIds: number[];
 }
@@ -122,22 +124,28 @@ export async function staffAccess(email: string): Promise<StaffAccess | null> {
   let access: StaffAccess | null = null;
   if (process.env.DATABASE_URL) {
     const [row] = await db()`
-      select name, role, campus_ids from staff where email = ${address} and active`;
+      select name, role, campus_ids, picture from staff where email = ${address} and active`;
     if (row) {
       access = {
         role: row.role as Role,
         name: row.name ? String(row.name) : null,
+        picture: row.picture ? String(row.picture) : null,
         campusIds: (row.campus_ids as number[]) ?? [],
       };
     }
   }
   if (BUILT_IN_SUPER_ADMINS.includes(address)) {
-    access = { role: 'super_admin', name: access?.name ?? null, campusIds: [] };
+    access = {
+      role: 'super_admin',
+      name: access?.name ?? null,
+      picture: access?.picture ?? null,
+      campusIds: [],
+    };
   } else if (
     !access &&
     (process.env.STAFF_EMAILS ?? '').split(',').map(normalizeEmail).includes(address)
   ) {
-    access = { role: 'hq', name: null, campusIds: [] };
+    access = { role: 'hq', name: null, picture: null, campusIds: [] };
   }
   staffCache.set(address, { access, at: Date.now() });
   return access;
@@ -224,6 +232,7 @@ export interface Viewer {
   /** Username (password accounts) or email. */
   user: string;
   name: string | null;
+  picture: string | null;
   role: Role;
   /** The campuses they may see; null means every campus. */
   campusIds: number[] | null;
@@ -242,12 +251,13 @@ export async function sessionViewer(request: Request): Promise<Viewer | null> {
       return {
         user: session.u,
         name: access.name,
+        picture: access.picture,
         role: access.role,
         campusIds: access.role === 'campus' ? access.campusIds : null,
       };
     }
     if (accounts().has(session.u) && (await passwordLoginEnabled())) {
-      return { user: session.u, name: null, role: 'hq', campusIds: null };
+      return { user: session.u, name: null, picture: null, role: 'hq', campusIds: null };
     }
     return null;
   } catch {
