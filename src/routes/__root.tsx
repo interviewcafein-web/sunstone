@@ -116,8 +116,13 @@ function RootComponent() {
       <footer className="border-t border-slate-200 bg-surface">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-slate-500">
           <BrandLockup logoClassName="h-4 opacity-80" primeClassName="text-[7px]" />
-          <span>
-            Stats from LeetCode, GeeksforGeeks, HackerRank, Codeforces, CodeChef and GitHub
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>
+              Stats from LeetCode, GeeksforGeeks, HackerRank, Codeforces, CodeChef and GitHub
+            </span>
+            <Link to="/privacy" className="font-medium hover:text-slate-700 hover:underline">
+              Privacy policy
+            </Link>
           </span>
         </div>
       </footer>
