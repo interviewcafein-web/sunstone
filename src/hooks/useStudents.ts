@@ -3,7 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { redirectToLogin } from '@/lib/session';
 import type { Student, StudentsResponse } from '@/lib/students/types';
 
-export const SHEET_POLL_MS = 60_000;
+// The list changes when the import runs (or, without a database, when the form sheet
+// changes): checking every few minutes is plenty, and lets the database sleep when idle.
+export const STUDENTS_POLL_MS = 5 * 60_000;
 
 async function fetchStudents(): Promise<StudentsResponse> {
   const response = await fetch('/api/students');
@@ -19,18 +21,18 @@ async function fetchStudents(): Promise<StudentsResponse> {
   return body;
 }
 
-/** The sheet is the source of truth, so poll it: new form responses show up within a minute. */
+/** Every student on the platform (staff only). */
 export function useStudents() {
   return useQuery({
     queryKey: ['students'],
     queryFn: fetchStudents,
     staleTime: 0,
-    refetchInterval: SHEET_POLL_MS,
+    refetchInterval: STUDENTS_POLL_MS,
     refetchOnWindowFocus: true,
   });
 }
 
-/** One student by their short-link slug; public, for the profile and coding-card pages. */
+/** One student by username (or an old profile address); public, for the profile and card pages. */
 export function useStudent(slug: string) {
   return useQuery({
     queryKey: ['student', slug],

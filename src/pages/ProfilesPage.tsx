@@ -18,6 +18,7 @@ import { PlatformPanel } from '@/components/coding/PlatformPanel';
 import { Card, formatNumber } from '@/components/coding/ui';
 import { HandleForm } from '@/components/profile/HandleForm';
 import { PlatformLogo } from '@/components/profile/PlatformLogo';
+import { StatusTags } from '@/components/students/StatusTags';
 import { useCodingProfiles } from '@/hooks/useCodingProfiles';
 import { useStudents } from '@/hooks/useStudents';
 import { useSession } from '@/lib/session';
@@ -167,6 +168,7 @@ export function ProfileView({ name, handles, student, onSubmit }: ProfileViewPro
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
               {name ?? 'Look up a coding profile'}
             </h1>
+            <StatusTags status={student?.status} size="md" className="mt-1.5" />
             <p className="text-brand-100 mt-1 text-sm">
               Problems solved, contests, badges, topics and activity across platforms.
             </p>

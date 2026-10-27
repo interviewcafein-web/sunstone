@@ -4,6 +4,7 @@ import { ArrowDown, Crown } from 'lucide-react';
 import { Avatar } from '@/components/common/Avatar';
 import { PlatformLogo } from '@/components/profile/PlatformLogo';
 import { Medal } from '@/components/students/Medal';
+import { StatusTags } from '@/components/students/StatusTags';
 import { PLATFORMS } from '@/lib/coding-profiles/platforms';
 import type { PlatformSummary } from '@/lib/coding-profiles/summaries';
 import type { Platform, PlatformId } from '@/lib/coding-profiles/types';
@@ -134,7 +135,10 @@ export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
                           .filter(Boolean)
                           .join(' · ')}
                       </div>
-                      {zone && <ZonePill zone={zone} />}
+                      <div className="flex flex-wrap items-center gap-1">
+                        {zone && <ZonePill zone={zone} />}
+                        <StatusTags status={student.status} className="mt-1" />
+                      </div>
                     </div>
                   </div>
                 </th>

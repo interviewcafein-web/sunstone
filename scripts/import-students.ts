@@ -1,0 +1,349 @@
+// Fills the students table: every PRIME, active, tech (SST), FLAGSHIP student in the Sunstone
+// LMS (read through Redash), with the coding usernames they gave in the Google Form sheet.
+// Safe to re-run: rows are updated in place, usernames never change once given, and
+// students who stop matching the rules are hidden (on_platform = false), not deleted.
+//
+//   REDASH_KEY=... npm run db:import            (DATABASE_URL and SHEET_ID from .env.local)
+//   REDASH_KEY=... npm run db:import -- --dry   (match and report, write nothing)
+
+import { Pool } from '@neondatabase/serverless';
+
+import type { PlatformId } from '../src/lib/coding-profiles/types';
+import { readSheet, type SheetStudent } from '../api/_sheet';
+
+const DRY_RUN = process.argv.includes('--dry');
+const REDASH_URL = process.env.REDASH_URL ?? 'https://redash.sunstone.in';
+const REDASH_DATA_SOURCE = Number(process.env.REDASH_DATA_SOURCE ?? 1);
+const PRIME_POLICY_ID = 20; // policies.type = 'PRIME_OPT_IN'
+const INACTIVE_FLAG_ID = 1; // flag_master.name = 'is_student_inactive'
+
+const PROGRAM_NAMES: Record<string, string> = { BTECH: 'B.Tech', BE: 'BE', BCA: 'BCA', MCA: 'MCA' };
+const PLATFORMS: PlatformId[] = [
+  'leetcode',
+  'geeksforgeeks',
+  'hackerrank',
+  'codeforces',
+  'codechef',
+  'github',
+];
+
+// PRIME + active student + tech school (SST). FLAGSHIP is checked below: a student's
+// offering comes from their own section, else from their campus/program/batch.
+const LMS_QUERY = `
+select u.id, trim(u.name) name, lower(trim(u.email)) email, lower(trim(u.sunstone_email)) sunstone_email,
+  u.mobile, u.whatsapp_no, u.alternate_no, u.sunstone_student_id, u.college_roll_no,
+  u.campus_id, trim(c.campus_fullname) campus, c.is_core, pr.short_name program, pr.course_type,
+  u.admission_year, u.passing_year,
+  coalesce(
+    (select group_concat(distinct p.offering_type) from student_section_mapping ss
+       join sections se on se.id = ss.section_id
+       join program_campus_batch_mapping p on p.id = se.pcbm_id
+     where ss.student_id = u.id and ss.status = '1'),
+    (select group_concat(distinct p.offering_type) from program_campus_batch_mapping p
+     where p.program_id = u.program and p.campus_id = u.campus_id and p.batch = u.admission_year
+       and p.status = '1')) offering,
+  (select concat_ws('|', d.debard_reason, if(d.is_permanent_debarded = 1, '', d.end_date))
+     from user_debarded d
+    where d.user_id = u.id and d.status = '1' and (d.is_permanent_debarded = 1 or d.end_date >= curdate())
+    order by d.is_permanent_debarded desc, d.end_date desc limit 1) debarred,
+  case when u.is_user_blocked = '1' then 'Account blocked' else
+    (select b.reason from blocks b where b.user_id = u.id and b.status = '1' and b.is_blocked = 1
+      order by b.modified desc limit 1) end blocked,
+  (select coalesce(f.reason, 'Inactive') from user_flag_mapping f
+    where f.user_id = u.id and f.flag_id = ${INACTIVE_FLAG_ID} and f.status = '1'
+    order by f.modified desc limit 1) inactive
+from users u
+join (select distinct user_id from user_policy_mapping where policy_id = ${PRIME_POLICY_ID}) m on m.user_id = u.id
+join programs pr on pr.id = u.program
+left join campus c on c.id = u.campus_id
+where u.role = 'student' and u.status = '1' and pr.course_type = 'SST' and u.admission_year <> '2050'`;
+
+interface LmsStudent {
+  id: number;
+  name: string;
+  email: string | null;
+  sunstone_email: string | null;
+  mobile: string | null;
+  whatsapp_no: string | null;
+  alternate_no: string | null;
+  sunstone_student_id: string | null;
+  college_roll_no: string | null;
+  campus_id: number | null;
+  campus: string | null;
+  is_core: number | null;
+  program: string;
+  course_type: string;
+  admission_year: string | null;
+  passing_year: number | null;
+  offering: string | null;
+  debarred: string | null;
+  blocked: string | null;
+  inactive: string | null;
+}
+
+async function redash<T>(sql: string): Promise<T[]> {
+  const key = process.env.REDASH_KEY;
+  if (!key) throw new Error('REDASH_KEY is not set.');
+  // Redash's JSON responses, loosely typed: only the fields read below are relied on.
+  const call = async (path: string, body?: unknown): Promise<any> => {
+    const response = await fetch(REDASH_URL + path, {
+      method: body ? 'POST' : 'GET',
+      headers: { Authorization: `Key ${key}`, 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!response.ok)
+      throw new Error(`Redash ${path}: ${response.status} ${await response.text()}`);
+    return response.json();
+  };
+
+  const first = await call('/api/query_results', {
+    data_source_id: REDASH_DATA_SOURCE,
+    query: sql,
+    max_age: 0,
+  });
+  let resultId = first.query_result?.id;
+  for (let attempt = 0; !resultId; attempt++) {
+    if (attempt > 200) throw new Error('Redash query timed out.');
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const { job } = await call(`/api/jobs/${first.job.id}`);
+    if (job.status === 4) throw new Error(`Redash query failed: ${job.error}`);
+    if (job.status === 3) resultId = job.query_result_id;
+  }
+  const { query_result } = await call(`/api/query_results/${resultId}`);
+  return query_result.data.rows as T[];
+}
+
+const digits = (value: string | null | undefined) => {
+  const all = (value ?? '').replace(/\D/g, '');
+  return all.length >= 10 ? all.slice(-10) : null;
+};
+const emailsIn = (value: string) =>
+  (value.toLowerCase().match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g) ?? []).map((email) => email);
+
+/** "10/11/2026 4:57:49" (the form's timestamp, India time) → ISO. */
+function formTime(value: string): string | null {
+  const match = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4}) (\d{1,2}):(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const [, month, day, year, hour, minute, second] = match.map(Number);
+  const utc = Date.UTC(year, month - 1, day, hour, minute, second) - 330 * 60_000;
+  return new Date(utc).toISOString();
+}
+
+/** LMS names are mostly well-cased; fix the ones typed all-lower or all-upper. */
+function displayName(raw: string): string {
+  const name = raw.replace(/\s+/g, ' ').trim();
+  if (name !== name.toLowerCase() && name !== name.toUpperCase()) return name;
+  return name.toLowerCase().replace(/\b\p{L}/gu, (letter) => letter.toUpperCase());
+}
+
+/** "A Akash Kumar Rao" → "akash.rao": first and last name, initials dropped. */
+function usernameBase(name: string): string {
+  const words = name
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+  const real = words.filter((word) => word.length > 1);
+  const parts = real.length ? real : words;
+  const base = parts.length > 1 ? `${parts[0]}.${parts[parts.length - 1]}` : (parts[0] ?? '');
+  return (base.length >= 3 ? base : `${base || 'student'}.prime`).slice(0, 28);
+}
+
+// --- 1. Read both sources -------------------------------------------------------------
+
+console.log('Reading the LMS through Redash…');
+const all = await redash<LmsStudent>(LMS_QUERY);
+const lms = all.filter((student) => (student.offering ?? '').includes('FLAGSHIP'));
+console.log(`  ${all.length} PRIME tech students, ${lms.length} FLAGSHIP.`);
+
+console.log('Reading the Google Form sheet…');
+const sheet = await readSheet();
+if ('error' in sheet) throw new Error(sheet.error);
+console.log(`  ${sheet.students.length} students in the sheet.`);
+
+// --- 2. Match sheet entries to LMS students (email first, then mobile) ------------------
+
+const byEmail = new Map<string, LmsStudent[]>();
+const byPhone = new Map<string, LmsStudent[]>();
+const add = (map: Map<string, LmsStudent[]>, key: string | null, student: LmsStudent) => {
+  if (key) map.set(key, [...(map.get(key) ?? []), student]);
+};
+for (const student of lms) {
+  add(byEmail, student.email, student);
+  add(byEmail, student.sunstone_email, student);
+  for (const phone of [student.mobile, student.whatsapp_no, student.alternate_no]) {
+    add(byPhone, digits(phone), student);
+  }
+}
+
+const formFor = new Map<number, SheetStudent>();
+let matchedByEmail = 0;
+let matchedByPhone = 0;
+const unmatched: SheetStudent[] = [];
+for (const entry of sheet.students) {
+  let candidates = emailsIn(entry.email).flatMap((email) => byEmail.get(email) ?? []);
+  if (candidates.length) matchedByEmail++;
+  else {
+    candidates = byPhone.get(digits(entry.mobile) ?? '') ?? [];
+    if (candidates.length) matchedByPhone++;
+  }
+  if (!candidates.length) {
+    unmatched.push(entry);
+    continue;
+  }
+  // Two LMS accounts for one person: the newer account is the one in use.
+  const student = candidates.reduce((a, b) => (b.id > a.id ? b : a));
+  const previous = formFor.get(student.id);
+  const time = (form: SheetStudent) => formTime(form.submitted) ?? '';
+  if (!previous || time(entry) > time(previous)) formFor.set(student.id, entry);
+}
+
+// --- 3. Usernames: keep existing ones, give new students first.last (+ a number) ---------
+
+const url = process.env.DATABASE_URL;
+if (!url) throw new Error('DATABASE_URL is not set (add it to .env.local).');
+const pool = new Pool({ connectionString: url });
+
+const existing = new Map<number, { username: string; legacy_slugs: string[] }>();
+for (const row of (
+  await pool.query<{ lms_user_id: number; username: string; legacy_slugs: string[] }>(
+    'select lms_user_id, username, legacy_slugs from students'
+  )
+).rows) {
+  existing.set(row.lms_user_id, row);
+}
+const taken = new Set<string>();
+for (const row of existing.values()) {
+  taken.add(row.username.toLowerCase());
+  row.legacy_slugs.forEach((slug) => taken.add(slug.toLowerCase()));
+}
+for (const entry of sheet.students) taken.add(entry.slug.toLowerCase());
+
+function newUsername(name: string): string {
+  const base = usernameBase(name);
+  for (let n = 1; ; n++) {
+    const candidate = n === 1 ? base : `${base}${n}`;
+    if (!taken.has(candidate)) {
+      taken.add(candidate);
+      return candidate;
+    }
+  }
+}
+
+// --- 4. Build rows --------------------------------------------------------------------
+
+const now = new Date().toISOString();
+const rows = [...lms]
+  .sort((a, b) => a.id - b.id) // earlier accounts get the plain first.last
+  .map((student) => {
+    const form = formFor.get(student.id);
+    const kept = existing.get(student.id);
+    const name = displayName(student.name);
+    const [debarReason, debarUntil] = (student.debarred ?? '').split('|');
+    const legacy = new Set(kept?.legacy_slugs ?? []);
+    if (form) legacy.add(form.slug);
+    return {
+      lms_user_id: student.id,
+      username: kept?.username ?? newUsername(name),
+      legacy_slugs: [...legacy],
+      on_platform: true,
+      name,
+      email: student.email,
+      sunstone_email: student.sunstone_email,
+      mobile: digits(student.mobile),
+      sunstone_student_id: student.sunstone_student_id,
+      college_roll_no: student.college_roll_no,
+      campus_id: student.campus_id,
+      campus: student.campus ?? 'Not specified',
+      is_core_campus: student.is_core === 1,
+      program: PROGRAM_NAMES[student.program] ?? student.program,
+      course_type: student.course_type,
+      offering_type: 'FLAGSHIP',
+      admission_year: Number(student.admission_year) || null,
+      passing_year: student.passing_year,
+      is_prime: true,
+      is_debarred: Boolean(student.debarred),
+      debarred_reason: student.debarred ? debarReason || null : null,
+      debarred_until: student.debarred && debarUntil ? debarUntil.slice(0, 10) : null,
+      is_blocked: Boolean(student.blocked),
+      blocked_reason: student.blocked,
+      is_inactive: Boolean(student.inactive),
+      inactive_reason: student.inactive,
+      ...Object.fromEntries(
+        PLATFORMS.map((platform) => [platform, form?.handles[platform] ?? null])
+      ),
+      invalid_handles: form?.invalid ?? [],
+      form_submitted_at: form ? formTime(form.submitted) : null,
+      lms_synced_at: now,
+    };
+  });
+
+const linked = rows.filter((row) => row.form_submitted_at).length;
+console.log(`
+LMS students to import:       ${rows.length}
+  with coding usernames:      ${linked}  (sheet matched by email ${matchedByEmail}, by mobile ${matchedByPhone})
+  debarred (red tag):         ${rows.filter((row) => row.is_debarred).length}
+  flagged inactive:           ${rows.filter((row) => row.is_inactive).length}
+  blocked:                    ${rows.filter((row) => row.is_blocked).length}
+  new / already in database:  ${rows.filter((row) => !existing.has(row.lms_user_id)).length} / ${rows.filter((row) => existing.has(row.lms_user_id)).length}
+Sheet entries not matched to an eligible LMS student: ${unmatched.length}`);
+console.log(
+  'Sample usernames:',
+  rows
+    .slice(0, 5)
+    .map((row) => row.username)
+    .join(', ')
+);
+
+if (DRY_RUN) {
+  console.log('\nDry run: nothing written.');
+  await pool.end();
+  process.exit(0);
+}
+
+// --- 5. Write -------------------------------------------------------------------------
+
+const columns = Object.keys(rows[0]) as (keyof (typeof rows)[number])[];
+const updates = columns
+  .filter((column) => column !== 'lms_user_id' && column !== 'username')
+  .map((column) => `${column} = excluded.${column}`)
+  .concat('updated_at = now()')
+  .join(', ');
+
+const client = await pool.connect();
+try {
+  await client.query('begin');
+  const BATCH = 300;
+  for (let start = 0; start < rows.length; start += BATCH) {
+    const batch = rows.slice(start, start + BATCH);
+    const values: unknown[] = [];
+    const tuples = batch.map((row) => {
+      const placeholders = columns.map((column) => {
+        values.push(row[column]);
+        return `$${values.length}`;
+      });
+      return `(${placeholders.join(', ')})`;
+    });
+    await client.query(
+      `insert into students (${columns.join(', ')}) values ${tuples.join(', ')}
+       on conflict (lms_user_id) do update set ${updates}`,
+      values
+    );
+  }
+  const hidden = await client.query(
+    `update students set on_platform = false, updated_at = now()
+     where on_platform and not (lms_user_id = any($1::int[]))`,
+    [rows.map((row) => row.lms_user_id)]
+  );
+  await client.query('commit');
+  console.log(
+    `\nWrote ${rows.length} students; ${hidden.rowCount ?? 0} no longer eligible were hidden.`
+  );
+} catch (error) {
+  await client.query('rollback');
+  throw error;
+} finally {
+  client.release();
+  await pool.end();
+}
