@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { Link, getRouteApi } from '@tanstack/react-router';
 import type { UseQueryResult } from '@tanstack/react-query';
 import {
+  ClipboardList,
   Check,
   ChevronRight,
   FileDown,
@@ -12,6 +13,7 @@ import {
   Pencil,
 } from 'lucide-react';
 
+import { StudentAssessments } from '@/components/assessments/StudentAssessments';
 import { Avatar } from '@/components/common/Avatar';
 import { CodingOverview } from '@/components/coding/CodingOverview';
 import { PlatformPanel } from '@/components/coding/PlatformPanel';
@@ -34,7 +36,7 @@ import { cn } from '@/lib/utils';
 
 const route = getRouteApi('/profile');
 
-type Tab = 'overview' | PlatformId;
+type Tab = 'overview' | 'assessments' | PlatformId;
 
 export default function ProfilesPage() {
   const { name, ...handles } = route.useSearch();
@@ -81,10 +83,13 @@ export function ProfileView({ name, handles, student, onSubmit }: ProfileViewPro
   const loaded = results.flatMap(({ query }) => (query.data ? [query.data] : []));
   const hasHandles = results.length > 0;
   const active = results.find(({ platform }) => platform.id === tab);
+  // Staff see a student's Sunstone assessments next to their coding profiles.
+  const showAssessments = Boolean(student) && signedIn;
+  const showTabs = hasHandles || showAssessments;
 
-  // A different person's handles: start again from the overview.
+  // A different person's handles: start again from the first tab.
   const handleKey = JSON.stringify(handles);
-  useEffect(() => setTab('overview'), [handleKey]);
+  useEffect(() => setTab(hasHandles ? 'overview' : 'assessments'), [handleKey, hasHandles]);
 
   const shareUrl = student ? `${window.location.origin}/s/${student.slug}` : undefined;
 
@@ -189,20 +194,29 @@ export function ProfileView({ name, handles, student, onSubmit }: ProfileViewPro
             </div>
           </details>
         )
+      ) : student ? (
+        <Card>
+          <p className="text-sm text-slate-600">
+            No coding profiles linked yet. They appear here once {student.name.split(' ')[0]} fills
+            in the Sunstone PRIME coding profile form.
+          </p>
+        </Card>
       ) : (
         <HandleForm handles={handles} onSubmit={onSubmit} />
       )}
 
-      {hasHandles && (
+      {showTabs && (
         <>
           <nav
             aria-label="Platforms"
             className="-mx-4 flex gap-1 overflow-x-auto border-b border-slate-200 px-4 scrollbar-none"
           >
-            <TabButton selected={tab === 'overview'} onClick={() => setTab('overview')}>
-              <LayoutGrid className="text-brand-700 dark:text-brand-300 size-4" aria-hidden />
-              Overview
-            </TabButton>
+            {hasHandles && (
+              <TabButton selected={tab === 'overview'} onClick={() => setTab('overview')}>
+                <LayoutGrid className="text-brand-700 dark:text-brand-300 size-4" aria-hidden />
+                Overview
+              </TabButton>
+            )}
             {results.map(({ platform, query }) => (
               <TabButton
                 key={platform.id}
@@ -214,9 +228,17 @@ export function ProfileView({ name, handles, student, onSubmit }: ProfileViewPro
                 <TabCount query={query} />
               </TabButton>
             ))}
+            {showAssessments && (
+              <TabButton selected={tab === 'assessments'} onClick={() => setTab('assessments')}>
+                <ClipboardList className="text-brand-700 dark:text-brand-300 size-4" aria-hidden />
+                Assessments
+              </TabButton>
+            )}
           </nav>
 
-          {tab === 'overview' || !active ? (
+          {tab === 'assessments' && student ? (
+            <StudentAssessments username={student.slug} />
+          ) : !hasHandles ? null : tab === 'overview' || !active ? (
             loaded.length > 0 ? (
               <CodingOverview profiles={loaded} />
             ) : results.some(({ query }) => query.isPending) ? (

@@ -1,0 +1,259 @@
+// Copies PRIME domain assessments and AMCAT results for our students from the Sunstone LMS
+// (through Redash) into the database: tests, which sections they were released to, who is in
+// those sections, each student's best result, the subjects' syllabus (modules), and AMCAT
+// sittings with section scores. Replaces the previous copy in one transaction.
+//
+//   REDASH_KEY=... npm run db:sync-assessments   (DATABASE_URL from .env.local)
+
+import { neon } from '@neondatabase/serverless';
+
+import { redash } from './_redash';
+
+/** The PRIME domain subjects for tech students, by their (hand-typed) LMS names. */
+const PRIME_DOMAIN = `lower(trim(c.course_name)) in
+  ('prime domain coding', 'competitive coding (sunstone prime tech domain)')`;
+
+/** What kind of test this is, from its name. */
+function category(name: string): string {
+  if (/amcat/i.test(name)) return 'amcat_mock';
+  if (/\bmcqs?\b/i.test(name)) return 'mcq';
+  if (/practice test|\btest\b|weekly|quiz|assessment/i.test(name)) return 'test';
+  return 'assignment';
+}
+
+const url = process.env.DATABASE_URL;
+if (!url) throw new Error('DATABASE_URL is not set (add it to .env.local).');
+const sql = neon(url);
+
+const ids = (await sql`select lms_user_id from students where on_platform`).map((row) =>
+  Number(row.lms_user_id)
+);
+if (!ids.length) throw new Error('No students in the database yet: run npm run db:import first.');
+const idList = ids.join(',');
+const list = (values: Iterable<number>) => [...new Set(values)].join(',') || 'null';
+
+console.log(`Reading PRIME domain tests for ${ids.length} students…`);
+interface Release {
+  aid: number;
+  course_id: number;
+  module_id: number | null;
+  section_id: number;
+  release_at: string | null;
+  due_date: string | null;
+  name: string;
+  maximum_marks: number | null;
+  minutes: number | null;
+  course_name: string;
+}
+const releases = await redash<Release>(`
+  select am.academic_assessment_id aid, am.course_id, am.academic_module_id module_id,
+         ssm.section_id, max(s.release_at) release_at, max(s.due_date) due_date,
+         trim(a.name) name, a.maximum_marks, a.total_time_minutes minutes, trim(c.course_name) course_name
+  from academic_assessment_section_scope s
+  join academic_assessment_mapping am on am.id = s.base_mapping_id and am.status = '1'
+  join academic_assessment a on a.id = am.academic_assessment_id and a.status = '1'
+  join course c on c.id = am.course_id and c.status = '1'
+  join subject_section_mapping ssm on ssm.id = s.subject_section_mapping_id and ssm.status = '1'
+  where s.status = '1' and s.is_visible = '1' and s.release_at <= now() and ${PRIME_DOMAIN}
+    and exists (select 1 from student_section_mapping m
+                where m.section_id = ssm.section_id and m.status = '1' and m.student_id in (${idList}))
+  group by am.academic_assessment_id, am.course_id, am.academic_module_id, ssm.section_id,
+           a.name, a.maximum_marks, a.total_time_minutes, c.course_name`);
+
+const sectionIds = list(releases.map((release) => release.section_id));
+const testIds = list(releases.map((release) => release.aid));
+const courseIds = list(releases.map((release) => release.course_id));
+
+const members = await redash<{ section_id: number; student_id: number }>(`
+  select distinct section_id, student_id from student_section_mapping
+  where status = '1' and section_id in (${sectionIds}) and student_id in (${idList})`);
+
+const results = await redash<{
+  aid: number;
+  student_id: number;
+  attempts: number;
+  marks: number | null;
+  max_marks: number | null;
+  submitted: number;
+  submitted_at: string | null;
+}>(`
+  select academic_assessment_id aid, student_id, count(*) attempts,
+         max(total_marks_obtained) marks, max(max_marks) max_marks,
+         max(submission_status = 'submitted') submitted, max(submitted_at) submitted_at
+  from academic_assessment_submission
+  where status = '1' and student_id in (${idList}) and academic_assessment_id in (${testIds})
+  group by academic_assessment_id, student_id`);
+
+const courses = await redash<{ id: number; name: string; modules: number; lectures: number }>(`
+  select c.id, trim(c.course_name) name,
+    (select count(*) from academic_modules m where m.course_id = c.id and m.status = '1') modules,
+    (select count(*) from academic_lectures l where l.course_id = c.id and l.status = '1') lectures
+  from course c where c.id in (${courseIds})`);
+
+const modules = await redash<{
+  id: number;
+  course_id: number;
+  name: string;
+  position: number | null;
+}>(`
+  select id, course_id, trim(name) name, parent_module_priority position
+  from academic_modules where status = '1' and course_id in (${courseIds})`);
+
+console.log('Reading AMCAT results…');
+const sittings = await redash<{
+  id: number;
+  user_id: number;
+  test_name: string;
+  taken_at: string | null;
+  status: string | null;
+}>(`
+  select asr.id, asr.user_id, coalesce(aat.display_name, aat.project_name) test_name,
+         coalesce(asr.participant_start_date, asr.scheduled_date) taken_at, asr.participant_status status
+  from amcat_assessment_results asr
+  join amcat_assessment_types aat on aat.id = asr.assessment_type_id
+  where asr.status = '1' and asr.user_id in (${idList})`);
+const sectionScores = await redash<{
+  assessment_id: number;
+  name: string;
+  score: string | null;
+  total: string | null;
+}>(`
+  select ass.assessment_id, trim(ass.name) name, ass.score_obtained score, ass.total_score total
+  from amcat_assessment_subjects ass
+  join amcat_assessment_results asr on asr.id = ass.assessment_id
+  where ass.status = '1' and asr.status = '1' and asr.user_id in (${idList})`);
+
+// --- Shape the rows -----------------------------------------------------------------------
+
+const number = (value: unknown) =>
+  value === null || value === undefined || value === '' || Number.isNaN(Number(value))
+    ? null
+    : Number(value);
+
+const tests = new Map<number, Release>();
+for (const release of releases) tests.set(release.aid, release);
+
+const scoresBySitting = new Map<
+  number,
+  { name: string; score: number | null; total: number | null }[]
+>();
+for (const row of sectionScores) {
+  const sections = scoresBySitting.get(row.assessment_id) ?? [];
+  sections.push({ name: row.name, score: number(row.score), total: number(row.total) });
+  scoresBySitting.set(row.assessment_id, sections);
+}
+
+// --- Write --------------------------------------------------------------------------------
+
+/** Inserts in batches that stay well under Postgres' 65,535-parameter limit. */
+function inserts<T extends Record<string, unknown>>(table: string, rows: T[]) {
+  if (!rows.length) return [];
+  const columns = Object.keys(rows[0]);
+  const perBatch = Math.max(1, Math.floor(20_000 / columns.length));
+  const queries = [];
+  for (let start = 0; start < rows.length; start += perBatch) {
+    const values: unknown[] = [];
+    const tuples = rows.slice(start, start + perBatch).map((row) => {
+      const placeholders = columns.map((column) => {
+        values.push(row[column]);
+        return `$${values.length}`;
+      });
+      return `(${placeholders.join(', ')})`;
+    });
+    queries.push(
+      sql.query(`insert into ${table} (${columns.join(', ')}) values ${tuples.join(', ')}`, values)
+    );
+  }
+  return queries;
+}
+
+const counts = {
+  tests: tests.size,
+  releases: releases.length,
+  sections: new Set(releases.map((release) => release.section_id)).size,
+  sectionStudents: members.length,
+  results: results.length,
+  courses: courses.length,
+  modules: modules.length,
+  amcatSittings: sittings.length,
+};
+
+await sql.transaction([
+  sql`delete from lms_courses`,
+  sql`delete from lms_modules`,
+  sql`delete from lms_tests`,
+  sql`delete from lms_test_releases`,
+  sql`delete from lms_section_students`,
+  sql`delete from lms_test_results`,
+  sql`delete from amcat_sittings`,
+  ...inserts(
+    'lms_courses',
+    courses.map((course) => ({
+      id: course.id,
+      name: course.name,
+      modules: Number(course.modules),
+      lectures: Number(course.lectures),
+    }))
+  ),
+  ...inserts(
+    'lms_modules',
+    modules.map((module) => ({
+      id: module.id,
+      course_id: module.course_id,
+      name: module.name,
+      position: number(module.position),
+    }))
+  ),
+  ...inserts(
+    'lms_tests',
+    [...tests.values()].map((test) => ({
+      id: test.aid,
+      name: test.name || 'Untitled',
+      category: category(test.name ?? ''),
+      max_marks: number(test.maximum_marks),
+      minutes: number(test.minutes),
+    }))
+  ),
+  ...inserts(
+    'lms_test_releases',
+    releases.map((release) => ({
+      test_id: release.aid,
+      section_id: release.section_id,
+      course_id: release.course_id,
+      module_id: release.module_id,
+      release_at: release.release_at,
+      due_at: release.due_date,
+    }))
+  ),
+  ...inserts(
+    'lms_section_students',
+    members.map((member) => ({ section_id: member.section_id, lms_user_id: member.student_id }))
+  ),
+  ...inserts(
+    'lms_test_results',
+    results.map((result) => ({
+      test_id: result.aid,
+      lms_user_id: result.student_id,
+      attempts: Number(result.attempts),
+      marks: number(result.marks),
+      max_marks: number(result.max_marks),
+      submitted: Number(result.submitted) === 1,
+      submitted_at: result.submitted_at,
+    }))
+  ),
+  ...inserts(
+    'amcat_sittings',
+    sittings.map((sitting) => ({
+      id: sitting.id,
+      lms_user_id: sitting.user_id,
+      test_name: sitting.test_name ?? 'AMCAT',
+      taken_at: sitting.taken_at,
+      status: sitting.status,
+      sections: JSON.stringify(scoresBySitting.get(sitting.id) ?? []),
+    }))
+  ),
+  sql`insert into sync_state (name, ran_at, detail) values ('assessments', now(), ${JSON.stringify(counts)})
+      on conflict (name) do update set ran_at = excluded.ran_at, detail = excluded.detail`,
+]);
+
+console.log('Saved:', counts);

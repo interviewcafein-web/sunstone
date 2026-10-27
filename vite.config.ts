@@ -37,6 +37,7 @@ const API_ROUTES: Record<string, Handler> = {
   '/api/cache': lazy(() => import('./api/cache')),
   '/api/sync-sheet': lazy(() => import('./api/sync-sheet')),
   '/api/team': lazy(() => import('./api/team')),
+  '/api/assessments': lazy(() => import('./api/assessments')),
   '/api/auth/methods': lazy(() => import('./api/auth/methods')),
   '/api/auth/otp': lazy(() => import('./api/auth/otp')),
   '/api/auth/google-callback': lazy(() => import('./api/auth/google-callback')),
