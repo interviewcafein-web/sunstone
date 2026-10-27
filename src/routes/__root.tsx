@@ -44,6 +44,14 @@ function RootComponent() {
                   Students
                 </Link>
                 <Link
+                  to="/assessments"
+                  className={navLink}
+                  activeProps={navLinkActive}
+                  activeOptions={{ includeSearch: false }}
+                >
+                  Assessments
+                </Link>
+                <Link
                   to="/profile"
                   className={navLink}
                   activeProps={navLinkActive}

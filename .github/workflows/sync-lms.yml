@@ -1,0 +1,50 @@
+# Nightly copy of LMS data into the database: the PRIME students (and their status, e.g.
+# debarred), their form usernames, and PRIME domain assessments + AMCAT results.
+# Needs repository secrets DATABASE_URL, REDASH_KEY and SHEET_ID; skips until they exist.
+# Run it by hand from the Actions tab ("Run workflow") after adding them.
+
+name: Sync LMS data
+
+on:
+  schedule:
+    - cron: '0 20 * * *' # 01:30 India time
+  workflow_dispatch:
+
+concurrency:
+  group: sync-lms
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      REDASH_KEY: ${{ secrets.REDASH_KEY }}
+      SHEET_ID: ${{ secrets.SHEET_ID }}
+    steps:
+      - name: Check secrets
+        id: secrets
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$REDASH_KEY" ] || [ -z "$SHEET_ID" ]; then
+            echo "Secrets DATABASE_URL, REDASH_KEY and SHEET_ID are not all set; skipping."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.ready == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        if: steps.secrets.outputs.ready == 'true'
+        run: npm ci
+      - name: Students from the LMS (+ form usernames)
+        if: steps.secrets.outputs.ready == 'true'
+        run: npx tsx scripts/import-students.ts
+      - name: PRIME domain assessments and AMCAT
+        if: steps.secrets.outputs.ready == 'true'
+        run: npx tsx scripts/sync-assessments.ts

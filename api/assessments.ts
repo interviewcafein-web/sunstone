@@ -53,6 +53,7 @@ async function campuses(viewer: Viewer) {
        from lms_test_releases r join sec using (section_id)),
      res as (
        select e.campus_id, e.test_id, e.lms_user_id, tr.submitted,
+              lower(trim(t.name)) || '|' || coalesce(t.max_marks::text, '') as test_key,
               tr.marks / nullif(coalesce(tr.max_marks, t.max_marks), 0) * 100 as pct
        from eligible e join lms_tests t on t.id = e.test_id
        left join lms_test_results tr on tr.test_id = e.test_id and tr.lms_user_id = e.lms_user_id),
@@ -61,7 +62,7 @@ async function campuses(viewer: Viewer) {
        from lms_test_releases r join sec using (section_id) group by sec.campus_id)
      select c.campus_id as id, c.campus as name, count(distinct c.lms_user_id)::int as students,
        count(distinct res.lms_user_id)::int as in_prime,
-       count(distinct res.test_id)::int as tests,
+       count(distinct res.test_key)::int as tests,
        count(*) filter (where res.submitted)::int as submissions,
        count(res.test_id)::int as expected,
        round(avg(res.pct) filter (where res.submitted))::int as avg_pct,
@@ -72,6 +73,60 @@ async function campuses(viewer: Viewer) {
     [viewer.campusIds]
   );
   return { campuses: rows, syncedAt: await lastSync() };
+}
+
+interface SubjectRow {
+  id: number;
+  name: string;
+  modules: number;
+  lectures: number;
+  students: number;
+  tests: number;
+  modules_list: { id: number; name: string; started: boolean; tests: number }[];
+}
+
+/**
+ * The LMS keeps a copy of a subject (and its modules) for each group of sections. A campus
+ * sees one "Prime Domain Coding": copies with the same name are merged, their modules matched
+ * by name, and a module counts as started when any copy has a test released from it.
+ */
+function mergeSubjects(rows: SubjectRow[], tests: { ids: number[] }[]) {
+  const subjects = new Map<string, SubjectRow & { order: Map<string, number> }>();
+  for (const row of rows) {
+    const key = row.name.trim().toLowerCase();
+    let subject = subjects.get(key);
+    if (!subject) {
+      subject = { ...row, students: 0, modules_list: [], order: new Map() };
+      subjects.set(key, subject);
+    }
+    subject.students += row.students;
+    subject.lectures = Math.max(subject.lectures, row.lectures);
+    row.modules_list.forEach((module, index) => {
+      const moduleKey = module.name.trim().toLowerCase();
+      const existing = subject.modules_list.find(
+        (candidate) => candidate.name.trim().toLowerCase() === moduleKey
+      );
+      if (existing) {
+        existing.started ||= module.started;
+        existing.tests += module.tests;
+        subject.order.set(moduleKey, Math.min(subject.order.get(moduleKey) ?? index, index));
+      } else {
+        subject.modules_list.push({ ...module });
+        subject.order.set(moduleKey, index);
+      }
+    });
+  }
+  return [...subjects.values()].map(({ order, ...subject }) => ({
+    ...subject,
+    modules: subject.modules_list.length,
+    // Tests are grouped across section copies the same way in the tests list.
+    tests: subjects.size === 1 ? tests.length : subject.tests,
+    modules_list: subject.modules_list.sort(
+      (a, b) =>
+        (order.get(a.name.trim().toLowerCase()) ?? 0) -
+        (order.get(b.name.trim().toLowerCase()) ?? 0)
+    ),
+  }));
 }
 
 async function campus(campusId: number, batch: number | null) {
@@ -129,7 +184,13 @@ async function campus(campusId: number, batch: number | null) {
       where on_platform and campus_id = ${campusId} and admission_year is not null
       order by admission_year desc`
   ).map((row) => Number(row.admission_year));
-  return { summary, tests, subjects, batches, syncedAt: await lastSync() };
+  return {
+    summary,
+    tests,
+    subjects: mergeSubjects(subjects as SubjectRow[], tests as { ids: number[] }[]),
+    batches,
+    syncedAt: await lastSync(),
+  };
 }
 
 async function test(campusId: number, batch: number | null, testIds: number[]) {
