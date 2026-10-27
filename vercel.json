@@ -1,4 +1,17 @@
 {
+  "redirects": [
+    {
+      "source": "/((?!api/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "sunstone-seven.vercel.app"
+        }
+      ],
+      "destination": "https://vertex.sunstone.in/$1",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/s/:slug/card",
