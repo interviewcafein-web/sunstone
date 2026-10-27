@@ -259,6 +259,7 @@ export default function StudentsPage() {
         toFix={toFix}
         checkedAt={students.dataUpdatedAt}
         settled={summaries.settled}
+        refreshing={summaries.refreshing}
         onRefresh={refresh}
       />
 

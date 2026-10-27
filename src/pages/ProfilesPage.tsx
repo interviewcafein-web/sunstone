@@ -77,7 +77,7 @@ export function ProfileView({ name, handles, student, onSubmit }: ProfileViewPro
   const [tab, setTab] = useState<Tab>('overview');
   const signedIn = Boolean(useSession().data);
 
-  const results = useCodingProfiles(handles);
+  const results = useCodingProfiles(handles, { student: student?.slug, save: signedIn });
   const loaded = results.flatMap(({ query }) => (query.data ? [query.data] : []));
   const hasHandles = results.length > 0;
   const active = results.find(({ platform }) => platform.id === tab);

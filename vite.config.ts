@@ -34,6 +34,7 @@ const API_ROUTES: Record<string, Handler> = {
   '/api/card': lazy(() => import('./api/card')),
   '/api/share': lazy(() => import('./api/share')),
   '/api/health': lazy(() => import('./api/health')),
+  '/api/cache': lazy(() => import('./api/cache')),
 };
 
 // In production Vercel serves the files in api/ as Edge Functions. Locally there is no

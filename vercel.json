@@ -1,7 +1,22 @@
 {
   "rewrites": [
-    { "source": "/s/:slug/card", "destination": "/api/share?slug=:slug&card=1" },
-    { "source": "/s/:slug", "destination": "/api/share?slug=:slug" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    {
+      "source": "/s/:slug/card",
+      "destination": "/api/share?slug=:slug&card=1"
+    },
+    {
+      "source": "/s/:slug",
+      "destination": "/api/share?slug=:slug"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/sync-sheet",
+      "schedule": "30 0 * * *"
+    }
   ]
 }

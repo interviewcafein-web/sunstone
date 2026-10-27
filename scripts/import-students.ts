@@ -1,5 +1,6 @@
 // Fills the students table: every PRIME, active, tech (SST), FLAGSHIP student in the Sunstone
-// LMS (read through Redash), with the coding usernames they gave in the Google Form sheet.
+// LMS (read through Redash). Their coding usernames then come from the Google Form sheet,
+// matched by email (api/_sheet-sync.ts, also run daily on its own).
 // Safe to re-run: rows are updated in place, usernames never change once given, and
 // students who stop matching the rules are hidden (on_platform = false), not deleted.
 //
@@ -8,8 +9,7 @@
 
 import { Pool } from '@neondatabase/serverless';
 
-import type { PlatformId } from '../src/lib/coding-profiles/types';
-import { readSheet, type SheetStudent } from '../api/_sheet';
+import { syncSheet } from '../api/_sheet-sync';
 
 const DRY_RUN = process.argv.includes('--dry');
 const REDASH_URL = process.env.REDASH_URL ?? 'https://redash.sunstone.in';
@@ -18,15 +18,6 @@ const PRIME_POLICY_ID = 20; // policies.type = 'PRIME_OPT_IN'
 const INACTIVE_FLAG_ID = 1; // flag_master.name = 'is_student_inactive'
 
 const PROGRAM_NAMES: Record<string, string> = { BTECH: 'B.Tech', BE: 'BE', BCA: 'BCA', MCA: 'MCA' };
-const PLATFORMS: PlatformId[] = [
-  'leetcode',
-  'geeksforgeeks',
-  'hackerrank',
-  'codeforces',
-  'codechef',
-  'github',
-];
-
 // PRIME + active student + tech school (SST). FLAGSHIP is checked below: a student's
 // offering comes from their own section, else from their campus/program/batch.
 const LMS_QUERY = `
@@ -117,18 +108,6 @@ const digits = (value: string | null | undefined) => {
   const all = (value ?? '').replace(/\D/g, '');
   return all.length >= 10 ? all.slice(-10) : null;
 };
-const emailsIn = (value: string) =>
-  (value.toLowerCase().match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g) ?? []).map((email) => email);
-
-/** "10/11/2026 4:57:49" (the form's timestamp, India time) → ISO. */
-function formTime(value: string): string | null {
-  const match = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4}) (\d{1,2}):(\d{2}):(\d{2})$/);
-  if (!match) return null;
-  const [, month, day, year, hour, minute, second] = match.map(Number);
-  const utc = Date.UTC(year, month - 1, day, hour, minute, second) - 330 * 60_000;
-  return new Date(utc).toISOString();
-}
-
 /** LMS names are mostly well-cased; fix the ones typed all-lower or all-upper. */
 function displayName(raw: string): string {
   const name = raw.replace(/\s+/g, ' ').trim();
@@ -140,7 +119,7 @@ function displayName(raw: string): string {
 function usernameBase(name: string): string {
   const words = name
     .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter(Boolean);
@@ -150,56 +129,14 @@ function usernameBase(name: string): string {
   return (base.length >= 3 ? base : `${base || 'student'}.prime`).slice(0, 28);
 }
 
-// --- 1. Read both sources -------------------------------------------------------------
+// --- 1. Read the LMS ------------------------------------------------------------------
 
 console.log('Reading the LMS through Redash…');
 const all = await redash<LmsStudent>(LMS_QUERY);
 const lms = all.filter((student) => (student.offering ?? '').includes('FLAGSHIP'));
 console.log(`  ${all.length} PRIME tech students, ${lms.length} FLAGSHIP.`);
 
-console.log('Reading the Google Form sheet…');
-const sheet = await readSheet();
-if ('error' in sheet) throw new Error(sheet.error);
-console.log(`  ${sheet.students.length} students in the sheet.`);
-
-// --- 2. Match sheet entries to LMS students (email first, then mobile) ------------------
-
-const byEmail = new Map<string, LmsStudent[]>();
-const byPhone = new Map<string, LmsStudent[]>();
-const add = (map: Map<string, LmsStudent[]>, key: string | null, student: LmsStudent) => {
-  if (key) map.set(key, [...(map.get(key) ?? []), student]);
-};
-for (const student of lms) {
-  add(byEmail, student.email, student);
-  add(byEmail, student.sunstone_email, student);
-  for (const phone of [student.mobile, student.whatsapp_no, student.alternate_no]) {
-    add(byPhone, digits(phone), student);
-  }
-}
-
-const formFor = new Map<number, SheetStudent>();
-let matchedByEmail = 0;
-let matchedByPhone = 0;
-const unmatched: SheetStudent[] = [];
-for (const entry of sheet.students) {
-  let candidates = emailsIn(entry.email).flatMap((email) => byEmail.get(email) ?? []);
-  if (candidates.length) matchedByEmail++;
-  else {
-    candidates = byPhone.get(digits(entry.mobile) ?? '') ?? [];
-    if (candidates.length) matchedByPhone++;
-  }
-  if (!candidates.length) {
-    unmatched.push(entry);
-    continue;
-  }
-  // Two LMS accounts for one person: the newer account is the one in use.
-  const student = candidates.reduce((a, b) => (b.id > a.id ? b : a));
-  const previous = formFor.get(student.id);
-  const time = (form: SheetStudent) => formTime(form.submitted) ?? '';
-  if (!previous || time(entry) > time(previous)) formFor.set(student.id, entry);
-}
-
-// --- 3. Usernames: keep existing ones, give new students first.last (+ a number) ---------
+// --- 2. Usernames: keep existing ones, give new students first.last (+ a number) ---------
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error('DATABASE_URL is not set (add it to .env.local).');
@@ -218,7 +155,6 @@ for (const row of existing.values()) {
   taken.add(row.username.toLowerCase());
   row.legacy_slugs.forEach((slug) => taken.add(slug.toLowerCase()));
 }
-for (const entry of sheet.students) taken.add(entry.slug.toLowerCase());
 
 function newUsername(name: string): string {
   const base = usernameBase(name);
@@ -231,22 +167,18 @@ function newUsername(name: string): string {
   }
 }
 
-// --- 4. Build rows --------------------------------------------------------------------
+// --- 3. Build rows --------------------------------------------------------------------
 
 const now = new Date().toISOString();
 const rows = [...lms]
   .sort((a, b) => a.id - b.id) // earlier accounts get the plain first.last
   .map((student) => {
-    const form = formFor.get(student.id);
     const kept = existing.get(student.id);
     const name = displayName(student.name);
     const [debarReason, debarUntil] = (student.debarred ?? '').split('|');
-    const legacy = new Set(kept?.legacy_slugs ?? []);
-    if (form) legacy.add(form.slug);
     return {
       lms_user_id: student.id,
       username: kept?.username ?? newUsername(name),
-      legacy_slugs: [...legacy],
       on_platform: true,
       name,
       email: student.email,
@@ -270,24 +202,16 @@ const rows = [...lms]
       blocked_reason: student.blocked,
       is_inactive: Boolean(student.inactive),
       inactive_reason: student.inactive,
-      ...Object.fromEntries(
-        PLATFORMS.map((platform) => [platform, form?.handles[platform] ?? null])
-      ),
-      invalid_handles: form?.invalid ?? [],
-      form_submitted_at: form ? formTime(form.submitted) : null,
       lms_synced_at: now,
     };
   });
 
-const linked = rows.filter((row) => row.form_submitted_at).length;
 console.log(`
 LMS students to import:       ${rows.length}
-  with coding usernames:      ${linked}  (sheet matched by email ${matchedByEmail}, by mobile ${matchedByPhone})
   debarred (red tag):         ${rows.filter((row) => row.is_debarred).length}
   flagged inactive:           ${rows.filter((row) => row.is_inactive).length}
   blocked:                    ${rows.filter((row) => row.is_blocked).length}
-  new / already in database:  ${rows.filter((row) => !existing.has(row.lms_user_id)).length} / ${rows.filter((row) => existing.has(row.lms_user_id)).length}
-Sheet entries not matched to an eligible LMS student: ${unmatched.length}`);
+  new / already in database:  ${rows.filter((row) => !existing.has(row.lms_user_id)).length} / ${rows.filter((row) => existing.has(row.lms_user_id)).length}`);
 console.log(
   'Sample usernames:',
   rows
@@ -297,12 +221,14 @@ console.log(
 );
 
 if (DRY_RUN) {
+  const sheet = await syncSheet({ dryRun: true });
+  console.log(`Sheet entries matched by email: ${sheet.matched} of ${sheet.sheetEntries}`);
   console.log('\nDry run: nothing written.');
   await pool.end();
   process.exit(0);
 }
 
-// --- 5. Write -------------------------------------------------------------------------
+// --- 4. Write -------------------------------------------------------------------------
 
 const columns = Object.keys(rows[0]) as (keyof (typeof rows)[number])[];
 const updates = columns
@@ -347,3 +273,11 @@ try {
   client.release();
   await pool.end();
 }
+
+// --- 5. Coding usernames from the form sheet, by email --------------------------------------
+
+const sheet = await syncSheet();
+console.log(
+  `Sheet: ${sheet.matched} of ${sheet.sheetEntries} entries matched a student by email; ` +
+    `${sheet.updated} updated, ${sheet.unmatched.length} with no matching student.`
+);

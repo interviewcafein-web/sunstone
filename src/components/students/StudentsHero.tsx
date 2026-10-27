@@ -15,6 +15,8 @@ interface StudentsHeroProps {
   checkedAt: number;
   /** Platform profiles loaded so far, out of `linked`. */
   settled: number;
+  /** Saved numbers on screen that are being refreshed from the platforms right now. */
+  refreshing: number;
   onRefresh: () => void;
 }
 
@@ -27,9 +29,11 @@ export function StudentsHero({
   toFix,
   checkedAt,
   settled,
+  refreshing,
   onRefresh,
 }: StudentsHeroProps) {
   const loading = settled < linked;
+  const syncing = loading || refreshing > 0;
 
   return (
     <section className="from-brand-700 via-brand-700 to-brand-900 relative overflow-hidden rounded-2xl bg-gradient-to-br p-5 text-white shadow-[0_20px_50px_-20px_rgb(16_38_70/0.6)] sm:p-7">
@@ -54,7 +58,9 @@ export function StudentsHero({
               <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75 motion-reduce:hidden" />
               <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
             </span>
-            Live from the sheet · checked {new Date(checkedAt).toLocaleTimeString()}
+            {refreshing > 0
+              ? `Showing saved stats · syncing ${refreshing} profile${refreshing === 1 ? '' : 's'} in the background`
+              : `Up to date · checked ${new Date(checkedAt).toLocaleTimeString()}`}
           </p>
         </div>
         <button
@@ -62,7 +68,7 @@ export function StudentsHero({
           onClick={onRefresh}
           className="text-brand-800 hover:bg-brand-50 inline-flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-2 text-sm font-semibold shadow-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         >
-          <RefreshCw className={cn('size-4', loading && 'animate-spin')} aria-hidden />
+          <RefreshCw className={cn('size-4', syncing && 'animate-spin')} aria-hidden />
           Refresh stats
         </button>
       </div>

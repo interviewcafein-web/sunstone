@@ -12,7 +12,8 @@
     "format:check": "prettier --check .",
     "hash-password": "node scripts/hash-password.mjs",
     "db:migrate": "tsx --env-file=.env.local scripts/migrate.ts",
-    "db:import": "tsx --env-file=.env.local scripts/import-students.ts"
+    "db:import": "tsx --env-file=.env.local scripts/import-students.ts",
+    "db:sync-sheet": "tsx --env-file=.env.local scripts/sync-sheet.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
