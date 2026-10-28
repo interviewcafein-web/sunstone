@@ -1,8 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { RequireLogin } from '@/components/common/RequireLogin';
-import AssessmentsPage from '@/pages/AssessmentsPage';
-
 export interface AssessmentsSearch {
   /** LMS campus id. */
   campus?: number;
@@ -34,9 +31,4 @@ export const Route = createFileRoute('/campuses')({
     type: typeof search.type === 'string' ? search.type : undefined,
     tab: typeof search.tab === 'string' ? search.tab : undefined,
   }),
-  component: () => (
-    <RequireLogin>
-      <AssessmentsPage />
-    </RequireLogin>
-  ),
 });

@@ -1,12 +1,4 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { RequireLogin } from '@/components/common/RequireLogin';
-import AccountPage from '@/pages/AccountPage';
-
-export const Route = createFileRoute('/account')({
-  component: () => (
-    <RequireLogin>
-      <AccountPage />
-    </RequireLogin>
-  ),
-});
+// The page itself is in account.lazy.tsx, downloaded only when someone opens it.
+export const Route = createFileRoute('/account')({});

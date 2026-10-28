@@ -1,6 +1,18 @@
 import { useEffect, useState } from 'react';
 import { getRouteApi } from '@tanstack/react-router';
-import { ArrowLeft, Eye, EyeOff, KeyRound, Loader2, LockKeyhole, Mail } from 'lucide-react';
+import {
+  ArrowLeft,
+  Building2,
+  Code2,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Loader2,
+  LockKeyhole,
+  Mail,
+  ShieldCheck,
+  TrendingUp,
+} from 'lucide-react';
 
 import { BrandLockup } from '@/components/common/BrandLockup';
 import { VertexLogo } from '@/components/common/VertexLogo';
@@ -10,9 +22,9 @@ import { cn } from '@/lib/utils';
 const route = getRouteApi('/login');
 
 const field =
-  'focus-visible:outline-brand-500 w-full rounded-lg border border-slate-300 bg-surface px-3 py-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-1';
+  'focus-visible:outline-brand-500 w-full rounded-xl border border-slate-300 bg-surface px-3.5 py-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-1';
 const primaryButton =
-  'bg-brand-700 hover:bg-brand-800 focus-visible:outline-brand-500 inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60';
+  'bg-brand-700 hover:bg-brand-800 focus-visible:outline-brand-500 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow-sm transition active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60';
 const linkButton =
   'text-brand-700 dark:text-brand-300 inline-flex items-center gap-1 text-xs font-semibold hover:underline';
 
@@ -41,28 +53,18 @@ export default function LoginPage() {
   const showPassword = mode === 'password' || passwordOnly;
 
   return (
-    <div className="flex min-h-[70vh] items-center justify-center">
-      <div className="w-full max-w-sm">
-        <div className="shadow-card bg-surface overflow-hidden rounded-2xl border border-slate-200">
-          <div className="from-brand-700 to-brand-900 bg-gradient-to-br px-6 py-6 text-white">
-            <div className="flex items-center gap-4">
-              <BrandLockup
-                logoClassName="h-5 brightness-0 invert dark:filter-none"
-                primeClassName="text-[9px]"
-              />
-              <span className="h-9 border-l border-white/25" aria-hidden />
-              <VertexLogo onDark className="h-10" />
-            </div>
-            <h1 className="mt-5 flex items-center gap-2 text-xl font-bold">
-              <LockKeyhole className="size-5" aria-hidden />
-              Sign in to Vertex
-            </h1>
-            <p className="text-brand-100 mt-1 text-sm">
-              Student progress, zones and campus reports for the Sunstone PRIME team.
-            </p>
-          </div>
+    <div className="flex min-h-[78vh] items-center justify-center py-4">
+      <div className="shadow-card bg-surface animate-rise grid w-full max-w-4xl overflow-hidden rounded-3xl border border-slate-200 md:grid-cols-[1.1fr_1fr]">
+        <BrandPanel />
 
-          <div className="space-y-4 p-6">
+        <div className="flex flex-col justify-center p-6 sm:p-10">
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
+            <LockKeyhole className="text-brand-600 size-5" aria-hidden />
+            Welcome back
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">Sign in with your work account to continue.</p>
+
+          <div className="mt-6 space-y-4">
             {googleError && mode === 'choose' && (
               <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
                 {GOOGLE_ERRORS[googleError] ?? 'Sign-in did not work. Please try again.'}
@@ -70,8 +72,10 @@ export default function LoginPage() {
             )}
 
             {!methods ? (
-              <div className="flex justify-center py-6">
-                <Loader2 className="size-5 animate-spin text-slate-400" aria-label="Loading" />
+              <div className="space-y-3" aria-label="Loading" role="status">
+                <div className="skeleton h-11 rounded-xl" />
+                <div className="skeleton h-3 w-1/3 rounded" />
+                <div className="skeleton h-11 rounded-xl" />
               </div>
             ) : showPassword ? (
               <>
@@ -89,7 +93,7 @@ export default function LoginPage() {
                 {methods.google && methods.email && (
                   <div className="flex items-center gap-3 text-xs text-slate-400">
                     <span className="h-px flex-1 bg-slate-200" />
-                    or
+                    or with a one-time code
                     <span className="h-px flex-1 bg-slate-200" />
                   </div>
                 )}
@@ -109,11 +113,70 @@ export default function LoginPage() {
               </>
             )}
           </div>
+
+          <p className="mt-8 flex items-center gap-1.5 text-xs text-slate-500">
+            <ShieldCheck className="size-3.5 text-emerald-600" aria-hidden />
+            For the Sunstone PRIME team. No access? Ask HQ to add your email.
+          </p>
         </div>
-        <p className="mt-4 text-center text-xs text-slate-500">
-          No access? Ask the Sunstone PRIME team to add your email.
-        </p>
       </div>
+    </div>
+  );
+}
+
+const HIGHLIGHTS = [
+  { icon: Code2, title: 'Coding practice', text: 'LeetCode, GFG and GitHub for every student' },
+  { icon: Building2, title: 'Campus journeys', text: 'Tests, exams, attendance and AMCAT' },
+  { icon: TrendingUp, title: 'Trends that matter', text: 'Spot who is slipping, week by week' },
+];
+
+/** The left half: brand, a line about Vertex and what is inside, over a slowly moving backdrop. */
+function BrandPanel() {
+  return (
+    <div className="from-brand-700 via-brand-800 to-brand-900 hero-glow relative flex flex-col justify-between gap-8 bg-gradient-to-br p-6 text-white sm:p-10">
+      <div aria-hidden className="grid-lines absolute inset-0 -z-10" />
+      <div
+        aria-hidden
+        className="animate-float absolute -bottom-16 -left-12 -z-10 size-56 rounded-full bg-sky-400/20 blur-2xl"
+      />
+      <div
+        aria-hidden
+        className="animate-float absolute top-10 right-8 -z-10 hidden size-24 md:block rounded-3xl border border-white/15 bg-white/5"
+        style={{ animationDelay: '-6s' }}
+      />
+
+      <div className="flex items-center gap-4">
+        <BrandLockup
+          logoClassName="h-5 brightness-0 invert dark:filter-none"
+          primeClassName="text-[9px]"
+        />
+        <span className="h-9 border-l border-white/25" aria-hidden />
+        <VertexLogo onDark className="h-10" />
+      </div>
+
+      <div>
+        <h2 className="text-3xl leading-tight font-bold sm:text-4xl">
+          Every student&rsquo;s climb,
+          <span className="block bg-gradient-to-r from-[#fde68a] via-[#fcd34d] to-[#bae6fd] bg-clip-text text-transparent">
+            in one view.
+          </span>
+        </h2>
+        <ul className="rise-stagger mt-6 hidden space-y-3 md:block">
+          {HIGHLIGHTS.map(({ icon: Icon, title, text }) => (
+            <li key={title} className="flex items-start gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/15">
+                <Icon className="size-4.5" aria-hidden />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold">{title}</span>
+                <span className="text-brand-100 block text-xs">{text}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <p className="text-brand-200 hidden text-xs md:block">Sunstone PRIME · Vertex</p>
     </div>
   );
 }
@@ -123,7 +186,7 @@ function GoogleButton({ next }: { next?: string }) {
   return (
     <a
       href={href}
-      className="bg-surface focus-visible:outline-brand-500 flex w-full items-center justify-center gap-3 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2"
+      className="bg-surface focus-visible:outline-brand-500 hover-lift flex w-full items-center justify-center gap-3 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2"
     >
       <GoogleLogo className="size-4.5" />
       Continue with Google

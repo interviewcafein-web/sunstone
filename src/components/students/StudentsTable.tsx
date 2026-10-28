@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { ArrowDown, CalendarCheck, ClipboardCheck, Crown, Award } from 'lucide-react';
 
@@ -59,7 +60,32 @@ const TABLE_PLATFORMS = PLATFORMS.filter((platform) =>
   ['leetcode', 'geeksforgeeks', 'github'].includes(platform.id)
 );
 
+// Thousands of rows (every campus) are too many to draw at once: draw a page, then more as
+// the reader scrolls near the end. Sorting, zones and reports still use every row.
+const PAGE = 60;
+
 export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
+  const [limit, setLimit] = useState(PAGE);
+  // A new sort or filter starts again from the top.
+  const signature = `${sort}|${rows.length}|${rows[0]?.student.id ?? ''}`;
+  useEffect(() => setLimit(PAGE), [signature]);
+  const visible = rows.slice(0, limit);
+  const more = rows.length - visible.length;
+
+  const sentinel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const target = sentinel.current;
+    if (!target || more <= 0) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setLimit((current) => current + PAGE);
+      },
+      { rootMargin: '600px 0px' }
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [more, limit]);
+
   const maxTotal = Math.max(...rows.map((row) => row.total), 1);
   // Best value per platform column in this view: drives the mini bars and the crown.
   const columnMax = Object.fromEntries(
@@ -147,15 +173,15 @@ export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
           </tr>
         </thead>
         <tbody>
-          {rows.map(
+          {visible.map(
             ({ student, cells, total, strongest, lastActive, zone, loading, metrics }, index) => {
               const podium = sort === 'total' && index < 3 && total > 0;
               return (
                 <tr
                   key={student.id}
                   className={cn(
-                    'animate-rise hover:bg-brand-50/50 dark:hover:bg-brand-900/30 border-b border-dotted border-slate-300 transition-colors last:border-0',
-                    podium && PODIUM_TINT[index]
+                    'animate-rise group/row border-b border-slate-200 transition-colors last:border-0 hover:bg-brand-50/70 dark:hover:bg-brand-900/30 [&>*:first-child]:border-l-[3px] [&>*:first-child]:border-l-transparent hover:[&>*:first-child]:border-l-brand-500',
+                    podium ? PODIUM_TINT[index] : index % 2 === 1 && 'bg-slate-50/70'
                   )}
                   style={{ animationDelay: `${Math.min(index, 15) * 30}ms` }}
                 >
@@ -239,6 +265,24 @@ export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
           )}
         </tbody>
       </table>
+      {more > 0 && (
+        <div
+          ref={sentinel}
+          className="flex items-center justify-center gap-3 border-t border-slate-200 px-4 py-4"
+        >
+          <span className="text-sm text-slate-500">
+            Showing {visible.length.toLocaleString('en-IN')} of{' '}
+            {rows.length.toLocaleString('en-IN')}
+          </span>
+          <button
+            type="button"
+            onClick={() => setLimit((current) => current + PAGE * 4)}
+            className="text-brand-700 hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-900/40 rounded-full border border-slate-200 px-3 py-1 text-sm font-semibold"
+          >
+            Show more
+          </button>
+        </div>
+      )}
     </div>
   );
 }

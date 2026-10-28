@@ -30,7 +30,7 @@ const AccountRoute = AccountRouteImport.update({
   id: '/account',
   path: '/account',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any).lazy(() => import('./routes/account.lazy').then((d) => d.Route))
 const AssessmentsRoute = AssessmentsRouteImport.update({
   id: '/assessments',
   path: '/assessments',
@@ -40,7 +40,7 @@ const CampusesRoute = CampusesRouteImport.update({
   id: '/campuses',
   path: '/campuses',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any).lazy(() => import('./routes/campuses.lazy').then((d) => d.Route))
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -65,7 +65,7 @@ const TeamRoute = TeamRouteImport.update({
   id: '/team',
   path: '/team',
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any).lazy(() => import('./routes/team.lazy').then((d) => d.Route))
 const SSlugRoute = SSlugRouteImport.update({
   id: '/s/$slug',
   path: '/s/$slug',

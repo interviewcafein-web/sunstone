@@ -1,12 +1,4 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { RequireLogin } from '@/components/common/RequireLogin';
-import TeamPage from '@/pages/TeamPage';
-
-export const Route = createFileRoute('/team')({
-  component: () => (
-    <RequireLogin>
-      <TeamPage />
-    </RequireLogin>
-  ),
-});
+// The page itself is in team.lazy.tsx, downloaded only when someone opens it.
+export const Route = createFileRoute('/team')({});
