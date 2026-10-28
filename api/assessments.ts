@@ -715,7 +715,7 @@ async function student(viewer: Viewer, username: string) {
  * attendance, AMCAT sitting averages in date order (for the trend), PRIME test average and
  * counts, and the internal exam average (Midterms and End-term; not Mock PI / GD).
  */
-async function metrics(viewer: Viewer) {
+export async function metrics(viewer: Viewer) {
   const rows = await db().query(
     `with roster as (
        select lms_user_id, username from students

@@ -8,14 +8,16 @@
 export const canSendEmail = () =>
   Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM) || !process.env.VERCEL;
 
-interface Email {
-  to: string;
+export interface Email {
+  to: string | string[];
+  /** Copied in (e.g. HQ on a campus email). */
+  cc?: string[];
   subject: string;
   text: string;
   html: string;
 }
 
-export async function sendEmail({ to, subject, text, html }: Email): Promise<void> {
+export async function sendEmail({ to, cc, subject, text, html }: Email): Promise<void> {
   const key = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
   if (!key || !from) {
@@ -28,7 +30,14 @@ export async function sendEmail({ to, subject, text, html }: Email): Promise<voi
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from, to: [to], subject, text, html }),
+    body: JSON.stringify({
+      from,
+      to: Array.isArray(to) ? to : [to],
+      ...(cc?.length ? { cc } : {}),
+      subject,
+      text,
+      html,
+    }),
   });
   if (!response.ok) {
     throw new Error(`Resend ${response.status}: ${(await response.text()).slice(0, 300)}`);
@@ -55,9 +64,10 @@ Sunstone PRIME Vertex`;
   return { subject, text, html };
 }
 
-const SITE = 'https://vertex.sunstone.in';
+export const SITE = 'https://vertex.sunstone.in';
 
-const escape = (value: string) => value.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
+export const escape = (value: string) =>
+  value.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 
 export interface WelcomeDetails {
   /** First name or full name; the greeting falls back to "Hi there". */
@@ -235,7 +245,14 @@ export async function sendEmails(emails: Email[]): Promise<number> {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(
-        chunk.map(({ to, subject, text, html }) => ({ from, to: [to], subject, text, html }))
+        chunk.map(({ to, cc, subject, text, html }) => ({
+          from,
+          to: Array.isArray(to) ? to : [to],
+          ...(cc?.length ? { cc } : {}),
+          subject,
+          text,
+          html,
+        }))
       ),
     });
     if (!response.ok) {

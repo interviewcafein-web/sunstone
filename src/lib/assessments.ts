@@ -65,12 +65,14 @@ export const percent = (part: number, whole: number) =>
 
 async function get<T>(params: Record<string, string | number | undefined>): Promise<T> {
   const query = new URLSearchParams(
-    Object.entries(params).flatMap(([key, value]) =>
-      value === undefined || value === '' ? [] : [[key, String(value)]]
+    Object.fromEntries(
+      Object.entries(params)
+        .filter(([, value]) => value !== undefined && value !== '')
+        .map(([key, value]) => [key, String(value)])
     )
   );
   const response = await fetch(`/api/assessments?${query}`);
-  const body = await response.json().catch(() => null);
+  const body = (await response.json().catch(() => null)) as { error?: string } | null;
   if (!response.ok) throw new Error(body?.error ?? 'Assessments could not be loaded.');
   return body as T;
 }

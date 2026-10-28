@@ -1,0 +1,47 @@
+# The Monday weekly report: the 360° view, pain points, top performers and who needs
+# attention. HQ gets the all-campus report; each campus's staff get theirs with HQ copied;
+# everything also goes to the bell. Runs after the nightly LMS sync (01:30 India time).
+# Needs repository secrets DATABASE_URL, RESEND_API_KEY and EMAIL_FROM; skips until they exist.
+
+name: Weekly report
+
+on:
+  schedule:
+    - cron: '30 3 * * 1' # Monday 09:00 India time
+  workflow_dispatch:
+
+concurrency:
+  group: weekly-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+    steps:
+      - name: Check secrets
+        id: secrets
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$RESEND_API_KEY" ] || [ -z "$EMAIL_FROM" ]; then
+            echo "Secrets DATABASE_URL, RESEND_API_KEY and EMAIL_FROM are not all set; skipping."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.ready == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        if: steps.secrets.outputs.ready == 'true'
+        run: npm ci
+      - name: Send the weekly report
+        if: steps.secrets.outputs.ready == 'true'
+        run: npx tsx scripts/weekly-report.ts --send

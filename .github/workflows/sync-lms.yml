@@ -22,6 +22,9 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       REDASH_KEY: ${{ secrets.REDASH_KEY }}
       SHEET_ID: ${{ secrets.SHEET_ID }}
+      # For the new-test emails; without them the notices still go to the bell.
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
     steps:
       - name: Check secrets
         id: secrets
@@ -57,3 +60,6 @@ jobs:
       - name: Internal exams
         if: steps.secrets.outputs.ready == 'true'
         run: npx tsx scripts/sync-exams.ts
+      - name: Tell campuses about new tests (bell + email, HQ copied)
+        if: steps.secrets.outputs.ready == 'true'
+        run: npx tsx scripts/notify-new-tests.ts
