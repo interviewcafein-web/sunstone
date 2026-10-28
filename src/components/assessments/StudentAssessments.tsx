@@ -12,6 +12,7 @@ import {
 import {
   Award,
   BookOpenCheck,
+  CalendarCheck,
   ChevronRight,
   ClipboardCheck,
   Folder,
@@ -21,6 +22,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 
+import { attendanceFill, attendanceTone } from '@/components/assessments/CampusInsights';
 import { Card, CardHeader } from '@/components/coding/ui';
 import {
   CATEGORY_LABELS,
@@ -101,7 +103,20 @@ export function StudentAssessments({ username }: { username: string }) {
     );
   }
 
-  const { tests, amcat, syncedAt } = query.data;
+  const { tests, amcat, attendance, syncedAt } = query.data;
+  const attended = attendance.subjects.reduce(
+    (sum, subject) => ({
+      sessions: sum.sessions + subject.sessions,
+      present: sum.present + subject.present,
+      primeSessions: sum.primeSessions + (subject.prime ? subject.sessions : 0),
+      primePresent: sum.primePresent + (subject.prime ? subject.present : 0),
+    }),
+    { sessions: 0, present: 0, primeSessions: 0, primePresent: 0 }
+  );
+  const attendancePct = attended.sessions ? percent(attended.present, attended.sessions) : null;
+  const primeAttendance = attended.primeSessions
+    ? percent(attended.primePresent, attended.primeSessions)
+    : null;
   const submitted = tests.filter((test) => test.submitted);
   const average = submitted.length
     ? Math.round(submitted.reduce((sum, test) => sum + (test.pct ?? 0), 0) / submitted.length)
@@ -136,7 +151,7 @@ export function StudentAssessments({ username }: { username: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Kpi
           icon={BookOpenCheck}
           label="PRIME tests released"
@@ -162,12 +177,109 @@ export function StudentAssessments({ username }: { username: string }) {
           tone={scoreTone(average)}
         />
         <Kpi
+          icon={CalendarCheck}
+          label="Attendance"
+          value={attendancePct === null ? '—' : `${attendancePct}%`}
+          hint={primeAttendance === null ? 'All classes' : `PRIME classes ${primeAttendance}%`}
+          tone={attendanceTone(attendancePct)}
+        />
+        <Kpi
           icon={Award}
           label="AMCAT sittings"
           value={String(amcat.length)}
           hint={amcat[0] ? `Latest ${lmsDate(amcat[0].taken_at)}` : 'None yet'}
         />
       </div>
+
+      {attendance.subjects.length > 0 && (
+        <Card>
+          <CardHeader
+            title={
+              <span className="flex items-center gap-2">
+                <CalendarCheck className="text-brand-700 dark:text-brand-300 size-4" aria-hidden />
+                Attendance
+              </span>
+            }
+            aside={<span className="text-xs text-slate-500">Classes since 1 July</span>}
+          />
+          <div className="grid gap-5 lg:grid-cols-2">
+            <div className="h-44">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={attendance.weeks.map((week) => ({
+                    ...week,
+                    label: lmsDate(week.week).replace(/ \d{4}$/, ''),
+                  }))}
+                  margin={{ top: 8, right: 8, bottom: 0, left: -24 }}
+                >
+                  <CartesianGrid stroke={colors.grid} strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 10, fill: colors.tick }}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    tick={{ fontSize: 10, fill: colors.tick }}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: colors.tooltip,
+                      border: `1px solid ${colors.grid}`,
+                      borderRadius: 12,
+                      color: colors.text,
+                      fontSize: 12,
+                    }}
+                    labelFormatter={(label) => `Week of ${label}`}
+                    formatter={(value, _key, item) => [
+                      `${value}% (${item.payload.present}/${item.payload.sessions})`,
+                      'Attended',
+                    ]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="pct"
+                    stroke="#10b981"
+                    strokeWidth={2.5}
+                    dot={{ r: 2.5 }}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <ul className="max-h-44 space-y-2 overflow-y-auto pr-1">
+              {attendance.subjects.map((subject) => (
+                <li key={subject.subject}>
+                  <div className="flex items-baseline justify-between gap-2 text-xs">
+                    <span className="min-w-0 truncate font-medium">
+                      {subject.subject}
+                      {subject.prime && (
+                        <span className="ml-1 text-[10px] font-semibold text-amber-600">PRIME</span>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-slate-500 tabular-nums">
+                      <span className={cn('font-bold', attendanceTone(subject.pct))}>
+                        {subject.pct}%
+                      </span>{' '}
+                      · {subject.present}/{subject.sessions}
+                    </span>
+                  </div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${subject.pct ?? 0}%`,
+                        backgroundColor: attendanceFill(subject.pct),
+                      }}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Card>
+      )}
 
       {trend.length > 1 && (
         <Card>

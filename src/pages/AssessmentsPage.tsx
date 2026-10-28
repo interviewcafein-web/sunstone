@@ -13,7 +13,9 @@ import {
   YAxis,
 } from 'recharts';
 import {
+  Award,
   BookOpenCheck,
+  CalendarCheck,
   Building2,
   CalendarDays,
   Check,
@@ -23,7 +25,6 @@ import {
   FolderTree,
   LayoutDashboard,
   ClipboardCheck,
-  GraduationCap,
   Loader2,
   Search,
   Target,
@@ -32,6 +33,12 @@ import {
   X,
 } from 'lucide-react';
 
+import {
+  AmcatTab,
+  AttendanceTab,
+  InsightsPanel,
+  attendanceTone,
+} from '@/components/assessments/CampusInsights';
 import { Avatar } from '@/components/common/Avatar';
 import {
   CATEGORY_LABELS,
@@ -266,6 +273,10 @@ function CampusCard({ campus }: { campus: CampusOverview }) {
             <Ring value={campus.avg_pct} />
             <span className="mt-1 text-[10px] text-slate-500">Avg score</span>
           </div>
+          <div className="flex flex-col items-center">
+            <Ring value={campus.attendance_pct} />
+            <span className="mt-1 text-[10px] text-slate-500">Attendance</span>
+          </div>
           <dl className="ml-auto text-right text-xs text-slate-500">
             <dt>Tests</dt>
             <dd className="text-lg font-bold text-slate-800 tabular-nums">{campus.tests}</dd>
@@ -289,6 +300,8 @@ const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'subject', label: 'Subject tests', icon: Trophy },
   { id: 'modules', label: 'Module tests', icon: FolderTree },
+  { id: 'attendance', label: 'Attendance', icon: CalendarCheck },
+  { id: 'amcat', label: 'AMCAT', icon: Award },
   { id: 'students', label: 'Students', icon: Users },
 ] as const;
 
@@ -388,10 +401,12 @@ function CampusView({ campusId, name }: { campusId: number; name?: string }) {
             value={summary.avg_pct === null ? '—' : `${summary.avg_pct}%`}
           />
           <HeroStat
-            icon={GraduationCap}
-            label="In PRIME sections"
-            value={String(summary.in_prime)}
-            note={`of ${summary.students}`}
+            icon={CalendarCheck}
+            label="Attendance"
+            value={data.attendance.pct === null ? '—' : `${data.attendance.pct}%`}
+            note={
+              data.attendance.prime_pct === null ? undefined : `PRIME ${data.attendance.prime_pct}%`
+            }
           />
           <HeroStat
             icon={CalendarDays}
@@ -434,6 +449,8 @@ function CampusView({ campusId, name }: { campusId: number; name?: string }) {
       {tab === 'modules' && (
         <ModulesTab data={data} onOpen={open} type={search.type} onType={(type) => set({ type })} />
       )}
+      {tab === 'attendance' && <AttendanceTab data={data.attendance} />}
+      {tab === 'amcat' && <AmcatTab data={data.amcat} />}
       {tab === 'students' && <StudentsTab students={data.students} />}
 
       {search.test && (
@@ -984,101 +1001,131 @@ function StudentsTab({ students }: { students: CampusStudentRow[] }) {
     (student) => !needle || student.name.toLowerCase().includes(needle)
   );
   return (
-    <section className={cn(panel, 'overflow-hidden')}>
-      <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5">
-        <div>
-          <h2 className="text-lg font-bold">Students</h2>
-          <p className="text-sm text-slate-500">
-            Every student in PRIME sections, by average score. Open one for their full journey.
-          </p>
+    <div className="space-y-5">
+      <InsightsPanel students={students} />
+      <section className={cn(panel, 'overflow-hidden')}>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-5">
+          <div>
+            <h2 className="text-lg font-bold">Students</h2>
+            <p className="text-sm text-slate-500">
+              Every student in PRIME sections, by average score. Open one for their full journey.
+            </p>
+          </div>
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400"
+              aria-hidden
+            />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search by name"
+              aria-label="Search students"
+              className="focus-visible:outline-brand-500 bg-surface w-56 rounded-lg border border-slate-300 py-2 pr-3 pl-9 text-sm focus-visible:outline-2"
+            />
+          </div>
         </div>
-        <div className="relative">
-          <Search
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400"
-            aria-hidden
-          />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search by name"
-            aria-label="Search students"
-            className="focus-visible:outline-brand-500 bg-surface w-56 rounded-lg border border-slate-300 py-2 pr-3 pl-9 text-sm focus-visible:outline-2"
-          />
-        </div>
-      </div>
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="text-left text-xs text-slate-500">
-            <tr className="border-y border-slate-200">
-              <th className="w-10 px-5 py-2 font-medium">#</th>
-              <th className="px-3 py-2 font-medium">Student</th>
-              <th className="px-3 py-2 font-medium">Tests taken</th>
-              <th className="px-3 py-2 text-right font-medium">Average</th>
-              <th className="px-3 py-2 font-medium">Last submission</th>
-              <th className="px-5 py-2 text-right font-medium">AMCAT</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown.map((student, index) => {
-              const taken = percent(student.submitted, student.released);
-              return (
-                <tr
-                  key={student.username}
-                  className="border-b border-dotted border-slate-200 last:border-0"
-                >
-                  <td className="px-5 py-2.5 text-xs text-slate-400 tabular-nums">{index + 1}</td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-2.5">
-                      <Avatar name={student.name} className="size-8" />
-                      <div className="min-w-0">
-                        <Link
-                          to="/s/$slug"
-                          params={{ slug: student.username }}
-                          className="text-brand-700 dark:text-brand-300 block truncate font-semibold hover:underline"
-                        >
-                          {student.name}
-                        </Link>
-                        <p className="text-xs text-slate-500">
-                          {student.program} {student.admission_year}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-100">
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${taken}%`, backgroundColor: scoreFill(taken) }}
-                        />
-                      </div>
-                      <span className="text-xs text-slate-600 tabular-nums">
-                        {student.submitted}/{student.released}
-                      </span>
-                    </div>
-                  </td>
-                  <td
-                    className={cn(
-                      'px-3 py-2.5 text-right font-bold tabular-nums',
-                      scoreTone(student.avg_pct)
-                    )}
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs text-slate-500">
+              <tr className="border-y border-slate-200">
+                <th className="w-10 px-5 py-2 font-medium">#</th>
+                <th className="px-3 py-2 font-medium">Student</th>
+                <th className="px-3 py-2 font-medium">Tests taken</th>
+                <th className="px-3 py-2 text-right font-medium">Average</th>
+                <th className="px-3 py-2 text-right font-medium">Attendance</th>
+                <th className="px-3 py-2 text-right font-medium">Attendance</th>
+                <th className="px-3 py-2 font-medium">Last submission</th>
+                <th className="px-5 py-2 text-right font-medium">AMCAT avg</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((student, index) => {
+                const taken = percent(student.submitted, student.released);
+                return (
+                  <tr
+                    key={student.username}
+                    className="border-b border-dotted border-slate-200 last:border-0"
                   >
-                    {student.avg_pct === null ? '—' : `${student.avg_pct}%`}
-                  </td>
-                  <td className="px-3 py-2.5 text-xs whitespace-nowrap text-slate-600">
-                    {lmsDate(student.last_submitted_at)}
-                  </td>
-                  <td className="px-5 py-2.5 text-right text-slate-600 tabular-nums">
-                    {student.amcat || '—'}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {!shown.length && <p className="px-5 py-6 text-sm text-slate-500">No student matches.</p>}
-      </div>
-    </section>
+                    <td className="px-5 py-2.5 text-xs text-slate-400 tabular-nums">{index + 1}</td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <Avatar name={student.name} className="size-8" />
+                        <div className="min-w-0">
+                          <Link
+                            to="/s/$slug"
+                            params={{ slug: student.username }}
+                            className="text-brand-700 dark:text-brand-300 block truncate font-semibold hover:underline"
+                          >
+                            {student.name}
+                          </Link>
+                          <p className="text-xs text-slate-500">
+                            {student.program} {student.admission_year}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${taken}%`, backgroundColor: scoreFill(taken) }}
+                          />
+                        </div>
+                        <span className="text-xs text-slate-600 tabular-nums">
+                          {student.submitted}/{student.released}
+                        </span>
+                      </div>
+                    </td>
+                    <td
+                      className={cn(
+                        'px-3 py-2.5 text-right font-bold tabular-nums',
+                        scoreTone(student.avg_pct)
+                      )}
+                    >
+                      {student.avg_pct === null ? '—' : `${student.avg_pct}%`}
+                    </td>
+                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                      <span
+                        className={cn(
+                          'font-bold tabular-nums',
+                          attendanceTone(student.attendance_pct)
+                        )}
+                      >
+                        {student.attendance_pct === null ? '—' : `${student.attendance_pct}%`}
+                      </span>
+                      {student.prime_attendance_pct !== null && (
+                        <span className="block text-[11px] text-slate-500 tabular-nums">
+                          PRIME {student.prime_attendance_pct}%
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-xs whitespace-nowrap text-slate-600">
+                      {lmsDate(student.last_submitted_at)}
+                    </td>
+                    <td
+                      className={cn(
+                        'px-5 py-2.5 text-right font-semibold tabular-nums',
+                        scoreTone(student.amcat_avg)
+                      )}
+                    >
+                      {student.amcat_avg ?? '—'}
+                      {student.amcat > 1 && (
+                        <span className="block text-[11px] font-normal text-slate-500">
+                          {student.amcat} rounds
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {!shown.length && <p className="px-5 py-6 text-sm text-slate-500">No student matches.</p>}
+        </div>
+      </section>
+    </div>
   );
 }
 

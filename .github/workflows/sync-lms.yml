@@ -1,5 +1,5 @@
 # Nightly copy of LMS data into the database: the PRIME students (and their status, e.g.
-# debarred), their form usernames, and PRIME domain assessments + AMCAT results.
+# debarred), their form usernames, PRIME domain assessments + AMCAT results, and attendance.
 # Needs repository secrets DATABASE_URL, REDASH_KEY and SHEET_ID; skips until they exist.
 # Run it by hand from the Actions tab ("Run workflow") after adding them.
 
@@ -48,3 +48,6 @@ jobs:
       - name: PRIME domain assessments and AMCAT
         if: steps.secrets.outputs.ready == 'true'
         run: npx tsx scripts/sync-assessments.ts
+      - name: Class attendance
+        if: steps.secrets.outputs.ready == 'true'
+        run: npx tsx scripts/sync-attendance.ts

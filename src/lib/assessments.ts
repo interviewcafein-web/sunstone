@@ -23,7 +23,8 @@ export const CATEGORY_LABELS: Record<TestCategory, string> = {
   assignment: 'Assignment',
   test: 'Test',
   mcq: 'MCQ',
-  amcat_mock: 'AMCAT mock',
+  // Mock tests run on Sunstone's own LMS; real AMCAT results come from the AMCAT platform.
+  amcat_mock: 'Mock test (LMS)',
 };
 
 export const CATEGORY_STYLES: Record<TestCategory, string> = {
@@ -88,6 +89,7 @@ export interface CampusOverview {
   expected: number;
   avg_pct: number | null;
   scheduled: number;
+  attendance_pct: number | null;
   last_test_at: string | null;
 }
 
@@ -136,7 +138,52 @@ export interface CampusStudentRow {
   submitted: number;
   avg_pct: number | null;
   last_submitted_at: string | null;
+  attendance_pct: number | null;
+  prime_attendance_pct: number | null;
+  sessions: number;
   amcat: number;
+  amcat_avg: number | null;
+}
+
+export interface CampusAttendance {
+  marks: number;
+  pct: number | null;
+  prime_pct: number | null;
+  students: number;
+  weeks: { week: string; marks: number; pct: number | null }[];
+  subjects: {
+    subject: string;
+    students: number;
+    marks: number;
+    pct: number | null;
+    prime: boolean;
+  }[];
+  faculty: {
+    faculty_id: number;
+    faculty: string;
+    sessions: number;
+    marks: number;
+    pct: number | null;
+    subjects: string;
+    prime: boolean;
+    last_class: string | null;
+  }[];
+  syncedAt: string | null;
+}
+
+export interface AmcatRound {
+  test_name: string;
+  students: number;
+  first_at: string | null;
+  last_at: string | null;
+  avg_score: number | null;
+  sections: { name: string; avg: number | null; takers: number }[] | null;
+  top: { name: string; username: string; avg: number }[] | null;
+}
+
+export interface CampusAmcat {
+  rounds: AmcatRound[];
+  sections: { name: string; avg: number | null; takers: number }[];
 }
 
 export interface CampusDetail {
@@ -156,6 +203,8 @@ export interface CampusDetail {
   subjects: { key: string; name: string; modules: SyllabusModule[] }[];
   timeline: { week: string; tests: number; avg_pct: number | null }[];
   students: CampusStudentRow[];
+  attendance: CampusAttendance;
+  amcat: CampusAmcat;
   batches: number[];
   now: string;
   syncedAt: string | null;
@@ -218,6 +267,17 @@ export interface AmcatSitting {
 export interface StudentAssessmentsData {
   tests: StudentTest[];
   amcat: AmcatSitting[];
+  attendance: {
+    subjects: {
+      subject: string;
+      sessions: number;
+      present: number;
+      pct: number | null;
+      last_date: string | null;
+      prime: boolean;
+    }[];
+    weeks: { week: string; sessions: number; present: number; pct: number | null }[];
+  };
   now: string;
   syncedAt: string | null;
 }
