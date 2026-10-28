@@ -7,7 +7,8 @@ import {
   OAUTH_COOKIE,
   type OAuthState,
   googleConfigured,
-  loginError,
+  appReturn,
+  loginError as webLoginError,
   oauthCookie,
   redirect,
   redirectUri,
@@ -52,6 +53,11 @@ export default async function handler(request: Request): Promise<Response> {
   const clearState = oauthCookie(request, '', 0);
   const state = await unsign<OAuthState>(readCookie(request, OAUTH_COOKIE));
   const next = state?.n ?? '/';
+  // Started from the mobile app: every outcome goes back to the app instead of /login.
+  const loginError = (reason: string, nextPath: string, cookies: string[] = []) =>
+    state?.a
+      ? appReturn(state.a, { error: reason }, cookies)
+      : webLoginError(reason, nextPath, cookies);
 
   if (!googleConfigured()) return loginError('google_not_configured', next, [clearState]);
   // Cancelled on Google's screen, or an old/forged callback.
@@ -103,8 +109,7 @@ export default async function handler(request: Request): Promise<Response> {
     where email = ${email}`.catch(() => undefined);
   forgetStaff(email);
 
-  return redirect(next, [
-    clearState,
-    sessionCookie(request, await createSession(email, 'google'), SESSION_DAYS * 86_400),
-  ]);
+  const session = await createSession(email, 'google');
+  if (state!.a) return appReturn(state!.a, { token: session }, [clearState]);
+  return redirect(next, [clearState, sessionCookie(request, session, SESSION_DAYS * 86_400)]);
 }

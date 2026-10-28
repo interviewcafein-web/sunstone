@@ -227,6 +227,12 @@ export function readCookie(request: Request, name: string): string | undefined {
     ?.slice(name.length + 1);
 }
 
+/** The session token from an "Authorization: Bearer …" header (the mobile app). */
+export function bearerToken(request: Request): string | undefined {
+  const match = request.headers.get('authorization')?.match(/^Bearer\s+(\S+)$/i);
+  return match?.[1];
+}
+
 /** Who is signed in, and what they may see. */
 export interface Viewer {
   /** Username (password accounts) or email. */
@@ -242,7 +248,10 @@ export interface Viewer {
  *  account still has access. Password accounts (the bootstrap logins) count as HQ. */
 export async function sessionViewer(request: Request): Promise<Viewer | null> {
   if (!canSignSessions()) return null;
-  const session = await unsign<Session>(readCookie(request, SESSION_COOKIE));
+  // The website sends the session as a cookie; the Vertex mobile app as a Bearer token.
+  const session = await unsign<Session>(
+    readCookie(request, SESSION_COOKIE) ?? bearerToken(request)
+  );
   if (!session || typeof session.u !== 'string' || !(session.e > Date.now())) return null;
   try {
     if (session.m === 'google' || session.m === 'otp') {

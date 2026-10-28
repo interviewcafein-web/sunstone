@@ -26,7 +26,19 @@ export interface OAuthState {
   n: string;
   /** Expiry, ms since 1970. */
   e: number;
+  /** The mobile app's return address (vertex://… or Expo Go's exp://…), when it started this. */
+  a?: string;
 }
+
+/** A mobile app return address: only the Vertex app's own scheme, or Expo Go while testing. */
+export const safeAppReturn = (value: string | null | undefined) =>
+  value && /^(vertex|exps?):\/\/[\w.:\-/@%?=&]*$/i.test(value) && value.length < 300
+    ? value
+    : undefined;
+
+/** Back to the app with the outcome (a session token, or why sign-in failed). */
+export const appReturn = (to: string, params: Record<string, string>, cookies: string[] = []) =>
+  redirect(`${to}${to.includes('?') ? '&' : '?'}${new URLSearchParams(params)}`, cookies);
 
 export function oauthCookie(request: Request, value: string, maxAgeSeconds: number) {
   const secure = new URL(request.url).protocol === 'https:' ? '; Secure' : '';

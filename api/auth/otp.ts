@@ -2,6 +2,8 @@
 //
 //   POST /api/auth/otp { action: 'send', email }          -> emails a 6-digit code
 //   POST /api/auth/otp { action: 'verify', email, code }  -> sets the session cookie
+//   (with client: 'app', the mobile app's sign-in, the session token is also returned in the
+//   body, as the app sends it as a Bearer token rather than a cookie)
 //
 // The reply to 'send' is the same whether or not the email has access, so the form cannot
 // be used to find out who is staff. Codes last 10 minutes, are stored only as an HMAC, allow
@@ -74,7 +76,12 @@ async function send(email: string): Promise<Response> {
   return json(200, SENT);
 }
 
-async function verify(request: Request, email: string, code: string): Promise<Response> {
+async function verify(
+  request: Request,
+  email: string,
+  code: string,
+  app = false
+): Promise<Response> {
   const wrong = () => json(401, { error: 'That code is wrong or has expired.' });
   if (!/^\d{6}$/.test(code)) return wrong();
 
@@ -97,17 +104,10 @@ async function verify(request: Request, email: string, code: string): Promise<Re
   if (!(await isStaff(email))) return wrong();
   await db()`update staff set last_login_at = now() where email = ${email}`;
 
-  return json(
-    200,
-    { user: email },
-    {
-      'Set-Cookie': sessionCookie(
-        request,
-        await createSession(email, 'otp'),
-        SESSION_DAYS * 86_400
-      ),
-    }
-  );
+  const token = await createSession(email, 'otp');
+  return json(200, app ? { user: email, token } : { user: email }, {
+    'Set-Cookie': sessionCookie(request, token, SESSION_DAYS * 86_400),
+  });
 }
 
 export default async function handler(request: Request): Promise<Response> {
@@ -120,6 +120,7 @@ export default async function handler(request: Request): Promise<Response> {
     action?: unknown;
     email?: unknown;
     code?: unknown;
+    client?: unknown;
   } | null;
   const email = normalizeEmail(typeof body?.email === 'string' ? body.email : '');
   if (!isEmail(email)) return json(400, { error: 'Enter a valid email address.' });
@@ -127,7 +128,12 @@ export default async function handler(request: Request): Promise<Response> {
   try {
     if (body?.action === 'send') return await send(email);
     if (body?.action === 'verify') {
-      return await verify(request, email, typeof body.code === 'string' ? body.code.trim() : '');
+      return await verify(
+        request,
+        email,
+        typeof body.code === 'string' ? body.code.trim() : '',
+        body.client === 'app'
+      );
     }
     return json(400, { error: 'Unknown action' });
   } catch (error) {
