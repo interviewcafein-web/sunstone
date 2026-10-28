@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, getRouteApi } from '@tanstack/react-router';
 import {
   Bar,
@@ -394,10 +394,10 @@ const CATEGORIES: TestCategory[] = ['assignment', 'test', 'mcq', 'amcat_mock'];
 const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'subject', label: 'Prime Mock Test', icon: Trophy },
-  { id: 'modules', label: 'Module tests', icon: FolderTree },
+  { id: 'modules', label: 'Practice Test and MCQs', icon: FolderTree },
   { id: 'exams', label: 'Exams', icon: NotebookPen },
-  { id: 'attendance', label: 'Attendance', icon: CalendarCheck },
   { id: 'amcat', label: 'AMCAT', icon: Award },
+  { id: 'attendance', label: 'Attendance', icon: CalendarCheck },
   { id: 'students', label: 'Students', icon: Users },
 ] as const;
 
@@ -438,6 +438,20 @@ function CampusView({
   const search = route.useSearch();
   const navigate = route.useNavigate();
   const detail = useCampusDetail(campusId, search.batch);
+  // On narrow screens the tab bar scrolls sideways; keep the open tab in view.
+  const tabBar = useRef<HTMLElement>(null);
+  const openTab = search.tab ?? 'overview';
+  useEffect(() => {
+    const bar = tabBar.current;
+    const active = bar?.querySelector<HTMLElement>('[aria-current="page"]');
+    // Scroll only the bar sideways, never the page.
+    if (bar && active) {
+      bar.scrollTo({
+        left: active.offsetLeft - (bar.clientWidth - active.clientWidth) / 2,
+        behavior: 'smooth',
+      });
+    }
+  }, [openTab, detail.data]);
   useTour('campus', Boolean(detail.data));
   const set = (patch: Partial<typeof search>) =>
     navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true });
@@ -539,9 +553,10 @@ function CampusView({
       </section>
 
       <nav
+        ref={tabBar}
         aria-label="Campus sections"
         data-tour="campus-tabs"
-        className="flex gap-1 overflow-x-auto border-b border-slate-200 scrollbar-none"
+        className="relative flex gap-1 overflow-x-auto border-b border-slate-200 scrollbar-none"
       >
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
@@ -880,7 +895,7 @@ function OverviewTab({
             onClick={() => onTab('modules')}
             className="text-brand-700 dark:text-brand-300 text-sm font-semibold hover:underline"
           >
-            Open module tests →
+            Open Practice Test and MCQs →
           </button>
         </div>
         {data.subjects.map((subject) => (

@@ -499,7 +499,7 @@ export function StudentAssessments({
           <Card className="overflow-hidden p-0">
             <div className="px-5 pt-4">
               <CardHeader
-                title="Module tests"
+                title="Practice Test and MCQs"
                 aside={
                   syncedAt && (
                     <span className="text-xs text-slate-500">
@@ -555,7 +555,7 @@ export function StudentAssessments({
               </div>
             ) : (
               <p className="px-5 pb-5 text-sm text-slate-500">
-                No module tests have been released to this student's sections yet.
+                No practice tests or MCQs have been released to this student's sections yet.
               </p>
             )}
           </Card>
