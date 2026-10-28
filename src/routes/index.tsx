@@ -6,7 +6,7 @@ import { PLATFORM_IDS } from '@/lib/coding-profiles/platforms';
 import type { PlatformId } from '@/lib/coding-profiles/types';
 import { ZONES, type ZoneId } from '@/lib/students/zones';
 
-export type SortKey = 'total' | 'name' | 'active' | PlatformId;
+export type SortKey = 'total' | 'name' | 'active' | 'attendance' | 'amcat' | 'tests' | PlatformId;
 
 export interface StudentsSearch {
   campus?: string;
@@ -18,7 +18,15 @@ export interface StudentsSearch {
   zone?: ZoneId;
 }
 
-const SORT_KEYS: string[] = ['total', 'name', 'active', ...PLATFORM_IDS];
+const SORT_KEYS: string[] = [
+  'total',
+  'name',
+  'active',
+  'attendance',
+  'amcat',
+  'tests',
+  ...PLATFORM_IDS,
+];
 
 const text = (value: unknown) =>
   typeof value === 'string' || typeof value === 'number'

@@ -1,5 +1,14 @@
 import { Link } from '@tanstack/react-router';
-import { ArrowDown, Crown } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowDownRight,
+  ArrowRight,
+  ArrowUpRight,
+  CalendarCheck,
+  ClipboardCheck,
+  Crown,
+  Award,
+} from 'lucide-react';
 
 import { Avatar } from '@/components/common/Avatar';
 import { PlatformLogo } from '@/components/profile/PlatformLogo';
@@ -8,6 +17,8 @@ import { StatusTags } from '@/components/students/StatusTags';
 import { PLATFORMS } from '@/lib/coding-profiles/platforms';
 import type { PlatformSummary } from '@/lib/coding-profiles/summaries';
 import type { Platform, PlatformId } from '@/lib/coding-profiles/types';
+import type { StudentMetrics } from '@/lib/assessments';
+import { scoreFill, scoreTone } from '@/lib/assessments';
 import type { Student } from '@/lib/students/types';
 import { zoneById, type ZoneResult } from '@/lib/students/zones';
 import type { SortKey } from '@/routes/index';
@@ -32,6 +43,8 @@ export interface StudentRow {
   zone: ZoneResult | null;
   /** Most recent active day across the platforms that report one. */
   lastActive?: { day: string; platform: PlatformId };
+  /** Attendance, AMCAT and PRIME tests, from the LMS (absent until loaded or if none). */
+  metrics?: StudentMetrics;
   loading: boolean;
 }
 
@@ -47,6 +60,12 @@ const PODIUM_TINT = [
   'bg-slate-100/70 dark:bg-slate-100/40',
   'bg-orange-50/60 dark:bg-orange-50/20',
 ];
+
+// The table shows the platforms most students use; a student's page shows all six, and the
+// total and zones still count every platform.
+const TABLE_PLATFORMS = PLATFORMS.filter((platform) =>
+  ['leetcode', 'geeksforgeeks', 'github'].includes(platform.id)
+);
 
 export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
   const maxTotal = Math.max(...rows.map((row) => row.total), 1);
@@ -73,7 +92,7 @@ export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
               #
             </th>
             <SortHeader label="Student" sortKey="name" sort={sort} onSort={onSort} />
-            {PLATFORMS.map((platform) => (
+            {TABLE_PLATFORMS.map((platform) => (
               <SortHeader
                 key={platform.id}
                 label={platform.name}
@@ -87,7 +106,38 @@ export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
               />
             ))}
             <SortHeader
+              label="Attendance"
+              icon={<CalendarCheck className="size-3.5 text-emerald-600" aria-hidden />}
+              hint="classes, PRIME"
+              sortKey="attendance"
+              sort={sort}
+              onSort={onSort}
+              numeric
+              divided
+            />
+            <SortHeader
+              label="AMCAT"
+              icon={<Award className="size-3.5 text-amber-600" aria-hidden />}
+              hint="latest, trend"
+              sortKey="amcat"
+              sort={sort}
+              onSort={onSort}
+              numeric
+              divided
+            />
+            <SortHeader
+              label="PRIME tests"
+              icon={<ClipboardCheck className="text-brand-600 size-3.5" aria-hidden />}
+              hint="average, taken"
+              sortKey="tests"
+              sort={sort}
+              onSort={onSort}
+              numeric
+              divided
+            />
+            <SortHeader
               label="Total solved"
+              hint="all platforms"
               sortKey="total"
               sort={sort}
               onSort={onSort}
@@ -105,83 +155,96 @@ export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
           </tr>
         </thead>
         <tbody>
-          {rows.map(({ student, cells, total, strongest, lastActive, zone, loading }, index) => {
-            const podium = sort === 'total' && index < 3 && total > 0;
-            return (
-              <tr
-                key={student.id}
-                className={cn(
-                  'animate-rise hover:bg-brand-50/50 dark:hover:bg-brand-900/30 border-b border-dotted border-slate-300 transition-colors last:border-0',
-                  podium && PODIUM_TINT[index]
-                )}
-                style={{ animationDelay: `${Math.min(index, 15) * 30}ms` }}
-              >
-                <td className="px-3 py-3 align-middle text-slate-400 tabular-nums">
-                  {podium ? <Medal place={index} /> : index + 1}
-                </td>
-                <th scope="row" className="px-3 py-3 text-left align-middle font-normal">
-                  <div className="flex items-center gap-3">
-                    <Avatar name={student.name} />
-                    <div className="min-w-0">
-                      <Link
-                        to="/s/$slug"
-                        params={{ slug: student.slug }}
-                        className="text-brand-700 dark:text-brand-300 font-semibold hover:underline"
-                      >
-                        {student.name}
-                      </Link>
-                      <div className="text-xs text-slate-500">
-                        {[student.campus, student.course, student.batch]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-1">
-                        {zone && <ZonePill zone={zone} />}
-                        <StatusTags status={student.status} className="mt-1" />
+          {rows.map(
+            ({ student, cells, total, strongest, lastActive, zone, loading, metrics }, index) => {
+              const podium = sort === 'total' && index < 3 && total > 0;
+              return (
+                <tr
+                  key={student.id}
+                  className={cn(
+                    'animate-rise hover:bg-brand-50/50 dark:hover:bg-brand-900/30 border-b border-dotted border-slate-300 transition-colors last:border-0',
+                    podium && PODIUM_TINT[index]
+                  )}
+                  style={{ animationDelay: `${Math.min(index, 15) * 30}ms` }}
+                >
+                  <td className="px-3 py-3 align-middle text-slate-400 tabular-nums">
+                    {podium ? <Medal place={index} /> : index + 1}
+                  </td>
+                  <th scope="row" className="px-3 py-3 text-left align-middle font-normal">
+                    <div className="flex items-center gap-3">
+                      <Avatar name={student.name} />
+                      <div className="min-w-0">
+                        <Link
+                          to="/s/$slug"
+                          params={{ slug: student.slug }}
+                          className="text-brand-700 dark:text-brand-300 font-semibold hover:underline"
+                        >
+                          {student.name}
+                        </Link>
+                        <div className="text-xs text-slate-500">
+                          {[student.campus, student.course, student.batch]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1">
+                          {zone && <ZonePill zone={zone} />}
+                          <StatusTags status={student.status} className="mt-1" />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </th>
-                {PLATFORMS.map((platform) => (
-                  <td
-                    key={platform.id}
-                    className="border-l border-dotted border-slate-200 px-3 py-3 text-right align-middle"
-                  >
-                    <PlatformCell
-                      platform={platform}
-                      cell={cells[platform.id]}
-                      columnMax={columnMax[platform.id]}
-                    />
+                  </th>
+                  {TABLE_PLATFORMS.map((platform) => (
+                    <td
+                      key={platform.id}
+                      className="border-l border-dotted border-slate-200 px-3 py-3 text-right align-middle"
+                    >
+                      <PlatformCell
+                        platform={platform}
+                        cell={cells[platform.id]}
+                        columnMax={columnMax[platform.id]}
+                      />
+                    </td>
+                  ))}
+                  <td className="border-l border-dotted border-slate-200 px-3 py-3 text-right align-middle">
+                    <AttendanceCell metrics={metrics} />
                   </td>
-                ))}
-                <td className="border-l border-dotted border-slate-200 px-3 py-3 text-right align-middle">
-                  <span className="text-base font-bold tabular-nums">{total.toLocaleString()}</span>
-                  <div className="mt-1 ml-auto h-1 w-20 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="from-brand-400 to-brand-700 h-full rounded-full bg-linear-to-r transition-[width] duration-500"
-                      style={{ width: `${(total / maxTotal) * 100}%` }}
-                    />
-                  </div>
-                  {loading ? (
-                    <div className="mt-0.5 text-xs text-slate-400">loading…</div>
-                  ) : (
-                    strongest && (
+                  <td className="border-l border-dotted border-slate-200 px-3 py-3 text-right align-middle">
+                    <AmcatCell metrics={metrics} />
+                  </td>
+                  <td className="border-l border-dotted border-slate-200 px-3 py-3 text-right align-middle">
+                    <TestsCell metrics={metrics} />
+                  </td>
+                  <td className="border-l border-dotted border-slate-200 px-3 py-3 text-right align-middle">
+                    <span className="text-base font-bold tabular-nums">
+                      {total.toLocaleString()}
+                    </span>
+                    <div className="mt-1 ml-auto h-1 w-20 overflow-hidden rounded-full bg-slate-100">
                       <div
-                        className="mt-1 inline-flex items-center gap-1 text-[11px] text-slate-500"
-                        title="Share of this student's total solved on their strongest platform"
-                      >
-                        <PlatformLogo platform={strongest.platform} className="size-3" />
-                        {strongest.share}% here
-                      </div>
-                    )
-                  )}
-                </td>
-                <td className="border-l border-dotted border-slate-200 px-3 py-3 align-middle">
-                  <LastActive value={lastActive} />
-                </td>
-              </tr>
-            );
-          })}
+                        className="from-brand-400 to-brand-700 h-full rounded-full bg-linear-to-r transition-[width] duration-500"
+                        style={{ width: `${(total / maxTotal) * 100}%` }}
+                      />
+                    </div>
+                    {loading ? (
+                      <div className="mt-0.5 text-xs text-slate-400">loading…</div>
+                    ) : (
+                      strongest && (
+                        <div
+                          className="mt-1 inline-flex items-center gap-1 text-[11px] text-slate-500"
+                          title="Share of this student's total solved on their strongest platform"
+                        >
+                          <PlatformLogo platform={strongest.platform} className="size-3" />
+                          {strongest.share}% here
+                        </div>
+                      )
+                    )}
+                  </td>
+                  <td className="border-l border-dotted border-slate-200 px-3 py-3 align-middle">
+                    <LastActive value={lastActive} />
+                  </td>
+                </tr>
+              );
+            }
+          )}
         </tbody>
       </table>
     </div>
@@ -412,6 +475,131 @@ function ZonePill({ zone }: { zone: ZoneResult }) {
           <PlatformLogo platform={basis.id} className="size-2.5" />
         </>
       )}
+    </span>
+  );
+}
+
+const empty = <span className="text-slate-300">—</span>;
+
+const attendanceTone = (pct: number | null | undefined) =>
+  pct == null
+    ? 'text-slate-400'
+    : pct >= 75
+      ? 'text-emerald-600 dark:text-emerald-400'
+      : pct >= 60
+        ? 'text-amber-600 dark:text-amber-400'
+        : 'text-red-600 dark:text-red-400';
+const attendanceFill = (pct: number) => (pct >= 75 ? '#10b981' : pct >= 60 ? '#f59e0b' : '#ef4444');
+
+function MiniBar({ pct, fill }: { pct: number; fill: string }) {
+  return (
+    <span className="mt-1 ml-auto block h-1 w-16 overflow-hidden rounded-full bg-slate-100">
+      <span
+        className="block h-full rounded-full transition-[width] duration-700"
+        style={{ width: `${Math.max(3, pct)}%`, background: fill }}
+      />
+    </span>
+  );
+}
+
+function AttendanceCell({ metrics }: { metrics?: StudentMetrics }) {
+  const pct = metrics?.attendance;
+  if (pct == null) return empty;
+  return (
+    <span className="inline-flex flex-col items-end" title="Classes attended since 1 July">
+      <span className={cn('text-base font-bold tabular-nums', attendanceTone(pct))}>{pct}%</span>
+      {metrics?.prime_attendance != null && (
+        <span className="text-xs whitespace-nowrap text-slate-500">
+          PRIME {metrics.prime_attendance}%
+        </span>
+      )}
+      <MiniBar pct={pct} fill={attendanceFill(pct)} />
+    </span>
+  );
+}
+
+/** Latest AMCAT average, a sparkline of every sitting, and the change since the previous one. */
+function AmcatCell({ metrics }: { metrics?: StudentMetrics }) {
+  const sittings = metrics?.amcat ?? [];
+  if (!sittings.length) return empty;
+  const scores = sittings.map(([, score]) => score);
+  const latest = scores[scores.length - 1];
+  const change = scores.length > 1 ? latest - scores[scores.length - 2] : null;
+  const width = 64;
+  const height = 18;
+  const points = scores
+    .map((score, index) => {
+      const x = scores.length === 1 ? width / 2 : (index / (scores.length - 1)) * width;
+      return `${x.toFixed(1)},${(height - (score / 100) * height).toFixed(1)}`;
+    })
+    .join(' ');
+  const Trend =
+    change === null || change === 0 ? ArrowRight : change > 0 ? ArrowUpRight : ArrowDownRight;
+  return (
+    <span
+      className="inline-flex flex-col items-end"
+      title={sittings.map(([date, score]) => `${date}: ${score}`).join('\n')}
+    >
+      <span className="inline-flex items-center gap-1">
+        <span className={cn('text-base font-bold tabular-nums', scoreTone(latest))}>{latest}</span>
+        {change !== null && (
+          <span
+            className={cn(
+              'inline-flex items-center text-[11px] font-semibold tabular-nums',
+              change > 0 ? 'text-emerald-600' : change < 0 ? 'text-red-600' : 'text-slate-400'
+            )}
+          >
+            <Trend className="size-3" aria-hidden />
+            {change > 0 ? `+${change}` : change < 0 ? change : ''}
+          </span>
+        )}
+      </span>
+      <svg
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        className="mt-0.5 overflow-visible"
+        aria-hidden
+      >
+        {scores.length > 1 && (
+          <polyline
+            points={points}
+            fill="none"
+            stroke={scoreFill(latest)}
+            strokeWidth={1.75}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        )}
+        {points.split(' ').map((point, index) => {
+          const [x, y] = point.split(',');
+          return index === scores.length - 1 || scores.length === 1 ? (
+            <circle key={index} cx={x} cy={y} r={2.5} fill={scoreFill(latest)} />
+          ) : null;
+        })}
+      </svg>
+      <span className="text-[11px] whitespace-nowrap text-slate-500">
+        {sittings.length} sitting{sittings.length === 1 ? '' : 's'}
+      </span>
+    </span>
+  );
+}
+
+function TestsCell({ metrics }: { metrics?: StudentMetrics }) {
+  if (!metrics?.released) return empty;
+  const taken = Math.round(((metrics.submitted ?? 0) / metrics.released) * 100);
+  return (
+    <span
+      className="inline-flex flex-col items-end"
+      title="Prime Domain Coding tests: average score, and tests taken out of released"
+    >
+      <span className={cn('text-base font-bold tabular-nums', scoreTone(metrics.test_avg))}>
+        {metrics.test_avg == null ? '—' : `${metrics.test_avg}%`}
+      </span>
+      <span className="text-xs whitespace-nowrap text-slate-500">
+        {metrics.submitted ?? 0}/{metrics.released} taken
+      </span>
+      <MiniBar pct={taken} fill={scoreFill(taken)} />
     </span>
   );
 }

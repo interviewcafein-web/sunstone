@@ -37,7 +37,7 @@ export function StudentsHero({
   const syncing = loading || refreshing > 0;
 
   return (
-    <section className="from-brand-700 via-brand-700 to-brand-900 relative overflow-hidden rounded-2xl bg-gradient-to-br p-5 text-white shadow-[0_20px_50px_-20px_rgb(16_38_70/0.6)] sm:p-7">
+    <section className="hero-glow from-brand-700 via-brand-700 to-brand-900 relative overflow-hidden rounded-2xl bg-gradient-to-br p-5 text-white shadow-[0_20px_50px_-20px_rgb(16_38_70/0.6)] sm:p-7">
       {/* The Sunstone step mark, as a faint backdrop. */}
       <div aria-hidden className="pointer-events-none absolute -right-10 -bottom-16 opacity-[0.04]">
         <div className="absolute right-10 bottom-36 h-36 w-80 bg-white" />
@@ -115,7 +115,7 @@ function HeroStat({ icon: Icon, label, value, note, tone = 'default' }: HeroStat
   return (
     <div
       className={cn(
-        'flex flex-col-reverse rounded-xl border p-3 backdrop-blur-sm',
+        'hover-lift flex flex-col-reverse rounded-xl border p-3 backdrop-blur-sm',
         tone === 'warn' ? 'border-amber-300/40 bg-amber-400/15' : 'border-white/15 bg-white/10'
       )}
     >

@@ -386,3 +386,22 @@ export const useStudentAssessments = (username: string | undefined) =>
     enabled: Boolean(username),
     ...options,
   });
+
+/** Per-student numbers for the students table. */
+export interface StudentMetrics {
+  attendance: number | null;
+  prime_attendance: number | null;
+  /** AMCAT sittings in date order: [date, average score]. */
+  amcat: [string, number][] | null;
+  test_avg: number | null;
+  submitted: number | null;
+  released: number | null;
+}
+
+export const useStudentMetrics = () =>
+  useQuery({
+    queryKey: ['assessments', 'metrics'],
+    queryFn: () => get<{ students: Record<string, StudentMetrics> }>({ view: 'metrics' }),
+    staleTime: 10 * 60_000,
+    retry: false,
+  });

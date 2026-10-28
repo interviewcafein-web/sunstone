@@ -17,6 +17,7 @@ import {
 import { useStudents } from '@/hooks/useStudents';
 import { PLATFORM_IDS, SOLVING_PLATFORM_IDS } from '@/lib/coding-profiles/platforms';
 import { ProfileError, type PlatformId } from '@/lib/coding-profiles/types';
+import { useStudentMetrics, type StudentMetrics } from '@/lib/assessments';
 import { useSession } from '@/lib/session';
 import type { Student } from '@/lib/students/types';
 import { ZONE_BASIS, zoneOf, type ZoneResult } from '@/lib/students/zones';
@@ -47,7 +48,11 @@ function toCell(student: Student, platform: PlatformId, queries: Map<string, Sum
   };
 }
 
-function toRow(student: Student, queries: Map<string, SummaryQuery>): StudentRow {
+function toRow(
+  student: Student,
+  queries: Map<string, SummaryQuery>,
+  metrics?: StudentMetrics
+): StudentRow {
   const cells = Object.fromEntries(
     PLATFORM_IDS.map((platform) => [platform, toCell(student, platform, queries)])
   ) as Record<PlatformId, Cell>;
@@ -79,6 +84,7 @@ function toRow(student: Student, queries: Map<string, SummaryQuery>): StudentRow
     strongest,
     lastActive,
     zone: rowZone(cells),
+    metrics,
     loading: PLATFORM_IDS.some((platform) => cells[platform].kind === 'loading'),
   };
 }
@@ -132,6 +138,9 @@ function compareRows(sort: SortKey) {
 
   const score = (row: StudentRow) => {
     if (sort === 'total') return row.total;
+    if (sort === 'attendance') return row.metrics?.attendance ?? -1;
+    if (sort === 'tests') return row.metrics?.test_avg ?? -1;
+    if (sort === 'amcat') return row.metrics?.amcat?.at(-1)?.[1] ?? -1;
     const cell = row.cells[sort];
     return cell.kind === 'ok' ? cell.summary.value : -1;
   };
@@ -147,6 +156,8 @@ export default function StudentsPage() {
   const sort = search.sort ?? 'total';
 
   const students = useStudents();
+  // Attendance, AMCAT and PRIME tests for the table (from the LMS copy in the database).
+  const metrics = useStudentMetrics();
   const all = useMemo(() => students.data?.students ?? [], [students.data]);
 
   const options = useMemo(
@@ -171,7 +182,9 @@ export default function StudentsPage() {
 
   // Only the students on screen are fetched, so a campus or batch view loads faster.
   const summaries = useStudentSummaries(filtered);
-  const rows = filtered.map((student) => toRow(student, summaries.byKey)).sort(compareRows(sort));
+  const rows = filtered
+    .map((student) => toRow(student, summaries.byKey, metrics.data?.students[student.slug]))
+    .sort(compareRows(sort));
 
   const shown = search.zone ? rows.filter((row) => row.zone?.zone === search.zone) : rows;
   const [reportState, setReportState] = useState<'idle' | 'busy' | 'failed'>('idle');

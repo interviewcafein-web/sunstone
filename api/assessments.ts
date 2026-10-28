@@ -7,6 +7,7 @@
 //   GET /api/assessments?view=test&campus=ID&test=ID,ID[&batch=Y]  each student's marks
 //                                                     (a test's section copies together)
 //   GET /api/assessments?view=student&s=username          one student's tests and AMCAT
+//   GET /api/assessments?view=metrics                     per-student numbers for the table
 //
 // The LMS keeps a copy of a subject, its modules and its tests for each group of sections.
 // A campus sees one subject: copies are merged by name (subject, module, sub-folder, test).
@@ -664,6 +665,55 @@ async function student(viewer: Viewer, username: string) {
   };
 }
 
+/**
+ * For the students table: per student (by username) the viewer may see, attendance, AMCAT
+ * sitting averages in date order (for the trend), and PRIME test average and counts.
+ */
+async function metrics(viewer: Viewer) {
+  const rows = await db().query(
+    `with roster as (
+       select lms_user_id, username from students
+       where on_platform and ($1::int[] is null or campus_id = any($1::int[]))),
+     att as (
+       select lms_user_id, sum(sessions) as s, sum(present) as p,
+              sum(sessions) filter (where ${PRIME_SUBJECT}) as ps,
+              sum(present) filter (where ${PRIME_SUBJECT}) as pp
+       from att_student_subject where lms_user_id in (select lms_user_id from roster)
+       group by lms_user_id),
+     sittings as (
+       select a.lms_user_id, a.taken_at, round(avg((x->>'score')::numeric))::int as score
+       from amcat_sittings a cross join lateral jsonb_array_elements(a.sections) x
+       where x->>'score' ~ '^[0-9.]+$' and a.lms_user_id in (select lms_user_id from roster)
+       group by a.id, a.lms_user_id, a.taken_at),
+     am as (
+       select lms_user_id, json_agg(json_build_array(taken_at::date::text, score) order by taken_at) as list
+       from sittings group by lms_user_id),
+     done as (
+       select test_id, section_id from lms_test_releases where visible and release_at <= ${NOW}),
+     eligible as (
+       select distinct d.test_id, ss.lms_user_id from done d join lms_section_students ss using (section_id)
+       where ss.lms_user_id in (select lms_user_id from roster)),
+     tst as (
+       select e.lms_user_id, count(*)::int as released, count(*) filter (where tr.submitted)::int as submitted,
+              round(avg(tr.marks / nullif(coalesce(tr.max_marks, t.max_marks), 0) * 100)
+                    filter (where tr.submitted))::int as avg
+       from eligible e join lms_tests t on t.id = e.test_id
+       left join lms_test_results tr on tr.test_id = e.test_id and tr.lms_user_id = e.lms_user_id
+       group by e.lms_user_id)
+     select r.username,
+            round(100.0 * att.p / nullif(att.s, 0))::int as attendance,
+            round(100.0 * att.pp / nullif(att.ps, 0))::int as prime_attendance,
+            am.list as amcat, tst.avg as test_avg, tst.submitted, tst.released
+     from roster r
+     left join att using (lms_user_id) left join am using (lms_user_id) left join tst using (lms_user_id)
+     where att.lms_user_id is not null or am.lms_user_id is not null or tst.lms_user_id is not null`,
+    [viewer.campusIds]
+  );
+  return {
+    students: Object.fromEntries(rows.map(({ username, ...rest }) => [String(username), rest])),
+  };
+}
+
 export default async function handler(request: Request): Promise<Response> {
   if (!process.env.DATABASE_URL) return json(404, { error: 'No database configured' });
   const viewer = await sessionViewer(request);
@@ -673,6 +723,7 @@ export default async function handler(request: Request): Promise<Response> {
   const view = params.get('view');
   try {
     if (view === 'campuses') return json(200, await campuses(viewer));
+    if (view === 'metrics') return json(200, await metrics(viewer));
     if (view === 'student') {
       const result = await student(viewer, params.get('s') ?? '');
       return result ? json(200, result) : json(404, { error: 'Student not found' });

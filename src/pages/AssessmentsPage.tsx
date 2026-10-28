@@ -69,7 +69,7 @@ import { cn } from '@/lib/utils';
 const route = getRouteApi('/assessments');
 
 const heroClass =
-  'from-brand-700 via-brand-700 to-brand-900 relative overflow-hidden rounded-2xl bg-gradient-to-br p-5 text-white shadow-[0_20px_50px_-20px_rgb(16_38_70/0.6)] sm:p-7';
+  'hero-glow from-brand-700 via-brand-700 to-brand-900 relative overflow-hidden rounded-2xl bg-gradient-to-br p-5 text-white shadow-[0_20px_50px_-20px_rgb(16_38_70/0.6)] sm:p-7';
 const panel = 'shadow-card bg-surface rounded-2xl border border-slate-200';
 
 function Loading({ label }: { label: string }) {
@@ -146,7 +146,7 @@ function HeroStat({
   note?: string;
 }) {
   return (
-    <div className="flex flex-col-reverse rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur-sm">
+    <div className="hover-lift flex flex-col-reverse rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur-sm">
       <dt className="text-brand-100 mt-0.5 flex items-center gap-1.5 text-xs">
         <Icon className="text-brand-200 size-3.5" aria-hidden />
         {label}

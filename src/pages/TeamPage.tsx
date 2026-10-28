@@ -177,7 +177,7 @@ export default function TeamPage() {
 
   return (
     <div className="rise-stagger space-y-5">
-      <section className="from-brand-700 via-brand-700 to-brand-900 relative overflow-hidden rounded-2xl bg-gradient-to-br p-5 text-white shadow-[0_20px_50px_-20px_rgb(16_38_70/0.6)] sm:p-7">
+      <section className="hero-glow from-brand-700 via-brand-700 to-brand-900 relative overflow-hidden rounded-2xl bg-gradient-to-br p-5 text-white shadow-[0_20px_50px_-20px_rgb(16_38_70/0.6)] sm:p-7">
         <div className="relative flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-brand-200 text-xs font-semibold tracking-[0.2em] uppercase">

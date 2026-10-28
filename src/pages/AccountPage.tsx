@@ -77,7 +77,7 @@ export default function AccountPage() {
 
   return (
     <div className="rise-stagger mx-auto max-w-4xl space-y-5">
-      <section className="from-brand-700 via-brand-700 to-brand-900 relative overflow-hidden rounded-2xl bg-gradient-to-br p-6 text-white shadow-[0_20px_50px_-20px_rgb(16_38_70/0.6)] sm:p-8">
+      <section className="hero-glow from-brand-700 via-brand-700 to-brand-900 relative overflow-hidden rounded-2xl bg-gradient-to-br p-6 text-white shadow-[0_20px_50px_-20px_rgb(16_38_70/0.6)] sm:p-8">
         <div
           aria-hidden
           className="bg-brand-400/30 pointer-events-none absolute -top-24 right-10 size-72 rounded-full blur-3xl"

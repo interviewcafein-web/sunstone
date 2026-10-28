@@ -191,10 +191,73 @@ html.splash-gone .rise-stagger > * {
   animation-play-state: running;
 }
 
+/* The header's navy-to-gold line: a light slowly travelling along it. */
+@keyframes shimmer {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 200% 50%;
+  }
+}
+
+@utility animate-shimmer {
+  background-size: 200% 100%;
+  animation: shimmer 8s linear infinite;
+}
+
+/* Hero banners: a soft light drifting behind the content. */
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate(-60px, 24px) scale(1.15);
+    opacity: 0.85;
+  }
+}
+
+@utility hero-glow {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  &::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    top: -40%;
+    right: -10%;
+    width: 55%;
+    height: 160%;
+    pointer-events: none;
+    background: radial-gradient(closest-side, rgb(96 165 250 / 0.35), transparent);
+    animation: drift 14s ease-in-out infinite;
+  }
+}
+
+/* Cards that lift slightly under the pointer. */
+@utility hover-lift {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px -14px rgb(15 23 42 / 0.35);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-rise,
-  .rise-stagger > * {
+  .rise-stagger > *,
+  .animate-shimmer,
+  .hero-glow::after {
     animation: none;
+  }
+  .hover-lift:hover {
+    transform: none;
   }
 }
 
