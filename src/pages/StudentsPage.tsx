@@ -18,6 +18,7 @@ import { PLATFORM_IDS, SOLVING_PLATFORM_IDS } from '@/lib/coding-profiles/platfo
 import { ProfileError, type PlatformId } from '@/lib/coding-profiles/types';
 import { useTour } from '@/hooks/useTour';
 import { useStudentMetrics, type StudentMetrics } from '@/lib/assessments';
+import { buildInsights, type StudentInsight } from '@/lib/insights';
 import { useSession } from '@/lib/session';
 import type { Student } from '@/lib/students/types';
 import { ZONE_BASIS, zoneOf, type ZoneResult } from '@/lib/students/zones';
@@ -104,7 +105,7 @@ function rowZone(cells: Record<PlatformId, Cell>): ZoneResult | null {
   return zoneOf(solved);
 }
 
-function toReportRow(row: StudentRow): CampusReportRow {
+function toReportRow(row: StudentRow, insight: StudentInsight): CampusReportRow {
   const values = Object.fromEntries(
     PLATFORM_IDS.map((platform): [PlatformId, ReportValue] => {
       const cell = row.cells[platform];
@@ -124,6 +125,8 @@ function toReportRow(row: StudentRow): CampusReportRow {
     total: row.total,
     zone: row.zone ?? { zone: 'none' },
     lastActive: row.lastActive?.day,
+    insight,
+    metrics: row.metrics,
   };
 }
 
@@ -194,17 +197,30 @@ export default function StudentsPage() {
 
   // The report covers every student in the chosen campus (or every campus) and batch/course
   // filters, so it waits until every profile has loaded and ignores the name search and zone
-  // filter. Without a campus it covers all campuses, one after another.
+  // filter. Without a campus it covers all campuses, one after another. It also waits for
+  // attendance, tests and AMCAT, but goes ahead without them if they could not be loaded.
   const reportBlocker = search.q
     ? 'Clear the name search so the report includes every student.'
-    : summaries.settled < summaries.total
+    : // A few platform lookups can hang for a long time; past 99.5% the report goes ahead and
+      // those profiles show without numbers.
+      summaries.total - summaries.settled > Math.max(3, Math.floor(summaries.total * 0.005))
       ? `Loading profiles: ${summaries.settled} of ${summaries.total}.`
-      : undefined;
+      : metrics.isPending
+        ? 'Loading attendance, tests and AMCAT.'
+        : undefined;
 
   const downloadReport = async () => {
     setReportState('busy');
     try {
       const { downloadCampusReport } = await import('@/reports');
+      // The 360° view of each student, from the coding numbers and LMS metrics already loaded.
+      const insights = new Map(
+        buildInsights(
+          filtered,
+          metrics.data?.students,
+          (platform, handle) => summaries.byKey.get(summaryKey(platform, handle))?.data
+        ).map((insight) => [insight.student, insight])
+      );
       await downloadCampusReport({
         origin: window.location.origin,
         title: search.campus ?? 'All campuses',
@@ -212,7 +228,7 @@ export default function StudentsPage() {
           (value): value is string => Boolean(value)
         ),
         generatedAt: new Date(),
-        rows: rows.map(toReportRow),
+        rows: rows.map((row) => toReportRow(row, insights.get(row.student)!)),
         allCampuses: !search.campus,
       });
       setReportState('idle');

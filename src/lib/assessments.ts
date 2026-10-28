@@ -417,10 +417,11 @@ export interface StudentMetrics {
   exam_avg: number | null;
 }
 
-export const useStudentMetrics = () =>
+export const useStudentMetrics = (enabled = true) =>
   useQuery({
     queryKey: ['assessments', 'metrics'],
     queryFn: () => get<{ students: Record<string, StudentMetrics> }>({ view: 'metrics' }),
+    enabled,
     staleTime: 10 * 60_000,
     retry: false,
   });

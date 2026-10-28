@@ -32,6 +32,8 @@ import { StatusTags } from '@/components/students/StatusTags';
 import { useCodingProfiles } from '@/hooks/useCodingProfiles';
 import { useTour } from '@/hooks/useTour';
 import { useStudents } from '@/hooks/useStudents';
+import { useStudentAssessments, useStudentMetrics } from '@/lib/assessments';
+import { buildInsights } from '@/lib/insights';
 import { useSession } from '@/lib/session';
 import {
   ProfileError,
@@ -136,13 +138,28 @@ export function ProfileView({ name, handles, student, onSubmit, view, onView }: 
 
   const shareUrl = student ? `${window.location.origin}/s/${student.slug}` : undefined;
 
+  // Staff reports add the student's LMS record and 360° scores (the same cached queries as the
+  // Assessments and Attendance sections).
+  const assessments = useStudentAssessments(showCategories ? student?.slug : undefined);
+  const metrics = useStudentMetrics(showCategories);
+
   // The PDF is drawn from what this page has loaded, so it waits for every platform.
-  const stillLoading = results.some(({ query }) => query.isPending);
+  const stillLoading =
+    results.some(({ query }) => query.isPending) ||
+    (showCategories && (assessments.isPending || metrics.isPending));
   const [pdfState, setPdfState] = useState<'idle' | 'busy' | 'failed'>('idle');
   const downloadPdf = async () => {
     setPdfState('busy');
     try {
       const { downloadStudentReport } = await import('@/reports');
+      // Coding counts come from the profiles on this page rather than the saved summaries.
+      const [insight] =
+        student && showCategories
+          ? buildInsights([student], metrics.data?.students, (platform) => {
+              const profile = loaded.find((item) => item.platform === platform);
+              return profile && profile.solved !== null ? { value: profile.solved } : undefined;
+            })
+          : [];
       await downloadStudentReport({
         origin: window.location.origin,
         name: name ?? student?.name ?? 'Coding profile',
@@ -151,6 +168,9 @@ export function ProfileView({ name, handles, student, onSubmit, view, onView }: 
         batch: student?.batch && student.batch !== 'Not specified' ? student.batch : undefined,
         generatedAt: new Date(),
         profiles: loaded,
+        insight,
+        metrics: student ? metrics.data?.students[student.slug] : undefined,
+        assessments: assessments.data,
       });
       setPdfState('idle');
     } catch (error) {
@@ -174,9 +194,9 @@ export function ProfileView({ name, handles, student, onSubmit, view, onView }: 
             platform={active?.platform.name}
             onOverview={() => setTab('overview')}
           />
-          {hasHandles && (
+          {(hasHandles || showCategories) && (
             <div className="flex flex-wrap gap-2">
-              {student && (
+              {student && hasHandles && (
                 <Link
                   to="/s/$slug/card"
                   params={{ slug: student.slug }}
@@ -189,12 +209,14 @@ export function ProfileView({ name, handles, student, onSubmit, view, onView }: 
               <button
                 type="button"
                 onClick={downloadPdf}
-                disabled={stillLoading || loaded.length === 0 || pdfState === 'busy'}
+                disabled={
+                  stillLoading || (loaded.length === 0 && !assessments.data) || pdfState === 'busy'
+                }
                 title={
                   pdfState === 'failed'
                     ? 'The PDF could not be created. Try again.'
                     : stillLoading
-                      ? 'Available once every platform has loaded'
+                      ? 'Available once every platform and the LMS record have loaded'
                       : 'Download this profile as a PDF report'
                 }
                 className="text-brand-800 hover:bg-brand-50 inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold disabled:opacity-60"

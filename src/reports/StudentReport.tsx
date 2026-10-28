@@ -1,10 +1,14 @@
 import { Document, Image, Page, Text, View } from '@react-pdf/renderer';
 
+import type { StudentAssessmentsData, StudentMetrics } from '@/lib/assessments';
 import { activityWindows, mergeCalendars, streaksOf } from '@/lib/coding-profiles/activity';
 import { PLATFORMS } from '@/lib/coding-profiles/platforms';
 import type { CodingProfile, PlatformId } from '@/lib/coding-profiles/types';
+import { BAND_COLORS, DIMENSIONS, bandOf, type StudentInsight } from '@/lib/insights';
 import { zoneById, zoneOf } from '@/lib/students/zones';
+import { AssessmentPages, AssessmentSections } from '@/reports/StudentAssessments';
 import {
+  BAND_LABELS,
   Bar,
   LINE,
   MUTED,
@@ -14,6 +18,9 @@ import {
   StatTile,
   base,
   formatNumber,
+  frontValue,
+  overallColor,
+  tint,
 } from '@/reports/shared';
 
 export interface StudentReportData {
@@ -24,6 +31,12 @@ export interface StudentReportData {
   batch?: string;
   generatedAt: Date;
   profiles: CodingProfile[];
+  /** The five fronts of the 360° view; only for students on the sheet, seen by staff. */
+  insight?: StudentInsight;
+  /** The student's line in the LMS metrics (attendance, tests, AMCAT, exams). */
+  metrics?: StudentMetrics;
+  /** PRIME tests, exams, AMCAT sittings and attendance from the LMS. */
+  assessments?: StudentAssessmentsData;
 }
 
 const HEAT = ['#eef2f6', '#b5cae6', '#86a6d3', '#3863a0', '#1a3e70'];
@@ -70,11 +83,14 @@ export function StudentReport({ data }: { data: StudentReportData }) {
   }
 
   return (
-    <Document title={`Sunstone PRIME Vertex – ${data.name}`} author="Sunstone PRIME">
+    <Document
+      title={`Sunstone PRIME Vertex – ${data.name} – Progress Report`}
+      author="Sunstone PRIME"
+    >
       <Page size="A4" style={base.page}>
         <ReportHeader
           origin={data.origin}
-          kind="Student Coding Report"
+          kind="Student Progress Report"
           generatedAt={data.generatedAt}
         />
         <View style={{ paddingHorizontal: 32, paddingTop: 18 }}>
@@ -126,71 +142,188 @@ export function StudentReport({ data }: { data: StudentReportData }) {
             </View>
           </View>
 
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
-            <StatTile
-              width="32%"
-              label="Problems solved"
-              value={formatNumber(solved)}
-              hint="all platforms"
-            />
-            <StatTile width="32%" label="Active days" value={formatNumber(streaks.activeDays)} />
-            <StatTile
-              width="32%"
-              label="Streak"
-              value={`${streaks.current}d`}
-              hint={`best ${streaks.best} days`}
-            />
-            <StatTile width="32%" label="Contests" value={formatNumber(contests)} />
-            <StatTile
-              width="32%"
-              label="Top contest rating"
-              value={rated[0] ? formatNumber(rated[0].rating!.current!) : '—'}
-              hint={rated[0] ? platformOf(rated[0].platform).name : 'no rated contests'}
-            />
-            <StatTile
-              width="32%"
-              label="Last 30 days"
-              value={formatNumber(windows[2].value)}
-              hint={`submissions · ${formatNumber(windows[1].value)} in the last 7 days`}
-            />
-          </View>
+          {data.insight ? <FrontsStrip insight={data.insight} metrics={data.metrics} /> : null}
 
-          {/* Activity heatmap */}
-          <View style={{ marginTop: 16, backgroundColor: SOFT, borderRadius: 8, padding: 12 }}>
-            <Text style={{ fontSize: 10, fontWeight: 700, marginBottom: 8 }}>
-              Activity in the last year, all platforms
+          <Text style={[base.sectionTitle, { marginTop: 16, marginBottom: 0 }]}>
+            Coding practice
+          </Text>
+          {profiles.length === 0 ? (
+            <Text style={{ fontSize: 8.5, color: MUTED, marginTop: 6 }}>
+              No coding profile to show: no username on any platform, or none could be loaded.
             </Text>
-            <View style={{ flexDirection: 'row', gap: 1.6 }}>
-              {weeks.map((week, index) => (
-                <View key={index} style={{ gap: 1.6 }}>
-                  {week.map((day) => (
-                    <View
-                      key={day.date}
-                      style={{
-                        width: 6.6,
-                        height: 6.6,
-                        borderRadius: 1.2,
-                        backgroundColor: HEAT[level(day.count)],
-                      }}
-                    />
+          ) : (
+            <>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                <StatTile
+                  width="32%"
+                  label="Problems solved"
+                  value={formatNumber(solved)}
+                  hint="all platforms"
+                />
+                <StatTile
+                  width="32%"
+                  label="Active days"
+                  value={formatNumber(streaks.activeDays)}
+                />
+                <StatTile
+                  width="32%"
+                  label="Streak"
+                  value={`${streaks.current}d`}
+                  hint={`best ${streaks.best} days`}
+                />
+                <StatTile width="32%" label="Contests" value={formatNumber(contests)} />
+                <StatTile
+                  width="32%"
+                  label="Top contest rating"
+                  value={rated[0] ? formatNumber(rated[0].rating!.current!) : '—'}
+                  hint={rated[0] ? platformOf(rated[0].platform).name : 'no rated contests'}
+                />
+                <StatTile
+                  width="32%"
+                  label="Last 30 days"
+                  value={formatNumber(windows[2].value)}
+                  hint={`submissions · ${formatNumber(windows[1].value)} in the last 7 days`}
+                />
+              </View>
+
+              {/* Activity heatmap */}
+              <View style={{ marginTop: 16, backgroundColor: SOFT, borderRadius: 8, padding: 12 }}>
+                <Text style={{ fontSize: 10, fontWeight: 700, marginBottom: 8 }}>
+                  Activity in the last year, all platforms
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 1.6 }}>
+                  {weeks.map((week, index) => (
+                    <View key={index} style={{ gap: 1.6 }}>
+                      {week.map((day) => (
+                        <View
+                          key={day.date}
+                          style={{
+                            width: 6.6,
+                            height: 6.6,
+                            borderRadius: 1.2,
+                            backgroundColor: HEAT[level(day.count)],
+                          }}
+                        />
+                      ))}
+                    </View>
                   ))}
                 </View>
-              ))}
-            </View>
-            <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 6 }}>
-              {formatNumber(streaks.activeDays)} active days · best streak {streaks.best} · current
-              streak {streaks.current}
-            </Text>
-          </View>
+                <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 6 }}>
+                  {formatNumber(streaks.activeDays)} active days · best streak {streaks.best} ·
+                  current streak {streaks.current}
+                </Text>
+              </View>
 
-          <Text style={[base.sectionTitle, { marginTop: 18 }]}>Platforms</Text>
-          {profiles.map((profile) => (
-            <PlatformSection key={profile.platform} profile={profile} origin={data.origin} />
-          ))}
+              <Text style={[base.sectionTitle, { marginTop: 18 }]}>Platforms</Text>
+              {profiles.map((profile) => (
+                <PlatformSection key={profile.platform} profile={profile} origin={data.origin} />
+              ))}
+            </>
+          )}
+          {/* Without coding profiles, the LMS record follows on the same page. */}
+          {data.assessments && profiles.length === 0 ? (
+            <AssessmentSections assessments={data.assessments} metrics={data.metrics} />
+          ) : null}
         </View>
         <ReportFooter label={data.name} />
       </Page>
+      {data.assessments && profiles.length > 0 ? (
+        <AssessmentPages assessments={data.assessments} metrics={data.metrics} name={data.name} />
+      ) : null}
     </Document>
+  );
+}
+
+/** The overall score and the five fronts, each coloured by its band. */
+function FrontsStrip({ insight, metrics }: { insight: StudentInsight; metrics?: StudentMetrics }) {
+  const notes: Record<string, string | undefined> = {
+    coding: insight.solved !== null ? `${formatNumber(insight.solved)} solved` : 'No DSA profile',
+    attendance:
+      metrics?.prime_attendance != null ? `PRIME ${metrics.prime_attendance}%` : undefined,
+    tests: metrics?.released
+      ? `${metrics.submitted ?? 0} of ${metrics.released} submitted`
+      : undefined,
+    amcat: metrics?.amcat?.length
+      ? `${metrics.amcat.length} sitting${metrics.amcat.length === 1 ? '' : 's'}`
+      : 'Not taken yet',
+    exams: 'Midterms, end-term',
+  };
+  const overall = overallColor(insight.overall);
+  return (
+    <View style={{ marginTop: 14 }}>
+      <Text style={[base.sectionTitle, { marginBottom: 6 }]}>360° view</Text>
+      <View style={{ flexDirection: 'row', gap: 6 }}>
+        <View
+          style={{
+            flexGrow: 1,
+            flexBasis: 0,
+            backgroundColor: tint(overall, 0.1),
+            borderRadius: 6,
+            borderTopWidth: 2.5,
+            borderTopColor: overall,
+            padding: 7,
+          }}
+        >
+          <Text style={{ fontSize: 6.5, fontWeight: 700, color: MUTED, letterSpacing: 0.5 }}>
+            OVERALL
+          </Text>
+          <Text style={{ fontSize: 16, fontWeight: 800, color: overall, marginTop: 2 }}>
+            {insight.overall ?? '—'}
+          </Text>
+          <Text style={{ fontSize: 6, color: MUTED, marginTop: 1 }}>
+            {insight.risks.length
+              ? `At risk on ${insight.risks.length} front${insight.risks.length === 1 ? '' : 's'}`
+              : 'Average of the fronts'}
+          </Text>
+        </View>
+        {DIMENSIONS.map((dimension) => {
+          const value = insight.scores[dimension.id];
+          const band = bandOf(dimension, value);
+          const shown =
+            dimension.id === 'coding' && insight.solved !== null ? insight.solved : value;
+          return (
+            <View
+              key={dimension.id}
+              style={{
+                flexGrow: 1,
+                flexBasis: 0,
+                borderWidth: 0.75,
+                borderColor: LINE,
+                borderTopWidth: 2.5,
+                borderTopColor: dimension.color,
+                borderRadius: 6,
+                padding: 7,
+              }}
+            >
+              <Text style={{ fontSize: 6.5, fontWeight: 700, color: MUTED, letterSpacing: 0.5 }}>
+                {dimension.short.toUpperCase()}
+              </Text>
+              <Text
+                style={{ fontSize: 14, fontWeight: 800, color: BAND_COLORS[band], marginTop: 2 }}
+              >
+                {frontValue(dimension, shown)}
+              </Text>
+              <Text style={{ fontSize: 6.5, fontWeight: 700, color: BAND_COLORS[band] }}>
+                {BAND_LABELS[band]}
+              </Text>
+              {notes[dimension.id] ? (
+                <Text style={{ fontSize: 6, color: MUTED, marginTop: 1 }}>
+                  {notes[dimension.id]}
+                </Text>
+              ) : null}
+            </View>
+          );
+        })}
+      </View>
+      <Text style={{ fontSize: 6.5, color: MUTED, marginTop: 4 }}>
+        Doing well from / at risk under:{' '}
+        {DIMENSIONS.map(
+          (dimension) =>
+            `${dimension.short} ${dimension.good}${dimension.suffix} / ${dimension.risk}${dimension.suffix}`
+        ).join(' · ')}
+        . Coding counts the best solved count on one DSA platform.
+      </Text>
+    </View>
   );
 }
 

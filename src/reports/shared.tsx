@@ -3,6 +3,8 @@
 
 import { Font, Image, StyleSheet, Text, View } from '@react-pdf/renderer';
 
+import { BAND_COLORS, type Band, type Dimension } from '@/lib/insights';
+
 export const NAVY = '#1a3e70';
 export const NAVY_DARK = '#102646';
 export const GOLD = '#f59e0b';
@@ -189,6 +191,94 @@ export function Bar({
           borderRadius: height,
         }}
       />
+    </View>
+  );
+}
+
+/** A hex colour at `opacity`, for light tinted backgrounds. */
+export function tint(hex: string, opacity: number) {
+  const value = parseInt(hex.slice(1), 16);
+  return `rgba(${(value >> 16) & 255},${(value >> 8) & 255},${value & 255},${opacity})`;
+}
+
+/** A front's score with its unit, or a dash when there is no data. */
+export const frontValue = (dimension: Dimension, value: number | null | undefined) =>
+  value == null ? '—' : `${formatNumber(value)}${dimension.suffix}`;
+
+export const BAND_LABELS: Record<Band, string> = {
+  good: 'Doing well',
+  ok: 'Average',
+  risk: 'At risk',
+  none: 'No data',
+};
+
+/** The overall score (mean of the fronts) is banded like the 360° page: 70+ well, under 50 at risk. */
+export const overallColor = (value: number | null) =>
+  value === null
+    ? BAND_COLORS.none
+    : value >= 70
+      ? BAND_COLORS.good
+      : value >= 50
+        ? BAND_COLORS.ok
+        : BAND_COLORS.risk;
+
+/** Green / amber / red swatches with their meaning. */
+export function BandLegend() {
+  return (
+    <View style={{ flexDirection: 'row', gap: 10 }}>
+      {(['good', 'ok', 'risk'] as const).map((band) => (
+        <View key={band} style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: 1.5,
+              backgroundColor: BAND_COLORS[band],
+              marginRight: 3,
+            }}
+          />
+          <Text style={{ fontSize: 7, color: MUTED }}>{BAND_LABELS[band]}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** A score in a tinted box coloured by its band; a plain dash when there is no data. */
+export function BandCell({
+  text,
+  color,
+  width,
+  note,
+  strong = false,
+}: {
+  text: string | null;
+  color: string;
+  width: number;
+  note?: string;
+  strong?: boolean;
+}) {
+  return (
+    <View style={{ width, paddingHorizontal: 2 }}>
+      {text === null ? (
+        <Text style={{ textAlign: 'center', color: '#cbd5e1' }}>—</Text>
+      ) : (
+        <View style={{ backgroundColor: tint(color, 0.12), borderRadius: 3, paddingVertical: 2.5 }}>
+          <Text
+            style={{
+              textAlign: 'center',
+              color,
+              fontWeight: 700,
+              fontSize: strong ? 9.5 : 8.5,
+            }}
+          >
+            {text}
+          </Text>
+          {note ? (
+            <Text style={{ textAlign: 'center', color, fontSize: 5.5, opacity: 0.8 }}>{note}</Text>
+          ) : null}
+        </View>
+      )}
     </View>
   );
 }

@@ -1,8 +1,11 @@
 import { Document, Image, Page, Text, View } from '@react-pdf/renderer';
 
+import { lmsDate, type StudentMetrics } from '@/lib/assessments';
 import { PLATFORMS } from '@/lib/coding-profiles/platforms';
 import type { PlatformId } from '@/lib/coding-profiles/types';
+import { BAND_COLORS, bandOf, dimensionById, type StudentInsight } from '@/lib/insights';
 import { ZONE_BASIS, ZONES, zoneById, type ZoneResult } from '@/lib/students/zones';
+import { HealthComparisonPage, InsightsPage } from '@/reports/Insights';
 import {
   INK,
   LINE,
@@ -30,6 +33,10 @@ export interface CampusReportRow {
   zone: ZoneResult;
   /** YYYY-MM-DD. */
   lastActive?: string;
+  /** The student on the five fronts of the 360° view. */
+  insight: StudentInsight;
+  /** Attendance, PRIME tests, AMCAT and exams from the LMS, when there are any. */
+  metrics?: StudentMetrics;
 }
 
 export interface CampusReportData {
@@ -92,31 +99,43 @@ function cellText(value: ReportValue) {
 
 // Column widths for the zone tables, in points (A4 landscape leaves ~778pt inside margins).
 const COLUMNS = {
-  index: 22,
-  student: 180,
-  basis: 86,
-  platform: 60,
-  total: 52,
-  active: 64,
+  index: 20,
+  student: 128,
+  basis: 78,
+  platform: 46,
+  total: 44,
+  active: 50,
+  /** Attendance, PRIME tests, AMCAT and exams. */
+  front: 44,
+  exams: 36,
 };
+
+const ATTENDANCE = dimensionById('attendance');
+const TESTS = dimensionById('tests');
+const AMCAT = dimensionById('amcat');
+const EXAMS = dimensionById('exams');
+
+/** "2026-08-21" → "Aug 2026". */
+const monthOf = (day: string) => lmsDate(day).replace(/^\d+ /, '');
 
 export function CampusReport({ data }: { data: CampusReportData }) {
   const label = [data.title, ...data.filters].join(' · ');
   const document = (children: React.ReactNode) => (
     <Document
-      title={`Sunstone PRIME Vertex – Coding Report – ${label}`}
+      title={`Sunstone PRIME Vertex – Progress Report – ${label}`}
       author="Sunstone PRIME"
-      subject="Students by coding practice zone"
+      subject="Coding practice, attendance, PRIME tests, AMCAT and internal exams"
     >
       {children}
     </Document>
   );
 
   if (!data.allCampuses) {
-    return document(<CampusPages data={data} kind="Campus Coding Report" withHeader />);
+    return document(<CampusPages data={data} kind="Campus Progress Report" withHeader />);
   }
 
-  // All campuses: overall summary, campus comparison, then every campus's own pages.
+  // All campuses: overall summary and 360°, the two campus comparisons, then every campus's
+  // own pages.
   const campuses = [...new Set(data.rows.map((row) => row.campus))].sort(
     (a, b) =>
       data.rows.filter((row) => row.campus === b).length -
@@ -124,13 +143,14 @@ export function CampusReport({ data }: { data: CampusReportData }) {
   );
   return document(
     <>
-      <CampusPages data={data} kind="All-Campus Coding Report" withHeader summaryOnly />
+      <CampusPages data={data} kind="All-Campus Progress Report" withHeader summaryOnly />
       <ComparisonPage data={data} campuses={campuses} label={label} />
+      <HealthComparisonPage insights={data.rows.map((row) => row.insight)} label={label} />
       {campuses.map((campus) => (
         <CampusPages
           key={campus}
           data={{ ...data, title: campus, rows: data.rows.filter((row) => row.campus === campus) }}
-          kind="Campus Coding Report"
+          kind="Campus Progress Report"
         />
       ))}
     </>
@@ -138,7 +158,7 @@ export function CampusReport({ data }: { data: CampusReportData }) {
 }
 
 /**
- * A campus's summary page and its zone tables. `withHeader` draws the navy branded band
+ * A campus's summary page, its 360° page and its zone tables. `withHeader` draws the navy branded band
  * (the first page of the file); later campuses start with a compact title instead.
  */
 function CampusPages({
@@ -331,6 +351,16 @@ function CampusPages({
         </View>
         <ReportFooter label={label} />
       </Page>
+
+      {/* ── 360°: the five fronts, pain points, who needs attention ── */}
+      <InsightsPage
+        title={data.title}
+        insights={rows.map((row) => row.insight)}
+        groupKey={(row) => (summaryOnly ? row.student.campus : row.student.batch)}
+        groupNoun={summaryOnly ? 'campuses' : 'batches'}
+        showCampus={summaryOnly}
+        label={label}
+      />
 
       {/* ── One section per zone ── */}
       {!summaryOnly && (
@@ -547,27 +577,38 @@ function TableHeader({ origin }: { origin: string }) {
       <Text style={[headerCell, { width: COLUMNS.student }]}>STUDENT</Text>
       <Text style={[headerCell, { width: COLUMNS.basis }]}>ZONE BASED ON</Text>
       {PLATFORMS.map((platform) => (
-        <View
-          key={platform.id}
-          style={{
-            width: COLUMNS.platform,
-            flexDirection: 'row',
-            justifyContent: 'flex-end',
-            alignItems: 'center',
-          }}
-        >
+        <View key={platform.id} style={{ width: COLUMNS.platform, alignItems: 'flex-end' }}>
           <PlatformMark origin={origin} id={platform.id} />
-          <Text style={headerCell}>{SHORT[platform.id]}</Text>
+          <Text style={[headerCell, { fontSize: 6.5, letterSpacing: 0, marginTop: 1.5 }]}>
+            {SHORT[platform.id]}
+          </Text>
         </View>
       ))}
       <Text style={[headerCell, { width: COLUMNS.total, textAlign: 'right' }]}>TOTAL</Text>
-      <Text style={[headerCell, { width: COLUMNS.active, textAlign: 'right' }]}>LAST ACTIVE</Text>
+      <Text style={[headerCell, { width: COLUMNS.active, textAlign: 'right' }]}>
+        LAST{'\n'}ACTIVE
+      </Text>
+      {/* From the LMS: coloured by the 360° bands. */}
+      <View
+        style={{
+          flexDirection: 'row',
+          marginLeft: 5,
+          borderLeftWidth: 0.75,
+          borderLeftColor: LINE,
+        }}
+      >
+        <Text style={[headerCell, { width: COLUMNS.front, textAlign: 'right' }]}>ATTEND.</Text>
+        <Text style={[headerCell, { width: COLUMNS.front, textAlign: 'right' }]}>TESTS</Text>
+        <Text style={[headerCell, { width: COLUMNS.front, textAlign: 'right' }]}>AMCAT</Text>
+        <Text style={[headerCell, { width: COLUMNS.exams, textAlign: 'right' }]}>EXAMS</Text>
+      </View>
     </View>
   );
 }
 
 function TableRow({ row, index, origin }: { row: CampusReportRow; index: number; origin: string }) {
   const zone = zoneById(row.zone.zone);
+  const amcat = row.metrics?.amcat?.at(-1);
   return (
     <View
       wrap={false}
@@ -634,6 +675,78 @@ function TableRow({ row, index, origin }: { row: CampusReportRow; index: number;
           {lastActiveLabel(row.lastActive)}
         </Text>
       </View>
+      <View
+        style={{
+          flexDirection: 'row',
+          marginLeft: 5,
+          borderLeftWidth: 0.75,
+          borderLeftColor: LINE,
+        }}
+      >
+        <FrontCell
+          width={COLUMNS.front}
+          value={row.metrics?.attendance}
+          suffix="%"
+          color={BAND_COLORS[bandOf(ATTENDANCE, row.metrics?.attendance)]}
+          note={
+            row.metrics?.prime_attendance != null
+              ? `PRIME ${row.metrics.prime_attendance}%`
+              : undefined
+          }
+        />
+        <FrontCell
+          width={COLUMNS.front}
+          value={row.metrics?.test_avg}
+          suffix="%"
+          color={BAND_COLORS[bandOf(TESTS, row.metrics?.test_avg)]}
+          note={
+            row.metrics?.released
+              ? `${row.metrics.submitted ?? 0} of ${row.metrics.released}`
+              : undefined
+          }
+        />
+        <FrontCell
+          width={COLUMNS.front}
+          value={amcat?.[1]}
+          color={BAND_COLORS[bandOf(AMCAT, amcat?.[1])]}
+          note={amcat ? monthOf(amcat[0]) : undefined}
+        />
+        <FrontCell
+          width={COLUMNS.exams}
+          value={row.metrics?.exam_avg}
+          suffix="%"
+          color={BAND_COLORS[bandOf(EXAMS, row.metrics?.exam_avg)]}
+        />
+      </View>
+    </View>
+  );
+}
+
+/** A score from the LMS with a small note under it, or a dash when there is none. */
+function FrontCell({
+  width,
+  value,
+  suffix = '',
+  color,
+  note,
+}: {
+  width: number;
+  value: number | null | undefined;
+  suffix?: string;
+  color: string;
+  note?: string;
+}) {
+  return (
+    <View style={{ width, alignItems: 'flex-end' }}>
+      {value == null ? (
+        <Text style={{ color: '#cbd5e1' }}>—</Text>
+      ) : (
+        <Text style={{ fontWeight: 700, color }}>
+          {formatNumber(value)}
+          {suffix}
+        </Text>
+      )}
+      {note ? <Text style={{ fontSize: 6, color: MUTED }}>{note}</Text> : null}
     </View>
   );
 }
