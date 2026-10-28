@@ -585,3 +585,31 @@ html.splash-gone .rise-stagger > * {
     }
   }
 }
+
+/* The bell rocks gently when there is something unread. */
+@keyframes bell-ring {
+  0%,
+  60%,
+  100% {
+    transform: rotate(0);
+  }
+  10%,
+  30% {
+    transform: rotate(14deg);
+  }
+  20%,
+  40% {
+    transform: rotate(-12deg);
+  }
+  50% {
+    transform: rotate(6deg);
+  }
+}
+
+@utility bell-ring {
+  transform-origin: 50% 10%;
+  animation: bell-ring 2.4s ease-in-out 3;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}

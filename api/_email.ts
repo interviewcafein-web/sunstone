@@ -217,3 +217,105 @@ Sunstone PRIME Vertex`;
 
   return { subject, text, html };
 }
+
+/** Sends many emails at once through Resend's batch endpoint (up to 100 per request). */
+export async function sendEmails(emails: Email[]): Promise<number> {
+  const key = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM;
+  if (!key || !from) {
+    if (process.env.VERCEL)
+      throw new Error('Email is not configured (RESEND_API_KEY, EMAIL_FROM).');
+    for (const email of emails) console.log(`\n[email to ${email.to}] ${email.subject}\n`);
+    return emails.length;
+  }
+  let sent = 0;
+  for (let start = 0; start < emails.length; start += 100) {
+    const chunk = emails.slice(start, start + 100);
+    const response = await fetch('https://api.resend.com/emails/batch', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(
+        chunk.map(({ to, subject, text, html }) => ({ from, to: [to], subject, text, html }))
+      ),
+    });
+    if (!response.ok) {
+      throw new Error(`Resend ${response.status}: ${(await response.text()).slice(0, 300)}`);
+    }
+    sent += chunk.length;
+  }
+  return sent;
+}
+
+const LEVEL_STYLE = {
+  info: { label: 'Update', color: '#274f87', tint: '#eef3fa' },
+  important: { label: 'Important', color: '#b45309', tint: '#fffbeb' },
+  urgent: { label: 'Urgent', color: '#b91c1c', tint: '#fef2f2' },
+} as const;
+
+/** A notification from the bell, as an email: the same branded frame as the welcome email. */
+export function notificationEmail({
+  title,
+  body,
+  link,
+  level,
+  sender,
+}: {
+  title: string;
+  body: string;
+  /** Absolute URL, or a path on the site. */
+  link?: string | null;
+  level: keyof typeof LEVEL_STYLE;
+  sender?: string | null;
+}) {
+  const style = LEVEL_STYLE[level];
+  const url = link ? (link.startsWith('/') ? `${SITE}${link}` : link) : `${SITE}/`;
+  const subject = level === 'info' ? title : `${style.label}: ${title}`;
+  const text = `${style.label.toUpperCase()}: ${title}
+
+${body}
+
+Open: ${url}
+${sender ? `\nSent by ${sender} on Sunstone PRIME Vertex.` : ''}`;
+
+  const paragraphs = escape(body)
+    .split(/\n{2,}/)
+    .map(
+      (paragraph) =>
+        `<p style="margin:0 0 12px;font-size:15px;line-height:24px;color:#334155">${paragraph.replace(/\n/g, '<br>')}</p>`
+    )
+    .join('');
+
+  const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light"><title>${escape(subject)}</title></head>
+<body style="margin:0;padding:0;background:#eef2f7;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">${escape(body.slice(0, 140))}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef2f7;padding:28px 12px">
+<tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 10px 40px rgba(16,38,70,0.12)">
+  <tr><td bgcolor="#102646" style="background:#102646;background-image:linear-gradient(135deg,#1a3e70 0%,#15325b 55%,#102646 100%);padding:24px 32px;text-align:left">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td><img src="${SITE}/vertex-logo-white.png" width="120" alt="Vertex" style="display:block;width:120px;height:auto;border:0"></td>
+      <td align="right" style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#b5cae6">🔔 Notification</td>
+    </tr></table>
+  </td></tr>
+  <tr><td style="padding:30px 32px 6px">
+    <span style="display:inline-block;padding:4px 10px;border-radius:999px;background:${style.tint};color:${style.color};font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase">${style.label}</span>
+    <div style="margin-top:12px;font-size:22px;line-height:30px;font-weight:bold;color:#0f172a">${escape(title)}</div>
+  </td></tr>
+  <tr><td style="padding:12px 32px 4px">${paragraphs}</td></tr>
+  <tr><td style="padding:12px 32px 30px">
+    <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+      <td bgcolor="#1a3e70" style="border-radius:12px;background:#1a3e70;background-image:linear-gradient(135deg,#274f87,#102646)">
+        <a href="${escape(url)}" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:12px">${link ? 'Open in Vertex' : 'Open Vertex'} &nbsp;&rarr;</a>
+      </td>
+    </tr></table>
+  </td></tr>
+  <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:18px 32px;text-align:center;font-size:12px;line-height:18px;color:#64748b">
+    ${sender ? `Sent by ${escape(sender)} · ` : ''}Also in the 🔔 bell on <a href="${SITE}" style="color:#274f87">vertex.sunstone.in</a>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+  return { subject, text, html };
+}

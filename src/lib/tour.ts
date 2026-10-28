@@ -57,6 +57,12 @@ const TOURS: Record<TourId, Step[]> = {
       side: 'bottom',
     },
     {
+      target: 'bell',
+      title: 'Notifications',
+      text: 'Important updates from HQ land here, and by email too when they matter.',
+      side: 'bottom',
+    },
+    {
       target: 'account',
       title: 'Your account',
       text: 'Your profile, the team (for HQ), sign out, and this tour again whenever you need it.',

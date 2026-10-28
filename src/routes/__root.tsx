@@ -2,6 +2,7 @@ import { Link, Outlet, createRootRoute } from '@tanstack/react-router';
 import { Building2, Library, LogIn, Radar, Users } from 'lucide-react';
 
 import { BrandLockup } from '@/components/common/BrandLockup';
+import { NotificationBell } from '@/components/common/NotificationBell';
 import { ProfileMenu } from '@/components/common/ProfileMenu';
 import { VertexLogo } from '@/components/common/VertexLogo';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
@@ -87,6 +88,9 @@ function RootComponent() {
               </span>
               {user && (
                 <>
+                  <span data-tour="bell" className="inline-flex">
+                    <NotificationBell />
+                  </span>
                   <span aria-hidden className="mx-1 h-6 w-px bg-slate-200" />
                   <ProfileMenu user={user} onLogOut={logOut} />
                 </>
