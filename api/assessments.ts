@@ -15,6 +15,7 @@
 
 import { type Viewer, json, seesCampus, sessionViewer } from './_auth';
 import { db } from './_db';
+import { integrityOf } from '../src/lib/integrity';
 
 export const config = { runtime: 'edge' };
 
@@ -157,9 +158,12 @@ interface GroupRow {
   submitted: number;
   avg_pct: number | null;
   top_pct: number | null;
+  perfect: number;
+  avg_exact: number | null;
+  spread: number | null;
 }
 
-async function campus(campusId: number, batch: number | null) {
+export async function campus(campusId: number, batch: number | null) {
   const params = [campusId, batch];
   const [{ now }] = await db().query(`select ${NOW}::text as now`);
 
@@ -169,7 +173,9 @@ async function campus(campusId: number, batch: number | null) {
     `with ${SCOPE},
      stats as (
        select test_id, count(*)::int as eligible, count(*) filter (where submitted)::int as submitted,
-              sum(pct) filter (where submitted) as pct_sum, max(pct) filter (where submitted) as top
+              sum(pct) filter (where submitted) as pct_sum, max(pct) filter (where submitted) as top,
+              sum(pct * pct) filter (where submitted) as pct_sq_sum,
+              count(*) filter (where submitted and pct >= 99.5)::int as perfect
        from res group by test_id),
      released as (
        select test_id, min(release_at) as first_at, max(release_at) as last_at, max(due_at) as due_at
@@ -184,7 +190,11 @@ async function campus(campusId: number, batch: number | null) {
             coalesce(sum(st.eligible), 0)::int as eligible,
             coalesce(sum(st.submitted), 0)::int as submitted,
             round(sum(st.pct_sum) / nullif(sum(st.submitted), 0))::int as avg_pct,
-            round(max(st.top))::int as top_pct
+            round(max(st.top))::int as top_pct,
+            coalesce(sum(st.perfect), 0)::int as perfect,
+            (sum(st.pct_sum) / nullif(sum(st.submitted), 0))::float8 as avg_exact,
+            sqrt(greatest(sum(st.pct_sq_sum) / nullif(sum(st.submitted), 0)
+              - power(sum(st.pct_sum) / nullif(sum(st.submitted), 0), 2), 0))::float8 as spread
      from lms_test_placements p
      join lms_tests t on t.id = p.test_id
      join lms_courses c on c.id = p.course_id
@@ -219,7 +229,18 @@ async function campus(campusId: number, batch: number | null) {
   );
 
   const tests = groups
-    .map((group) => ({ ...group, status: statusOf(group.released_at, group.due_at, now) }))
+    .map(({ avg_exact, spread, ...group }) => ({
+      ...group,
+      status: statusOf(group.released_at, group.due_at, now),
+      // Unusually high, uniform scores on an unproctored test (src/lib/integrity.ts).
+      integrity: integrityOf({
+        category: group.category,
+        submitted: group.submitted,
+        perfect: group.perfect,
+        avg: avg_exact,
+        spread,
+      }),
+    }))
     // Unscheduled placeholders are noise: "Untitled" drafts, and stray copies of module
     // tests that some subject copies hold without a module (the real ones are in the tree).
     // An unscheduled test on the subject itself is kept only if it is a mock test.

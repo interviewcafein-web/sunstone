@@ -15,7 +15,7 @@
 import { neon } from '@neondatabase/serverless';
 
 import type { Viewer } from '../api/_auth';
-import { metrics } from '../api/assessments';
+import { campus as campusDetail, metrics } from '../api/assessments';
 import { sendEmails, type Email } from '../api/_email';
 import { listStudents } from '../api/_roster';
 import type { PlatformSummary } from '../src/lib/coding-profiles/summaries';
@@ -30,6 +30,7 @@ import {
   type PainPoint,
   type StudentInsight,
 } from '../src/lib/insights';
+import type { Integrity } from '../src/lib/integrity';
 import { BAND, SITE, escape, frame, pill, section, table } from './_email-blocks';
 import { addNotice, staffDirectory } from './_notify';
 
@@ -80,6 +81,49 @@ const newTests = new Map(
       group by s.campus_id`
   ).map((row) => [Number(row.id), Number(row.tests)])
 );
+
+// Tests with unusually high, uniform scores (src/lib/integrity.ts), released in the last 30
+// days, per campus id.
+interface FlaggedTest {
+  campus: string;
+  campusId: number;
+  name: string;
+  category: string;
+  submitted: number;
+  released: string | null;
+  integrity: Integrity;
+}
+const flaggedByCampus = new Map<number, FlaggedTest[]>();
+const since = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+for (const row of campusRows) {
+  const detail = await campusDetail(Number(row.id), null);
+  const tests = [
+    ...detail.subjectTests,
+    ...detail.subjects.flatMap((subject) =>
+      subject.modules.flatMap((module) => [
+        ...module.tests,
+        ...module.folders.flatMap((folder) => folder.tests),
+      ])
+    ),
+  ];
+  flaggedByCampus.set(
+    Number(row.id),
+    tests
+      .filter((test) => test.integrity && (test.released_at ?? '') >= since)
+      .map((test) => ({
+        campus: String(row.name),
+        campusId: Number(row.id),
+        name: test.name,
+        category: test.category,
+        submitted: test.submitted,
+        released: test.released_at,
+        integrity: test.integrity!,
+      }))
+      .sort((a, b) =>
+        a.integrity.level === b.integrity.level ? 0 : a.integrity.level === 'high' ? -1 : 1
+      )
+  );
+}
 
 // The week just ended, Monday to Sunday.
 const today = new Date();
@@ -279,11 +323,52 @@ function people(rows: StudentInsight[], showCampus: boolean) {
   );
 }
 
+const CATEGORY_NAME: Record<string, string> = {
+  test: 'Test',
+  assignment: 'Practice',
+  mcq: 'MCQ',
+  amcat_mock: 'AMCAT mock',
+};
+
+function unusualScores(tests: FlaggedTest[], showCampus: boolean) {
+  if (!tests.length) return '';
+  return section(
+    '⚠️ Tests with unusually high scores',
+    table(
+      [{ label: 'Test' }, { label: 'Why' }, { label: 'Flag', align: 'center' }],
+      tests
+        .slice(0, 8)
+        .map((test) => [
+          `<b>${escape(test.name)}</b><div style="font-size:11px;color:#64748b">${escape(
+            [
+              showCampus ? test.campus : '',
+              CATEGORY_NAME[test.category] ?? test.category,
+              `${test.submitted} submitted`,
+            ]
+              .filter(Boolean)
+              .join(' · ')
+          )}</div>`,
+          `<span style="font-size:12px;color:#334155">${escape(test.integrity.reasons.join('; '))}</span>`,
+          test.integrity.level === 'high'
+            ? pill('Possible copying', BAND.risk)
+            : pill('Check', BAND.ok),
+        ])
+    ),
+    `Taken in an open browser: a sign to look into, not proof.${tests.length > 8 ? ` ${tests.length} tests in all; see Vertex.` : ''}`
+  );
+}
+
 function reportEmail(
   scope: GroupStats,
   rows: StudentInsight[],
   groups: GroupStats[],
-  options: { campus?: string; logo?: string | null; benchmark?: GroupStats; testsThisWeek: number }
+  options: {
+    campus?: string;
+    logo?: string | null;
+    benchmark?: GroupStats;
+    testsThisWeek: number;
+    flagged: FlaggedTest[];
+  }
 ) {
   const noun = options.campus ? 'Batch' : 'Campus';
   const points = findPainPoints(scope, groups, options.campus ? 'batches' : 'campuses');
@@ -303,6 +388,7 @@ function reportEmail(
       pains(points) +
       fronts(scope, options.benchmark) +
       (groups.length > 1 ? comparison(groups, noun) : '') +
+      unusualScores(options.flagged, !options.campus) +
       people(rows, !options.campus),
     cta: { label: 'Open the 360° view', href: `${SITE}${link}` },
     footer: options.campus
@@ -334,7 +420,15 @@ const campusGroups = groupBy(insights, (row) => row.student.campus).filter(
   (group) => group.students >= 5
 );
 const totalNewTests = [...newTests.values()].reduce((sum, count) => sum + count, 0);
-const overall = reportEmail(all, insights, campusGroups, { testsThisWeek: totalNewTests });
+const allFlagged = [...flaggedByCampus.values()]
+  .flat()
+  .sort((a, b) =>
+    a.integrity.level === b.integrity.level ? 0 : a.integrity.level === 'high' ? -1 : 1
+  );
+const overall = reportEmail(all, insights, campusGroups, {
+  testsThisWeek: totalNewTests,
+  flagged: allFlagged,
+});
 
 const campusReports = campusGroups.map((group) => {
   const rows = insights.filter((row) => row.student.campus === group.key);
@@ -349,6 +443,7 @@ const campusReports = campusGroups.map((group) => {
       logo: (campus?.logo as string | null) ?? null,
       benchmark: all,
       testsThisWeek: campus ? (newTests.get(Number(campus.id)) ?? 0) : 0,
+      flagged: campus ? (flaggedByCampus.get(Number(campus.id)) ?? []) : [],
     }),
   };
 });

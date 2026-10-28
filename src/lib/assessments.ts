@@ -2,6 +2,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 
+import type { Integrity } from './integrity';
+
 export type TestCategory = 'assignment' | 'test' | 'mcq' | 'amcat_mock';
 export type TestStatus = 'completed' | 'live' | 'scheduled' | 'unscheduled';
 
@@ -120,6 +122,10 @@ export interface CampusTest {
   submitted: number;
   avg_pct: number | null;
   top_pct: number | null;
+  /** Submissions with full marks. */
+  perfect: number;
+  /** Set when the scores look unusually high and uniform for this kind of test. */
+  integrity: Integrity | null;
 }
 
 export interface SubjectTest extends CampusTest {
@@ -379,6 +385,58 @@ export const useCampusDetail = (campus: number | undefined, batch: number | unde
     enabled: campus !== undefined,
     ...options,
   });
+
+/** A test with unusual scores, with its campus, for the reports. */
+export interface FlaggedTest {
+  campus: string;
+  name: string;
+  category: string;
+  submitted: number;
+  released: string | null;
+  integrity: Integrity;
+}
+
+/**
+ * The tests with unusually high, uniform scores at the named campuses (and batch), for the PDF
+ * reports: one request per campus, side by side. A campus that fails to load is left out.
+ */
+export async function fetchFlaggedTests(
+  campusNames: string[],
+  batch?: number
+): Promise<FlaggedTest[]> {
+  const { campuses } = await get<{ campuses: CampusOverview[] }>({ view: 'campuses' });
+  const wanted = campuses.filter((campus) => campusNames.includes(campus.name));
+  const details = await Promise.all(
+    wanted.map((campus) =>
+      get<CampusDetail>({ view: 'campus', campus: campus.id, batch })
+        .then((detail) => ({ campus, detail }))
+        .catch(() => null)
+    )
+  );
+  return details.flatMap((entry) => {
+    if (!entry) return [];
+    const { campus, detail } = entry;
+    const tests: CampusTest[] = [
+      ...detail.subjectTests,
+      ...detail.subjects.flatMap((subject) =>
+        subject.modules.flatMap((module) => [
+          ...module.tests,
+          ...module.folders.flatMap((folder) => folder.tests),
+        ])
+      ),
+    ];
+    return tests
+      .filter((test) => test.integrity)
+      .map((test) => ({
+        campus: campus.name,
+        name: test.name,
+        category: test.category,
+        submitted: test.submitted,
+        released: test.released_at,
+        integrity: test.integrity!,
+      }));
+  });
+}
 
 export const useTestDetail = (
   campus: number | undefined,

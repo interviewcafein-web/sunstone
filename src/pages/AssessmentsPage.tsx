@@ -27,6 +27,7 @@ import {
   NotebookPen,
   ClipboardCheck,
   Search,
+  ShieldAlert,
   Target,
   Trophy,
   Users,
@@ -45,7 +46,8 @@ import { AnimatedRing } from '@/components/common/AnimatedRing';
 import { CampusLogo } from '@/components/common/CampusLogo';
 import { PainPoints } from '@/components/insights/PainPoints';
 import { useInsightRows } from '@/hooks/useInsightRows';
-import { findPainPoints, groupBy, groupStats } from '@/lib/insights';
+import { findPainPoints, groupBy, groupStats, type PainPoint } from '@/lib/insights';
+import { INTEGRITY_NOTE, integrityOf, type Integrity } from '@/lib/integrity';
 import { Sparkline, TrendDelta, lastChange } from '@/components/common/Sparkline';
 import {
   CATEGORY_LABELS,
@@ -403,6 +405,30 @@ const TABS = [
 
 const isOut = (test: CampusTest) => test.status === 'completed' || test.status === 'live';
 
+/** A warning that a test's scores look unusually high and uniform (src/lib/integrity.ts). */
+function IntegrityBadge({
+  integrity,
+  compact = false,
+}: {
+  integrity: Integrity | null;
+  compact?: boolean;
+}) {
+  if (!integrity) return null;
+  const high = integrity.level === 'high';
+  return (
+    <span
+      title={`${integrity.reasons.join('. ')}.\n${INTEGRITY_NOTE}`}
+      className={cn(
+        'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1',
+        high ? 'bg-red-50 text-red-700 ring-red-200' : 'bg-amber-50 text-amber-800 ring-amber-200'
+      )}
+    >
+      <ShieldAlert className="size-3" aria-hidden />
+      {compact ? (high ? 'Copying?' : 'Check') : high ? 'Possible copying' : 'Check scores'}
+    </span>
+  );
+}
+
 function StatusChip({ status }: { status: TestStatus }) {
   return (
     <span
@@ -581,7 +607,7 @@ function CampusView({
 
       {tab === 'overview' && (
         <>
-          {name && <CampusPainPoints campus={name} batch={search.batch} />}
+          {name && <CampusPainPoints campus={name} batch={search.batch} tests={allTests(data)} />}
           <OverviewTab data={data} onOpen={open} onTab={(id) => set({ tab: id })} />
         </>
       )}
@@ -610,7 +636,16 @@ function CampusView({
  * This campus's (and batch's) pain points, from the same 360° model as the 360° page: its
  * students on all five fronts, with the batches compared when no batch is chosen.
  */
-function CampusPainPoints({ campus, batch }: { campus: string; batch?: number }) {
+function CampusPainPoints({
+  campus,
+  batch,
+  tests,
+}: {
+  campus: string;
+  batch?: number;
+  /** The campus's tests, for unusual-score flags. */
+  tests: CampusTest[];
+}) {
   const { rows, isPending } = useInsightRows();
   const { points, scope } = useMemo(() => {
     const scoped = rows.filter(
@@ -620,8 +655,28 @@ function CampusPainPoints({ campus, batch }: { campus: string; batch?: number })
     const groups = batch
       ? []
       : groupBy(scoped, (row) => row.student.batch).filter((group) => group.students >= 5);
-    return { points: findPainPoints(stats, groups, 'batches'), scope: stats };
-  }, [rows, campus, batch]);
+    const flagged = tests.filter((test) => test.integrity);
+    const integrity: PainPoint[] = flagged.length
+      ? [
+          {
+            severity: flagged.some((test) => test.integrity!.level === 'high') ? 'high' : 'medium',
+            dimension: 'tests',
+            title: `${flagged.length} test${flagged.length === 1 ? ' has' : 's have'} unusually high scores`,
+            detail: `Possible copying in the open browser: ${flagged
+              .slice(0, 3)
+              .map((test) => test.name)
+              .join(
+                ', '
+              )}${flagged.length > 3 ? ` and ${flagged.length - 3} more` : ''}. Look for the badge on the test.`,
+            weight: 70 + flagged.length * 5,
+          },
+        ]
+      : [];
+    const points = [...findPainPoints(stats, groups, 'batches'), ...integrity].sort(
+      (a, b) => b.weight - a.weight
+    );
+    return { points, scope: stats };
+  }, [rows, campus, batch, tests]);
 
   if (isPending) return <InlineLoader label="Finding pain points…" />;
   if (!scope.students) return null;
@@ -842,8 +897,9 @@ function OverviewTab({
                     {test.lecture ?? test.module ?? test.subject}
                   </span>
                 </span>
-                <span className="shrink-0 text-right">
+                <span className="flex shrink-0 flex-col items-end gap-0.5 text-right">
                   <StatusChip status={test.status} />
+                  <IntegrityBadge integrity={test.integrity} compact />
                   <span className="mt-0.5 block text-[11px] text-slate-500">
                     {test.status === 'live'
                       ? `Due ${lmsDate(test.due_at)}`
@@ -961,7 +1017,10 @@ function SubjectTestsTab({
                   {test.minutes ? ` · ${test.minutes} min` : ''}
                 </p>
               </div>
-              <StatusChip status={test.status} />
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <StatusChip status={test.status} />
+                <IntegrityBadge integrity={test.integrity} />
+              </div>
             </div>
             <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-600">
               <CalendarDays className="size-3.5 text-slate-400" aria-hidden />
@@ -1160,6 +1219,7 @@ function TestRow({ test, onOpen }: { test: CampusTest; onOpen: () => void }) {
         <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
           <CategoryChip category={test.category} />
           <StatusChip status={test.status} />
+          <IntegrityBadge integrity={test.integrity} />
           {test.max_marks && <span>{Number(test.max_marks)} marks</span>}
         </p>
       </td>
@@ -1412,6 +1472,21 @@ function TestPanel({
   const average = scores.length
     ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
     : null;
+  const spread = scores.length
+    ? Math.sqrt(
+        scores.reduce((sum, score) => sum + score * score, 0) / scores.length -
+          (scores.reduce((sum, score) => sum + score, 0) / scores.length) ** 2
+      )
+    : null;
+  const integrity = detail.data
+    ? integrityOf({
+        category: detail.data.test.category,
+        submitted: scores.length,
+        perfect: scores.filter((score) => score >= 100).length,
+        avg: scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null,
+        spread,
+      })
+    : null;
   const bands = BANDS.map((band) => ({
     ...band,
     students: scores.filter((score) => score >= band.from && score < band.to).length,
@@ -1484,6 +1559,32 @@ function TestPanel({
             </dl>
           )}
         </header>
+        {integrity && (
+          <div
+            role="note"
+            className={cn(
+              'flex items-start gap-3 border-b px-5 py-3 text-sm',
+              integrity.level === 'high'
+                ? 'border-red-200 bg-red-50 text-red-800'
+                : 'border-amber-200 bg-amber-50 text-amber-900'
+            )}
+          >
+            <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <div>
+              <p className="font-semibold">
+                {integrity.level === 'high'
+                  ? 'Possible copying: these scores are unusually high'
+                  : 'Check these scores: higher and more uniform than usual'}
+              </p>
+              <ul className="mt-0.5 list-disc pl-4 text-xs">
+                {integrity.reasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+              <p className="mt-1 text-xs opacity-80">{INTEGRITY_NOTE}</p>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto p-5">
           {detail.isPending ? (

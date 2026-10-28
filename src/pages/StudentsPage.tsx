@@ -17,7 +17,7 @@ import { useStudents } from '@/hooks/useStudents';
 import { PLATFORM_IDS, SOLVING_PLATFORM_IDS } from '@/lib/coding-profiles/platforms';
 import { ProfileError, type PlatformId } from '@/lib/coding-profiles/types';
 import { useTour } from '@/hooks/useTour';
-import { useStudentMetrics, type StudentMetrics } from '@/lib/assessments';
+import { fetchFlaggedTests, useStudentMetrics, type StudentMetrics } from '@/lib/assessments';
 import { buildInsights, type StudentInsight } from '@/lib/insights';
 import { useSession } from '@/lib/session';
 import type { Student } from '@/lib/students/types';
@@ -233,6 +233,12 @@ export default function StudentsPage() {
           (platform, handle) => summaries.byKey.get(summaryKey(platform, handle))?.data
         ).map((insight) => [insight.student, insight])
       );
+      // Tests with unusual scores at the report's campuses; the report goes ahead without them
+      // if they cannot be loaded.
+      const flaggedTests = await fetchFlaggedTests(
+        [...new Set(rows.map((row) => row.student.campus))],
+        search.batch ? Number(search.batch) : undefined
+      ).catch(() => []);
       await downloadCampusReport({
         origin: window.location.origin,
         title: search.campus ?? 'All campuses',
@@ -242,6 +248,7 @@ export default function StudentsPage() {
         generatedAt: new Date(),
         rows: rows.map((row) => toReportRow(row, insights.get(row.student)!)),
         allCampuses: !search.campus,
+        flaggedTests,
       });
       setReportState('idle');
     } catch (error) {

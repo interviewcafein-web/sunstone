@@ -6,6 +6,7 @@ import type { PlatformId } from '@/lib/coding-profiles/types';
 import { BAND_COLORS, bandOf, dimensionById, type StudentInsight } from '@/lib/insights';
 import { ZONE_BASIS, ZONES, zoneById, type ZoneResult } from '@/lib/students/zones';
 import { HealthComparisonPage, InsightsPage } from '@/reports/Insights';
+import { UnusualScoresPage, type ReportFlaggedTest } from '@/reports/UnusualScores';
 import {
   INK,
   LINE,
@@ -50,6 +51,8 @@ export interface CampusReportData {
   rows: CampusReportRow[];
   /** One report covering every campus: a comparison page, then each campus in turn. */
   allCampuses?: boolean;
+  /** Tests with unusually high, uniform scores (possible copying), for the report's campuses. */
+  flaggedTests?: ReportFlaggedTest[];
 }
 
 const SHORT: Record<PlatformId, string> = {
@@ -132,8 +135,14 @@ export function CampusReport({ data }: { data: CampusReportData }) {
     </Document>
   );
 
+  const flagged = data.flaggedTests ?? [];
   if (!data.allCampuses) {
-    return document(<CampusPages data={data} kind="Campus Progress Report" withHeader />);
+    return document(
+      <>
+        <CampusPages data={data} kind="Campus Progress Report" withHeader />
+        <UnusualScoresPage tests={flagged} label={label} showCampus={false} />
+      </>
+    );
   }
 
   // All campuses: overall summary and 360°, the two campus comparisons, then every campus's
@@ -148,6 +157,7 @@ export function CampusReport({ data }: { data: CampusReportData }) {
       <CampusPages data={data} kind="All-Campus Progress Report" withHeader summaryOnly />
       <ComparisonPage data={data} campuses={campuses} label={label} />
       <HealthComparisonPage insights={data.rows.map((row) => row.insight)} label={label} />
+      <UnusualScoresPage tests={flagged} label={label} showCampus />
       {campuses.map((campus) => (
         <CampusPages
           key={campus}
