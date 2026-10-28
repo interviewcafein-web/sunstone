@@ -26,6 +26,8 @@ interface SparklineProps {
   label?: string;
   /** Fill the container's width (the line is stretched, not scaled). */
   stretch?: boolean;
+  /** With `percent` off: start the scale at zero rather than at the lowest value. */
+  fromZero?: boolean;
 }
 
 /** A tiny line chart of a series (tests, weeks, sittings) with the last point marked. */
@@ -39,6 +41,7 @@ export function Sparkline({
   className,
   label,
   stretch = false,
+  fromZero = false,
 }: SparklineProps) {
   const gradient = `spark-${useId().replace(/:/g, '')}`;
   const points = values
@@ -46,7 +49,7 @@ export function Sparkline({
     .filter((point): point is { value: number; index: number } => typeof point.value === 'number');
   if (points.length < 2) return null;
 
-  const min = percent ? 0 : Math.min(...points.map((point) => point.value));
+  const min = percent || fromZero ? 0 : Math.min(...points.map((point) => point.value));
   const max = percent ? 100 : Math.max(...points.map((point) => point.value));
   const span = max - min || 1;
   const pad = 2.5;

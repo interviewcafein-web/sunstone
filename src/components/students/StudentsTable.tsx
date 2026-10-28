@@ -393,7 +393,7 @@ function PlatformCell({
         </button>
       );
     case 'ok': {
-      const { value, detail } = cell.summary;
+      const { value, detail, weeks } = cell.summary;
       const best = value > 0 && value === columnMax;
       return (
         <a
@@ -412,16 +412,23 @@ function PlatformCell({
           {detail && platform.id !== 'github' && (
             <span className="text-xs whitespace-nowrap text-slate-500">{detail}</span>
           )}
-          {/* Compared with the best on this platform in the current view. */}
-          <span className="mt-1 h-1 w-14 overflow-hidden rounded-full bg-slate-100">
-            <span
-              className="block h-full rounded-full"
-              style={{
-                width: `${columnMax ? Math.max(4, (value / columnMax) * 100) : 0}%`,
-                background: platform.color,
-              }}
+          {weeks && weeks.some(Boolean) ? (
+            <ActivityTrend
+              weeks={weeks}
+              unit={platform.id === 'github' ? 'contributions' : 'submissions'}
             />
-          </span>
+          ) : (
+            /* Compared with the best on this platform in the current view. */
+            <span className="mt-1 h-1 w-14 overflow-hidden rounded-full bg-slate-100">
+              <span
+                className="block h-full rounded-full"
+                style={{
+                  width: `${columnMax ? Math.max(4, (value / columnMax) * 100) : 0}%`,
+                  background: platform.color,
+                }}
+              />
+            </span>
+          )}
         </a>
       );
     }
@@ -618,6 +625,26 @@ function TestsCell({ metrics }: { metrics?: StudentMetrics }) {
       ) : (
         <MiniBar pct={taken} fill={scoreFill(taken)} />
       )}
+    </span>
+  );
+}
+
+/**
+ * Weekly activity on one platform over the last weeks: a small line, last week's count and
+ * the change from the week before.
+ */
+function ActivityTrend({ weeks, unit }: { weeks: number[]; unit: string }) {
+  const last = weeks.at(-1) ?? 0;
+  return (
+    <span
+      className="mt-1 flex flex-col items-end"
+      title={`${unit[0].toUpperCase()}${unit.slice(1)} per week, last ${weeks.length} weeks: ${weeks.join(', ')}`}
+    >
+      <Sparkline values={weeks} percent={false} fromZero width={64} height={18} />
+      <span className="flex items-center gap-1 text-[10px] whitespace-nowrap text-slate-500 tabular-nums">
+        {last} last wk
+        <TrendDelta values={weeks} className="text-[10px]" />
+      </span>
     </span>
   );
 }
