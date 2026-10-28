@@ -237,7 +237,7 @@ export default function StudentsPage() {
       // if they cannot be loaded.
       const flaggedTests = await fetchFlaggedTests(
         [...new Set(rows.map((row) => row.student.campus))],
-        search.batch ? Number(search.batch) : undefined
+        search.batch || undefined
       ).catch(() => []);
       await downloadCampusReport({
         origin: window.location.origin,

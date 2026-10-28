@@ -8,6 +8,7 @@ import { Medal } from '@/components/students/Medal';
 import type { StudentRow } from '@/components/students/StudentsTable';
 import { PLATFORMS, SOLVING_PLATFORM_IDS } from '@/lib/coding-profiles/platforms';
 import { cn } from '@/lib/utils';
+import { cohortLabel } from '@/lib/cohorts';
 
 /** Gold, silver and bronze (fixed hex: the theme's colour scales flip in dark mode). */
 const PODIUM = [
@@ -122,7 +123,9 @@ export function TopPerformers({ rows }: { rows: StudentRow[] }) {
                       {row.student.name}
                     </p>
                     <p className="truncate text-xs text-slate-500">
-                      {[row.student.campus, row.student.batch].filter(Boolean).join(' · ')}
+                      {[row.student.campus, cohortLabel(row.student.course, row.student.batch)]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </p>
                   </div>
                   <p className="shrink-0 text-right leading-none">

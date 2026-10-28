@@ -22,13 +22,17 @@ export const config = { runtime: 'edge' };
 const int = (value: string | null) => (value && /^\d+$/.test(value) ? Number(value) : null);
 const NOW = `(now() at time zone 'Asia/Kolkata')`;
 
+// A batch filter ($2): an admission year ("2025") or a cohort, program and admission year
+// ("BCA:2025", shown as BCA25-28), or null for everyone.
+const COHORT = `($2::text is null or admission_year::text = $2 or program || ':' || admission_year = $2)`;
+
 // One campus (and optionally one batch): its students, their PRIME sections, the subjects
 // those sections take, visible releases, the ones already out ("done"), who was given each
 // released test, and per-test totals. $1 = campus id, $2 = admission year or null.
 const SCOPE = `
   roster as (
     select lms_user_id, name, username, admission_year, program
-    from students where on_platform and campus_id = $1 and ($2::int is null or admission_year = $2)),
+    from students where on_platform and campus_id = $1 and ${COHORT}),
   sec as (
     select ss.section_id, ss.lms_user_id from lms_section_students ss join roster using (lms_user_id)),
   courses_in as (
@@ -163,7 +167,7 @@ interface GroupRow {
   spread: number | null;
 }
 
-export async function campus(campusId: number, batch: number | null) {
+export async function campus(campusId: number, batch: string | null) {
   const params = [campusId, batch];
   const [{ now }] = await db().query(`select ${NOW}::text as now`);
 
@@ -399,12 +403,77 @@ export async function campus(campusId: number, batch: number | null) {
      order by t.avg_pct desc nulls last, t.submitted desc nulls last, r.name`,
     params
   );
+  // Each student's marks on every Prime Mock Test that is out, and score on every AMCAT round,
+  // for the per-test columns of the Students tab.
+  const mockIds = subjectTests
+    .filter((test) => test.status === 'completed' || test.status === 'live')
+    .flatMap((test) => test.ids);
+  const mockRows = mockIds.length
+    ? await db().query(
+        `with ${SCOPE}
+         select r.username, res.test_id, res.submitted, res.marks, round(res.pct)::int as pct
+         from res join roster r using (lms_user_id)
+         where res.test_id = any($3::int[])`,
+        [campusId, batch, mockIds]
+      )
+    : [];
+  const keyOfTest = new Map(
+    subjectTests.flatMap((test) => test.ids.map((id) => [id, test.ids.join(',')] as const))
+  );
+  const amcatRows = await db().query(
+    `with ${SCOPE}
+     select r.username, a.test_name, min(a.taken_at)::date::text as taken_on,
+            round(avg((x->>'score')::numeric) filter (where x->>'score' ~ '^[0-9.]+$'))::int as score
+     from amcat_sittings a join roster r using (lms_user_id)
+     cross join lateral jsonb_array_elements(a.sections) x
+     group by r.username, a.test_name`,
+    params
+  );
+  const perStudent = new Map<
+    string,
+    {
+      mocks: Record<string, { pct: number | null; marks: number | null; submitted: boolean }>;
+      amcat_rounds: Record<string, { score: number | null; taken_on: string | null }>;
+    }
+  >();
+  const entry = (username: string) => {
+    let found = perStudent.get(username);
+    if (!found) perStudent.set(username, (found = { mocks: {}, amcat_rounds: {} }));
+    return found;
+  };
+  for (const row of mockRows) {
+    const key = keyOfTest.get(Number(row.test_id));
+    if (!key) continue;
+    const mocks = entry(String(row.username)).mocks;
+    // A student is in one section copy; keep the submitted one if both exist.
+    if (mocks[key]?.submitted && !row.submitted) continue;
+    mocks[key] = {
+      pct: row.pct === null ? null : Number(row.pct),
+      marks: row.marks === null ? null : Number(row.marks),
+      submitted: Boolean(row.submitted),
+    };
+  }
+  for (const row of amcatRows) {
+    entry(String(row.username)).amcat_rounds[String(row.test_name)] = {
+      score: row.score === null ? null : Number(row.score),
+      taken_on: row.taken_on ? String(row.taken_on) : null,
+    };
+  }
+
+  // The campus's cohorts: program and admission year, newest first.
   const batches = (
     await db()`
-      select distinct admission_year from students
+      select program, admission_year, count(*)::int as students from students
       where on_platform and campus_id = ${campusId} and admission_year is not null
-      order by admission_year desc`
-  ).map((row) => Number(row.admission_year));
+        and program is not null
+      group by program, admission_year
+      order by admission_year desc, program`
+  ).map((row) => ({
+    key: `${row.program}:${row.admission_year}`,
+    program: String(row.program),
+    year: Number(row.admission_year),
+    students: Number(row.students),
+  }));
 
   return {
     summary: {
@@ -422,7 +491,11 @@ export async function campus(campusId: number, batch: number | null) {
     subjectTests,
     subjects,
     timeline,
-    students,
+    students: students.map((student) => ({
+      ...student,
+      mocks: perStudent.get(String(student.username))?.mocks ?? {},
+      amcat_rounds: perStudent.get(String(student.username))?.amcat_rounds ?? {},
+    })),
     attendance: await attendance(campusId, batch),
     amcat: await amcatRounds(campusId, batch),
     exams: await internalExams(campusId, batch),
@@ -437,11 +510,11 @@ export async function campus(campusId: number, batch: number | null) {
 const PRIME_SUBJECT = `subject ~* '(^|[^a-z])prime([^a-z]|$)|competitive coding'`;
 
 /** Class attendance for one campus (and batch): overall, PRIME, weekly, per subject and instructor. */
-async function attendance(campusId: number, batch: number | null) {
+async function attendance(campusId: number, batch: string | null) {
   const params = [campusId, batch];
   const ROSTER = `roster as (
     select lms_user_id from students
-    where on_platform and campus_id = $1 and ($2::int is null or admission_year = $2))`;
+    where on_platform and campus_id = $1 and ${COHORT})`;
   const [overall] = await db().query(
     `with ${ROSTER}
      select sum(sessions)::int as marks, sum(present)::int as present,
@@ -508,7 +581,7 @@ const EXAM_EVENT = `coalesce(x.exam_type, 'other') || ':' ||
 const EXAM_MARKS = `
   roster as (
     select lms_user_id, name, username from students
-    where on_platform and campus_id = $1 and ($2::int is null or admission_year = $2)),
+    where on_platform and campus_id = $1 and ${COHORT}),
   mk as (
     select m.*, e.subject, e.title, e.kind, e.exam_date, e.max_marks,
            ${EXAM_EVENT} as event,
@@ -518,7 +591,7 @@ const EXAM_MARKS = `
     left join exm_examinations x on x.id = e.examination_id)`;
 
 /** Internal exams (Midterms, End-term) and Mock PI / GD for one campus and batch. */
-async function internalExams(campusId: number, batch: number | null) {
+async function internalExams(campusId: number, batch: string | null) {
   const params = [campusId, batch];
   const events = await db().query(
     `with ${EXAM_MARKS}
@@ -583,12 +656,12 @@ async function internalExams(campusId: number, batch: number | null) {
 }
 
 /** AMCAT rounds (from the AMCAT platform) taken by one campus's students. */
-async function amcatRounds(campusId: number, batch: number | null) {
+async function amcatRounds(campusId: number, batch: string | null) {
   const params = [campusId, batch];
   const BASE = `
     roster as (
       select lms_user_id, name, username from students
-      where on_platform and campus_id = $1 and ($2::int is null or admission_year = $2)),
+      where on_platform and campus_id = $1 and ${COHORT}),
     s as (select a.* from amcat_sittings a join roster r using (lms_user_id)),
     scores as (
       select s.id, s.test_name, s.lms_user_id, x->>'name' as section,
@@ -620,7 +693,7 @@ async function amcatRounds(campusId: number, batch: number | null) {
   return { rounds, sections };
 }
 
-async function test(campusId: number, batch: number | null, testIds: number[]) {
+async function test(campusId: number, batch: string | null, testIds: number[]) {
   const [info] = await db()`
     select min(name) as name, min(category) as category, max(max_marks) as max_marks,
            max(minutes) as minutes, count(*)::int as copies
@@ -828,7 +901,9 @@ export default async function handler(request: Request): Promise<Response> {
     if (!seesCampus(viewer, campusId)) {
       return json(403, { error: 'You do not have access to this campus' });
     }
-    const batch = int(params.get('batch'));
+    // "2025" or a cohort like "BCA:2025" (program names hold letters, dots and spaces).
+    const rawBatch = params.get('batch');
+    const batch = rawBatch && /^([A-Za-z. ]{2,20}:)?\d{4}$/.test(rawBatch) ? rawBatch : null;
 
     if (view === 'campus') return json(200, await campus(campusId, batch));
     if (view === 'test') {

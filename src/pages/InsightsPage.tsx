@@ -50,6 +50,7 @@ import {
 import { ZONES } from '@/lib/students/zones';
 import { chartColors, useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
+import { cohortLabel } from '@/lib/cohorts';
 
 const route = getRouteApi('/insights');
 
@@ -878,7 +879,9 @@ function StudentLine({ row, rank }: { row: StudentInsight; rank: number }) {
           {row.student.name}
         </Link>
         <p className="truncate text-xs text-slate-500">
-          {[row.student.campus, row.student.course, row.student.batch].filter(Boolean).join(' · ')}
+          {[row.student.campus, cohortLabel(row.student.course, row.student.batch)]
+            .filter(Boolean)
+            .join(' · ')}
         </p>
         <div className="mt-1">
           <ScoreChips row={row} />

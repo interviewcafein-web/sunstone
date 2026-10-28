@@ -16,6 +16,7 @@ import type { Student } from '@/lib/students/types';
 import { zoneById, type ZoneResult } from '@/lib/students/zones';
 import type { SortKey } from '@/routes/index';
 import { cn } from '@/lib/utils';
+import { cohortLabel } from '@/lib/cohorts';
 
 export type Cell =
   | { kind: 'none' }
@@ -200,7 +201,7 @@ export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
                           {student.name}
                         </Link>
                         <div className="text-xs text-slate-500">
-                          {[student.campus, student.course, student.batch]
+                          {[student.campus, cohortLabel(student.course, student.batch)]
                             .filter(Boolean)
                             .join(' · ')}
                         </div>

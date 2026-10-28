@@ -4,6 +4,7 @@
 
 import { Page, Text, View } from '@react-pdf/renderer';
 
+import { cohortLabel } from '@/lib/cohorts';
 import {
   BAND_COLORS,
   DIMENSIONS,
@@ -364,8 +365,7 @@ function StudentList({
                 <Text style={{ fontSize: 6, color: MUTED, maxLines: 1, textOverflow: 'ellipsis' }}>
                   {[
                     showCampus && row.student.campus,
-                    row.student.course,
-                    row.student.batch && `Batch ${row.student.batch}`,
+                    cohortLabel(row.student.course, row.student.batch),
                   ]
                     .filter(Boolean)
                     .join(' · ')}

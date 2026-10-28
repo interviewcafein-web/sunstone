@@ -1,6 +1,7 @@
 import { Document, Image, Page, Text, View } from '@react-pdf/renderer';
 
 import { lmsDate, type StudentMetrics } from '@/lib/assessments';
+import { cohortLabel } from '@/lib/cohorts';
 import { PLATFORMS } from '@/lib/coding-profiles/platforms';
 import type { PlatformId } from '@/lib/coding-profiles/types';
 import { BAND_COLORS, bandOf, dimensionById, type StudentInsight } from '@/lib/insights';
@@ -353,7 +354,7 @@ function CampusPages({
                   <View style={{ flexGrow: 1 }}>
                     <Text style={{ fontWeight: 600 }}>{row.name}</Text>
                     <Text style={{ fontSize: 7.5, color: MUTED }}>
-                      {[summaryOnly && row.campus, row.course, row.batch && `Batch ${row.batch}`]
+                      {[summaryOnly && row.campus, cohortLabel(row.course, row.batch)]
                         .filter(Boolean)
                         .join(' · ')}
                     </Text>
@@ -642,9 +643,7 @@ function TableRow({ row, index, origin }: { row: CampusReportRow; index: number;
       <Text style={{ width: COLUMNS.index, color: MUTED }}>{index + 1}</Text>
       <View style={{ width: COLUMNS.student, paddingRight: 8 }}>
         <Text style={{ fontWeight: 600 }}>{row.name}</Text>
-        <Text style={{ fontSize: 7, color: MUTED }}>
-          {[row.course, row.batch && `Batch ${row.batch}`].filter(Boolean).join(' · ')}
-        </Text>
+        <Text style={{ fontSize: 7, color: MUTED }}>{cohortLabel(row.course, row.batch)}</Text>
       </View>
       <View style={{ width: COLUMNS.basis }}>
         {row.zone.basis ? (

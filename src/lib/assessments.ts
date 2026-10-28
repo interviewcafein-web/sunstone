@@ -158,6 +158,10 @@ export interface CampusStudentRow {
   amcat: number;
   amcat_avg: number | null;
   exam_avg: number | null;
+  /** Marks on each Prime Mock Test that is out, by the test's ids joined ("12,34"). */
+  mocks: Record<string, { pct: number | null; marks: number | null; submitted: boolean }>;
+  /** Score on each AMCAT round, by round name. */
+  amcat_rounds: Record<string, { score: number | null; taken_on: string | null }>;
 }
 
 export interface CampusAttendance {
@@ -290,7 +294,8 @@ export interface CampusDetail {
   attendance: CampusAttendance;
   amcat: CampusAmcat;
   exams: CampusExams;
-  batches: number[];
+  /** Cohorts: program and admission year; `key` is the batch filter value ("BCA:2025"). */
+  batches: { key: string; program: string; year: number; students: number }[];
   now: string;
   syncedAt: string | null;
 }
@@ -378,7 +383,7 @@ export const useCampusOverview = () =>
     ...options,
   });
 
-export const useCampusDetail = (campus: number | undefined, batch: number | undefined) =>
+export const useCampusDetail = (campus: number | undefined, batch: string | undefined) =>
   useQuery({
     queryKey: ['assessments', 'campus', campus, batch],
     queryFn: () => get<CampusDetail>({ view: 'campus', campus, batch }),
@@ -402,7 +407,7 @@ export interface FlaggedTest {
  */
 export async function fetchFlaggedTests(
   campusNames: string[],
-  batch?: number
+  batch?: string
 ): Promise<FlaggedTest[]> {
   const { campuses } = await get<{ campuses: CampusOverview[] }>({ view: 'campuses' });
   const wanted = campuses.filter((campus) => campusNames.includes(campus.name));
@@ -440,7 +445,7 @@ export async function fetchFlaggedTests(
 
 export const useTestDetail = (
   campus: number | undefined,
-  batch: number | undefined,
+  batch: string | undefined,
   test: string | undefined
 ) =>
   useQuery({

@@ -18,6 +18,7 @@ import type { Viewer } from '../api/_auth';
 import { campus as campusDetail, metrics } from '../api/assessments';
 import { sendEmails, type Email } from '../api/_email';
 import { listStudents } from '../api/_roster';
+import { cohortLabel } from '../src/lib/cohorts';
 import type { PlatformSummary } from '../src/lib/coding-profiles/summaries';
 import {
   DIMENSIONS,
@@ -257,7 +258,7 @@ function comparison(groups: GroupStats[], noun: string) {
 
 function people(rows: StudentInsight[], showCampus: boolean) {
   const where = (row: StudentInsight) =>
-    [showCampus ? row.student.campus : '', row.student.course, row.student.batch]
+    [showCampus ? row.student.campus : '', cohortLabel(row.student.course, row.student.batch)]
       .filter(Boolean)
       .join(' · ');
   const name = (row: StudentInsight) =>

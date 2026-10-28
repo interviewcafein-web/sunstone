@@ -43,6 +43,7 @@ import {
 import { ExamsTab } from '@/components/assessments/ExamsSection';
 import { Avatar } from '@/components/common/Avatar';
 import { AnimatedRing } from '@/components/common/AnimatedRing';
+import { cohortLabel, parseBatch } from '@/lib/cohorts';
 import { PeriodFilter, inPeriod, type PeriodChoice } from '@/components/assessments/PeriodFilter';
 import { CampusLogo } from '@/components/common/CampusLogo';
 import { PainPoints } from '@/components/insights/PainPoints';
@@ -69,6 +70,7 @@ import {
   type CampusTest,
   type SubjectTest,
   type SyllabusModule,
+  type AmcatRound,
   type TestCategory,
   type TestStatus,
 } from '@/lib/assessments';
@@ -523,17 +525,22 @@ function CampusView({
           >
             {[undefined, ...batches].map((batch) => (
               <button
-                key={batch ?? 'all'}
+                key={batch?.key ?? 'all'}
                 type="button"
-                onClick={() => set({ batch, test: undefined })}
+                title={
+                  batch
+                    ? `${batch.program} admitted ${batch.year} · ${batch.students} students`
+                    : undefined
+                }
+                onClick={() => set({ batch: batch?.key, test: undefined })}
                 className={cn(
                   'rounded-full px-3 py-1 text-xs font-semibold transition',
-                  search.batch === batch
+                  search.batch === batch?.key
                     ? 'text-brand-800 bg-white'
                     : 'bg-white/10 text-white hover:bg-white/20'
                 )}
               >
-                {batch ? `Batch ${batch}` : 'All batches'}
+                {batch ? cohortLabel(batch.program, batch.year) : 'All batches'}
               </button>
             ))}
           </div>
@@ -636,7 +643,13 @@ function CampusView({
       {tab === 'exams' && <ExamsTab data={data.exams} />}
       {tab === 'attendance' && <AttendanceTab data={data.attendance} />}
       {tab === 'amcat' && <AmcatTab data={data.amcat} choice={choice} onChoice={setChoice} />}
-      {tab === 'students' && <StudentsTab students={data.students} />}
+      {tab === 'students' && (
+        <StudentsTab
+          students={data.students}
+          mocks={data.subjectTests}
+          rounds={data.amcat.rounds}
+        />
+      )}
 
       {search.test && (
         <TestPanel
@@ -660,14 +673,19 @@ function CampusPainPoints({
   tests,
 }: {
   campus: string;
-  batch?: number;
+  /** "2025" or a cohort "BCA:2025". */
+  batch?: string;
   /** The campus's tests, for unusual-score flags. */
   tests: CampusTest[];
 }) {
   const { rows, isPending } = useInsightRows();
+  const cohort = parseBatch(batch);
   const { points, scope } = useMemo(() => {
     const scoped = rows.filter(
-      (row) => row.student.campus === campus && (!batch || row.student.batch === String(batch))
+      (row) =>
+        row.student.campus === campus &&
+        (!cohort.year || row.student.batch === cohort.year) &&
+        (!cohort.program || row.student.course === cohort.program)
     );
     const stats = groupStats(campus, scoped);
     const groups = batch
@@ -694,7 +712,7 @@ function CampusPainPoints({
       (a, b) => b.weight - a.weight
     );
     return { points, scope: stats };
-  }, [rows, campus, batch, tests]);
+  }, [rows, campus, batch, tests, cohort.year, cohort.program]);
 
   if (isPending) return <InlineLoader label="Finding pain points…" />;
   if (!scope.students) return null;
@@ -706,7 +724,7 @@ function CampusPainPoints({
       action={
         <Link
           to="/insights"
-          search={{ campus, batch: batch ? String(batch) : undefined }}
+          search={{ campus, batch: cohort.year }}
           className="text-brand-700 dark:text-brand-300 inline-flex items-center gap-1 text-sm font-semibold hover:underline"
         >
           Full 360° view
@@ -987,7 +1005,49 @@ function OverviewTab({
           </div>
         ))}
       </section>
+
+      <SyllabusVsDelivery />
     </div>
+  );
+}
+
+/** Planned syllabus against what has actually been taught: waiting on the delivery data. */
+function SyllabusVsDelivery() {
+  return (
+    <section className={cn(panel, 'relative overflow-hidden border-dashed p-5 lg:col-span-3')}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <span className="bg-brand-500/10 text-brand-700 dark:text-brand-300 flex size-10 items-center justify-center rounded-xl">
+            <BookOpenCheck className="size-5" aria-hidden />
+          </span>
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-bold">
+              Syllabus vs Delivery
+              <span className="rounded-full bg-[#f59e0b]/15 px-2 py-0.5 text-[10px] font-bold tracking-wide text-[#b45309] uppercase">
+                Coming soon
+              </span>
+            </h2>
+            <p className="mt-0.5 max-w-2xl text-sm text-slate-500">
+              Each module&rsquo;s planned sessions against the sessions actually delivered, so you
+              can see which campuses and batches are ahead, on track or falling behind the syllabus.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div aria-hidden className="mt-4 grid gap-2 opacity-60 sm:grid-cols-3">
+        {[72, 48, 90].map((width, index) => (
+          <div key={index} className="rounded-xl border border-slate-200 p-3">
+            <div className="skeleton h-3 w-2/3 rounded" />
+            <div className="mt-3 flex items-center gap-2">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                <div className="bg-brand-300 h-full rounded-full" style={{ width: `${width}%` }} />
+              </div>
+              <div className="skeleton h-2.5 w-10 rounded" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1311,14 +1371,71 @@ function TestRow({ test, onOpen }: { test: CampusTest; onOpen: () => void }) {
   );
 }
 
-function StudentsTab({ students }: { students: CampusStudentRow[] }) {
+function StudentsTab({
+  students,
+  mocks,
+  rounds,
+}: {
+  students: CampusStudentRow[];
+  /** Prime Mock Tests, for one column each. */
+  mocks: SubjectTest[];
+  /** AMCAT rounds, for one column each. */
+  rounds: AmcatRound[];
+}) {
   // Week-by-week attendance and per-test scores, for the trend lines.
   const trends = useStudentMetrics().data?.students;
   const [query, setQuery] = useState('');
   const needle = query.trim().toLowerCase();
-  const shown = students.filter(
-    (student) => !needle || student.name.toLowerCase().includes(needle)
+
+  // Oldest first, so Mock Test 1 comes before Mock Test 2.
+  const mockColumns = mocks
+    .filter(isOut)
+    .sort((a, b) => (a.released_at ?? '').localeCompare(b.released_at ?? ''));
+  const roundColumns = [...rounds].sort((a, b) =>
+    (a.first_at ?? '').localeCompare(b.first_at ?? '')
   );
+
+  const rows = students
+    .filter((student) => !needle || student.name.toLowerCase().includes(needle))
+    .map((student) => {
+      const taken = mockColumns
+        .map((test) => student.mocks[test.ids.join(',')])
+        .filter((result) => result?.submitted && result.pct !== null);
+      const scores = roundColumns
+        .map((round) => student.amcat_rounds[round.test_name]?.score)
+        .filter((score): score is number => typeof score === 'number');
+      return {
+        student,
+        mockTaken: taken.length,
+        mockAssigned: mockColumns.filter((test) => student.mocks[test.ids.join(',')]).length,
+        mockAvg: taken.length
+          ? Math.round(taken.reduce((sum, result) => sum + result!.pct!, 0) / taken.length)
+          : null,
+        amcatRounds: scores.length,
+        amcatAvg: scores.length
+          ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
+          : null,
+      };
+    })
+    .sort(
+      (a, b) =>
+        (b.mockAvg ?? -1) - (a.mockAvg ?? -1) ||
+        (b.student.avg_pct ?? -1) - (a.student.avg_pct ?? -1) ||
+        a.student.name.localeCompare(b.student.name)
+    );
+
+  const head = 'px-3 py-2 font-medium whitespace-nowrap';
+  const group = 'border-l border-slate-200';
+  const sticky = 'bg-surface sticky left-0 z-10';
+  const amcatTone = (score: number | null | undefined) =>
+    score == null
+      ? 'text-slate-400'
+      : score >= 60
+        ? 'text-emerald-600 dark:text-emerald-400'
+        : score >= 40
+          ? 'text-amber-600 dark:text-amber-400'
+          : 'text-red-600 dark:text-red-400';
+
   return (
     <div className="space-y-5">
       <InsightsPanel students={students} />
@@ -1327,7 +1444,8 @@ function StudentsTab({ students }: { students: CampusStudentRow[] }) {
           <div>
             <h2 className="text-lg font-bold">Students</h2>
             <p className="text-sm text-slate-500">
-              Every student in PRIME sections, by average score. Open one for their full journey.
+              Every Prime Mock Test and AMCAT round, one column each, best mock average first.
+              Scroll sideways for more; open a student for their full journey.
             </p>
           </div>
           <div className="relative">
@@ -1347,73 +1465,161 @@ function StudentsTab({ students }: { students: CampusStudentRow[] }) {
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-xs text-slate-500">
+              <tr className="border-t border-slate-200 bg-slate-50/80 text-[10px] font-semibold tracking-wide uppercase">
+                <th colSpan={2} className={cn(sticky, 'bg-slate-50 px-5 py-1.5')} />
+                <th
+                  colSpan={mockColumns.length + 1}
+                  className={cn(group, 'text-brand-700 dark:text-brand-300 px-3 py-1.5')}
+                >
+                  Prime Mock Tests
+                </th>
+                <th
+                  colSpan={roundColumns.length + 1}
+                  className={cn(group, 'px-3 py-1.5 text-[#7c3aed]')}
+                >
+                  AMCAT
+                </th>
+                <th colSpan={4} className={cn(group, 'px-3 py-1.5')}>
+                  Attendance and exams
+                </th>
+              </tr>
               <tr className="border-y border-slate-200">
-                <th className="w-10 px-5 py-2 font-medium">#</th>
-                <th className="px-3 py-2 font-medium">Student</th>
-                <th className="px-3 py-2 font-medium">Tests taken</th>
-                <th className="px-3 py-2 text-right font-medium">Average</th>
-                <th className="px-3 py-2 text-right font-medium">Attendance</th>
-                <th className="px-3 py-2 text-right font-medium">Exams avg</th>
-                <th className="px-3 py-2 text-right font-medium">Attendance</th>
-                <th className="px-3 py-2 text-right font-medium">Exams avg</th>
-                <th className="px-3 py-2 font-medium">Last submission</th>
-                <th className="px-5 py-2 text-right font-medium">AMCAT avg</th>
+                <th className={cn(sticky, 'w-10 px-5 py-2 font-medium')}>#</th>
+                <th className={cn(sticky, 'left-10 px-3 py-2 font-medium')}>Student</th>
+                <th className={cn(head, group, 'text-right')}>Total</th>
+                {mockColumns.map((test) => (
+                  <th key={test.ids.join(',')} className={cn(head, 'text-right')}>
+                    <span className="block max-w-36 truncate text-slate-700" title={test.name}>
+                      {test.name}
+                    </span>
+                    <span className="block text-[10px] font-normal">
+                      {lmsDate(test.released_at)}
+                    </span>
+                  </th>
+                ))}
+                <th className={cn(head, group, 'text-right')}>Total</th>
+                {roundColumns.map((round) => (
+                  <th key={round.test_name} className={cn(head, 'text-right')}>
+                    <span
+                      className="block max-w-36 truncate text-slate-700"
+                      title={round.test_name}
+                    >
+                      {round.test_name}
+                    </span>
+                    <span className="block text-[10px] font-normal">{lmsDate(round.first_at)}</span>
+                  </th>
+                ))}
+                <th className={cn(head, group, 'text-right')}>Attendance</th>
+                <th className={cn(head, 'text-right')}>Exams avg</th>
+                <th className={cn(head, 'text-right')}>All PRIME tests</th>
+                <th className={cn(head, 'pr-5')}>Last submission</th>
               </tr>
             </thead>
             <tbody>
-              {shown.map((student, index) => {
-                const taken = percent(student.submitted, student.released);
-                return (
+              {rows.map(
+                ({ student, mockTaken, mockAssigned, mockAvg, amcatRounds, amcatAvg }, index) => (
                   <tr
                     key={student.username}
-                    className="border-b border-dotted border-slate-200 last:border-0"
+                    className={cn(
+                      'group/row border-b border-dotted border-slate-200 last:border-0',
+                      index % 2 === 1 && 'bg-slate-50/50'
+                    )}
                   >
-                    <td className="px-5 py-2.5 text-xs text-slate-400 tabular-nums">{index + 1}</td>
-                    <td className="px-3 py-2.5">
+                    <td className={cn(sticky, 'px-5 py-2.5 text-xs text-slate-400 tabular-nums')}>
+                      {index + 1}
+                    </td>
+                    <td className={cn(sticky, 'left-10 px-3 py-2.5')}>
                       <div className="flex items-center gap-2.5">
                         <Avatar name={student.name} className="size-8" />
                         <div className="min-w-0">
                           <Link
                             to="/s/$slug"
                             params={{ slug: student.username }}
-                            className="text-brand-700 dark:text-brand-300 block truncate font-semibold hover:underline"
+                            className="text-brand-700 dark:text-brand-300 block max-w-44 truncate font-semibold hover:underline"
                           >
                             {student.name}
                           </Link>
                           <p className="text-xs text-slate-500">
-                            {student.program} {student.admission_year}
+                            {cohortLabel(student.program, student.admission_year)}
                           </p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-100">
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${taken}%`, backgroundColor: scoreFill(taken) }}
-                          />
-                        </div>
-                        <span className="text-xs text-slate-600 tabular-nums">
-                          {student.submitted}/{student.released}
-                        </span>
-                      </div>
+
+                    <td className={cn(group, 'px-3 py-2.5 text-right whitespace-nowrap')}>
+                      <span className={cn('font-bold tabular-nums', scoreTone(mockAvg))}>
+                        {mockAvg === null ? '—' : `${mockAvg}%`}
+                      </span>
+                      <span className="block text-[11px] text-slate-500 tabular-nums">
+                        {mockTaken}/{mockAssigned} taken
+                      </span>
                     </td>
-                    <td
-                      className={cn(
-                        'px-3 py-2.5 text-right font-bold tabular-nums',
-                        scoreTone(student.avg_pct)
-                      )}
-                    >
-                      {student.avg_pct === null ? '—' : `${student.avg_pct}%`}
-                      <Sparkline
-                        values={trends?.[student.username]?.test_trend ?? []}
-                        width={60}
-                        height={16}
-                        className="mt-0.5 ml-auto block"
-                      />
+                    {mockColumns.map((test) => {
+                      const result = student.mocks[test.ids.join(',')];
+                      return (
+                        <td
+                          key={test.ids.join(',')}
+                          className="px-3 py-2.5 text-right whitespace-nowrap"
+                        >
+                          {!result ? (
+                            <span className="text-slate-300">—</span>
+                          ) : !result.submitted ? (
+                            <span className="text-xs font-medium text-slate-400">Absent</span>
+                          ) : (
+                            <>
+                              <span
+                                className={cn('font-semibold tabular-nums', scoreTone(result.pct))}
+                              >
+                                {result.pct}%
+                              </span>
+                              {result.marks !== null && test.max_marks && (
+                                <span className="block text-[11px] text-slate-500 tabular-nums">
+                                  {Number(result.marks)}/{Number(test.max_marks)}
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </td>
+                      );
+                    })}
+
+                    <td className={cn(group, 'px-3 py-2.5 text-right whitespace-nowrap')}>
+                      <span className={cn('font-bold tabular-nums', amcatTone(amcatAvg))}>
+                        {amcatAvg ?? '—'}
+                      </span>
+                      <span className="block text-[11px] text-slate-500 tabular-nums">
+                        {amcatRounds} round{amcatRounds === 1 ? '' : 's'}
+                      </span>
                     </td>
-                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                    {roundColumns.map((round) => {
+                      const result = student.amcat_rounds[round.test_name];
+                      return (
+                        <td
+                          key={round.test_name}
+                          className="px-3 py-2.5 text-right whitespace-nowrap"
+                        >
+                          {!result ? (
+                            <span className="text-slate-300">—</span>
+                          ) : (
+                            <>
+                              <span
+                                className={cn(
+                                  'font-semibold tabular-nums',
+                                  amcatTone(result.score)
+                                )}
+                              >
+                                {result.score ?? '—'}
+                              </span>
+                              <span className="block text-[11px] text-slate-500">
+                                {lmsDate(result.taken_on)}
+                              </span>
+                            </>
+                          )}
+                        </td>
+                      );
+                    })}
+
+                    <td className={cn(group, 'px-3 py-2.5 text-right whitespace-nowrap')}>
                       <span
                         className={cn(
                           'font-bold tabular-nums',
@@ -1436,34 +1642,31 @@ function StudentsTab({ students }: { students: CampusStudentRow[] }) {
                     </td>
                     <td
                       className={cn(
-                        'px-3 py-2.5 text-right font-semibold tabular-nums',
+                        'px-3 py-2.5 text-right font-semibold whitespace-nowrap tabular-nums',
                         scoreTone(student.exam_avg)
                       )}
                     >
                       {student.exam_avg === null ? '—' : `${student.exam_avg}%`}
                     </td>
-                    <td className="px-3 py-2.5 text-xs whitespace-nowrap text-slate-600">
+                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                      <span
+                        className={cn('font-semibold tabular-nums', scoreTone(student.avg_pct))}
+                      >
+                        {student.avg_pct === null ? '—' : `${student.avg_pct}%`}
+                      </span>
+                      <span className="block text-[11px] text-slate-500 tabular-nums">
+                        {student.submitted}/{student.released} done
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 pr-5 text-xs whitespace-nowrap text-slate-600">
                       {lmsDate(student.last_submitted_at)}
                     </td>
-                    <td
-                      className={cn(
-                        'px-5 py-2.5 text-right font-semibold tabular-nums',
-                        scoreTone(student.amcat_avg)
-                      )}
-                    >
-                      {student.amcat_avg ?? '—'}
-                      {student.amcat > 1 && (
-                        <span className="block text-[11px] font-normal text-slate-500">
-                          {student.amcat} rounds
-                        </span>
-                      )}
-                    </td>
                   </tr>
-                );
-              })}
+                )
+              )}
             </tbody>
           </table>
-          {!shown.length && <p className="px-5 py-6 text-sm text-slate-500">No student matches.</p>}
+          {!rows.length && <p className="px-5 py-6 text-sm text-slate-500">No student matches.</p>}
         </div>
       </section>
     </div>
@@ -1510,7 +1713,7 @@ function TestPanel({
   onClose,
 }: {
   campusId: number;
-  batch?: number;
+  batch?: string;
   test: string;
   onClose: () => void;
 }) {
