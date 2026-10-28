@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
-import { Activity, CheckCircle2, Link2, RefreshCw, TrendingUp, Users } from 'lucide-react';
+import { Activity, Check, CheckCircle2, Link2, RefreshCw, TrendingUp, Users } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 import { CountUp } from '@/components/common/CountUp';
 import { cn } from '@/lib/utils';
@@ -34,7 +35,6 @@ export function StudentsHero({
   onRefresh,
 }: StudentsHeroProps) {
   const loading = settled < linked;
-  const syncing = loading || refreshing > 0;
 
   return (
     <section className="hero-glow from-brand-700 via-brand-700 to-brand-900 relative overflow-hidden rounded-2xl bg-gradient-to-br p-5 text-white shadow-[0_20px_50px_-20px_rgb(16_38_70/0.6)] sm:p-7">
@@ -64,14 +64,13 @@ export function StudentsHero({
               : `Up to date · checked ${new Date(checkedAt).toLocaleTimeString()}`}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onRefresh}
-          className="text-brand-800 hover:bg-brand-50 inline-flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-2 text-sm font-semibold shadow-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-        >
-          <RefreshCw className={cn('size-4', syncing && 'animate-spin')} aria-hidden />
-          Refresh stats
-        </button>
+        <RefreshButton
+          onRefresh={onRefresh}
+          loading={loading}
+          settled={settled}
+          linked={linked}
+          refreshing={refreshing}
+        />
       </div>
 
       <dl className="relative mt-6 grid grid-cols-2 gap-3 md:grid-cols-5">
@@ -131,5 +130,127 @@ function HeroStat({ icon: Icon, label, value, note, tone = 'default' }: HeroStat
         {note && <span className="text-brand-200 ml-1 text-sm font-medium">{note}</span>}
       </dd>
     </div>
+  );
+}
+
+interface RefreshButtonProps {
+  onRefresh: () => void;
+  loading: boolean;
+  settled: number;
+  linked: number;
+  refreshing: number;
+}
+
+/**
+ * Idle: a white pill with a sheen on hover. Syncing: the pill fills up with striped progress and
+ * a ring counts round the icon. Done: a green tick pops in for a moment.
+ */
+function RefreshButton({ onRefresh, loading, settled, linked, refreshing }: RefreshButtonProps) {
+  const syncing = loading || refreshing > 0;
+
+  // Profiles with fresh numbers, out of all linked ones: one count across loading and refreshing.
+  const done = Math.max(0, settled - refreshing);
+  const total = linked;
+  const progress = total ? Math.min(1, done / total) : 0;
+
+  // Show "Up to date" briefly when a sync finishes.
+  const [justFinished, setJustFinished] = useState(false);
+  const wasSyncing = useRef(syncing);
+  useEffect(() => {
+    if (wasSyncing.current && !syncing) {
+      setJustFinished(true);
+      const timer = setTimeout(() => setJustFinished(false), 2200);
+      wasSyncing.current = syncing;
+      return () => clearTimeout(timer);
+    }
+    wasSyncing.current = syncing;
+  }, [syncing]);
+
+  const radius = 9;
+  const circumference = 2 * Math.PI * radius;
+
+  return (
+    <button
+      type="button"
+      onClick={onRefresh}
+      aria-busy={syncing}
+      className={cn(
+        'group relative isolate inline-flex min-w-44 items-center gap-2.5 overflow-hidden rounded-xl py-2 pr-4 pl-2.5 text-sm font-semibold shadow-lg transition-all duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white',
+        syncing
+          ? 'bg-white/15 text-white ring-1 ring-white/30 backdrop-blur'
+          : justFinished
+            ? 'bg-emerald-500 text-white ring-1 ring-emerald-300/60'
+            : 'sheen text-brand-800 bg-white hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0'
+      )}
+    >
+      {syncing && (
+        <span
+          aria-hidden
+          className="absolute inset-y-0 left-0 -z-10 bg-gradient-to-r from-sky-400/70 to-sky-300/80 transition-[width] duration-500 ease-out"
+          style={{ width: `${Math.max(progress * 100, 6)}%` }}
+        >
+          <span className="progress-stripes absolute inset-0" />
+        </span>
+      )}
+
+      <span className="relative flex size-6 shrink-0 items-center justify-center">
+        {syncing ? (
+          <>
+            <svg viewBox="0 0 24 24" className="absolute inset-0 -rotate-90" aria-hidden>
+              <circle
+                cx="12"
+                cy="12"
+                r={radius}
+                fill="none"
+                strokeWidth="2.5"
+                className="stroke-white/25"
+              />
+              <circle
+                cx="12"
+                cy="12"
+                r={radius}
+                fill="none"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                className="stroke-white transition-[stroke-dasharray] duration-500"
+                strokeDasharray={`${Math.max(progress, 0.08) * circumference} ${circumference}`}
+              />
+            </svg>
+            <RefreshCw className="size-3 animate-spin [animation-duration:1.6s]" aria-hidden />
+          </>
+        ) : justFinished ? (
+          <Check className="animate-pop size-5" strokeWidth={3} aria-hidden />
+        ) : (
+          <RefreshCw
+            className="size-4 transition-transform duration-500 group-hover:rotate-180"
+            aria-hidden
+          />
+        )}
+      </span>
+
+      <span className="flex flex-col items-start leading-tight">
+        {syncing ? (
+          <>
+            <span>Syncing stats</span>
+            <span className="text-[11px] font-medium text-white/80 tabular-nums">
+              {total
+                ? `${done.toLocaleString('en-IN')} / ${total.toLocaleString('en-IN')} profiles`
+                : 'Starting…'}
+            </span>
+          </>
+        ) : justFinished ? (
+          <span className="animate-rise">Up to date</span>
+        ) : (
+          <span>Refresh stats</span>
+        )}
+      </span>
+      <span className="sr-only" role="status">
+        {syncing
+          ? `Syncing, ${Math.round(progress * 100)} percent`
+          : justFinished
+            ? 'Stats up to date'
+            : ''}
+      </span>
+    </button>
   );
 }
