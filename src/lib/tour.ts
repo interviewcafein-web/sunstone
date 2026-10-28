@@ -47,7 +47,7 @@ const TOURS: Record<TourId, Step[]> = {
     {
       target: 'nav-campuses',
       title: 'Campuses',
-      text: 'Each campus’s PRIME journey: tests and syllabus, exams, attendance by subject and instructor, AMCAT, and who needs a follow-up.',
+      text: 'Each campus’s PRIME journey: tests and Learning & Practice, exams, attendance by subject and instructor, AMCAT, and who needs a follow-up.',
       side: 'bottom',
     },
     {
@@ -73,7 +73,7 @@ const TOURS: Record<TourId, Step[]> = {
     {
       target: 'campus-tiles',
       title: 'The campus at a glance',
-      text: 'Tests held, participation, average score, attendance and syllabus progress. The faint lines show the last weeks; ▲▼ is the change since last week.',
+      text: 'Tests held, participation, average score, attendance and Learning & Practice progress. The faint lines show the last weeks; ▲▼ is the change since last week.',
       side: 'bottom',
     },
     {

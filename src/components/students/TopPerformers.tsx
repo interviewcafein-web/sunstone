@@ -39,7 +39,7 @@ export function TopPerformers({ rows }: { rows: StudentRow[] }) {
         Top performers
         <span className="text-xs font-medium text-slate-500">· most problems solved</span>
       </h2>
-      <ol className="grid items-end gap-4 md:grid-cols-3">
+      <ol className="grid gap-4 pt-2 md:grid-cols-3">
         {top.map((row, place) => {
           const medal = PODIUM[place];
           const solved = SOLVING_PLATFORM_IDS.flatMap((id) => {
@@ -54,15 +54,17 @@ export function TopPerformers({ rows }: { rows: StudentRow[] }) {
           return (
             <li
               key={row.student.id}
-              className={cn('animate-rise', PODIUM_ORDER[place])}
+              className={cn('animate-rise min-w-0', PODIUM_ORDER[place])}
               style={{ animationDelay: `${[120, 0, 220][place]}ms` }}
             >
               <Link
                 to="/s/$slug"
                 params={{ slug: row.student.slug }}
                 className={cn(
-                  'group shadow-card bg-surface relative isolate flex flex-col overflow-hidden rounded-2xl border transition duration-300 hover:-translate-y-1',
-                  champion ? 'border-transparent md:pb-3' : 'border-slate-200'
+                  'group shadow-card bg-surface relative isolate flex min-w-0 flex-col overflow-hidden rounded-2xl border transition duration-300 hover:-translate-y-1',
+                  champion
+                    ? 'border-transparent md:-translate-y-2 md:hover:-translate-y-3'
+                    : 'border-slate-200'
                 )}
                 style={
                   champion
@@ -75,72 +77,70 @@ export function TopPerformers({ rows }: { rows: StudentRow[] }) {
                 {/* The medal colour washing down from the top. */}
                 <span
                   aria-hidden
-                  className="absolute inset-x-0 top-0 -z-10 h-24 opacity-25 transition-opacity duration-300 group-hover:opacity-40"
+                  className="absolute inset-x-0 top-0 -z-10 h-16 opacity-25 transition-opacity duration-300 group-hover:opacity-40"
                   style={{ background: `linear-gradient(180deg, ${medal.soft}, transparent)` }}
                 />
                 <span
                   aria-hidden
-                  className="absolute inset-x-0 top-0 h-1.5"
+                  className="absolute inset-x-0 top-0 h-1"
                   style={{ background: `linear-gradient(90deg, ${medal.color}, ${medal.soft})` }}
                 />
                 {champion && <span aria-hidden className="shimmer-sweep absolute inset-0 -z-10" />}
 
-                <div
-                  className={cn(
-                    'flex flex-col items-center px-4 text-center',
-                    champion ? 'pt-7' : 'pt-5'
-                  )}
-                >
-                  <div className="relative">
+                <div className="flex items-center gap-3 px-4 pt-4">
+                  <div className="relative shrink-0">
                     {champion && (
                       <Crown
-                        className="absolute -top-5 left-1/2 size-6 -translate-x-1/2 -rotate-6 fill-[#fbbf24] text-[#d97706] transition-transform duration-300 group-hover:-translate-y-1 group-hover:rotate-0"
+                        className="absolute -top-3.5 left-1/2 size-5 -translate-x-1/2 -rotate-6 fill-[#fbbf24] text-[#d97706] transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:rotate-0"
                         aria-hidden
                       />
                     )}
                     <span
-                      className="block rounded-full p-1"
+                      className="block rounded-full p-0.5"
                       style={{
                         background: `conic-gradient(${medal.color}, ${medal.soft}, ${medal.color})`,
                       }}
                     >
                       <Avatar
                         name={row.student.name}
-                        className={cn(
-                          'ring-2 ring-white',
-                          champion ? 'size-16 text-lg' : 'size-12 text-sm'
-                        )}
+                        className="size-11 text-sm ring-2 ring-white"
                       />
                     </span>
-                    <Medal place={place} className="absolute -right-1 -bottom-1" />
+                    <Medal
+                      place={place}
+                      className="absolute -right-1.5 -bottom-1 size-5 text-[10px]"
+                    />
                   </div>
-                  <span
-                    className="mt-2 rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase"
-                    style={{ background: `${medal.color}22`, color: medal.color }}
-                  >
-                    {medal.label}
-                  </span>
-                  <p className="group-hover:text-brand-700 dark:group-hover:text-brand-300 mt-1.5 max-w-full truncate font-bold text-slate-900">
-                    {row.student.name}
-                  </p>
-                  <p className="max-w-full truncate text-xs text-slate-500">
-                    {[row.student.campus, row.student.batch].filter(Boolean).join(' · ')}
-                  </p>
-
-                  <p
-                    className={cn(
-                      'mt-3 font-extrabold tracking-tight tabular-nums',
-                      champion ? 'text-4xl' : 'text-3xl'
-                    )}
-                  >
-                    <CountUp value={row.total} />
-                    <span className="ml-1.5 text-sm font-medium text-slate-500">solved</span>
+                  <div className="min-w-0 flex-1">
+                    <span
+                      className="rounded-full px-1.5 py-px text-[9px] font-bold tracking-wider uppercase"
+                      style={{ background: `${medal.color}22`, color: medal.color }}
+                    >
+                      {medal.label}
+                    </span>
+                    <p className="group-hover:text-brand-700 dark:group-hover:text-brand-300 mt-0.5 truncate font-bold text-slate-900">
+                      {row.student.name}
+                    </p>
+                    <p className="truncate text-xs text-slate-500">
+                      {[row.student.campus, row.student.batch].filter(Boolean).join(' · ')}
+                    </p>
+                  </div>
+                  <p className="shrink-0 text-right leading-none">
+                    <span
+                      className={cn(
+                        'block font-extrabold tracking-tight tabular-nums',
+                        champion ? 'text-3xl' : 'text-2xl'
+                      )}
+                    >
+                      <CountUp value={row.total} />
+                    </span>
+                    <span className="text-[11px] font-medium text-slate-500">solved</span>
                   </p>
                 </div>
 
                 {/* Where the problems were solved: one bar split by platform, then the counts. */}
-                <div className="mt-3 px-4 pb-4">
-                  <div className="flex h-2 gap-0.5 overflow-hidden rounded-full bg-slate-100">
+                <div className="flex flex-wrap items-center gap-2 px-4 pt-3 pb-3.5">
+                  <div className="flex h-1.5 min-w-24 flex-1 gap-0.5 overflow-hidden rounded-full bg-slate-100">
                     {solved.map(({ id, value }) => (
                       <span
                         key={id}
@@ -153,13 +153,13 @@ export function TopPerformers({ rows }: { rows: StudentRow[] }) {
                       />
                     ))}
                   </div>
-                  <ul className="mt-2.5 flex flex-wrap justify-center gap-1.5">
-                    {solved.slice(0, 4).map(({ id, value }) => (
+                  <ul className="flex shrink-0 gap-1">
+                    {solved.slice(0, 3).map(({ id, value }) => (
                       <li
                         key={id}
-                        className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700"
+                        className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-700"
                       >
-                        <PlatformLogo platform={id} className="size-3.5" />
+                        <PlatformLogo platform={id} className="size-3" />
                         {value.toLocaleString()}
                       </li>
                     ))}

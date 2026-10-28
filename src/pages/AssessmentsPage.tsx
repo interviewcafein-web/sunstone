@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, getRouteApi } from '@tanstack/react-router';
 import {
   Bar,
@@ -42,6 +42,9 @@ import {
 import { ExamsTab } from '@/components/assessments/ExamsSection';
 import { Avatar } from '@/components/common/Avatar';
 import { CampusLogo } from '@/components/common/CampusLogo';
+import { PainPoints } from '@/components/insights/PainPoints';
+import { useInsightRows } from '@/hooks/useInsightRows';
+import { findPainPoints, groupBy, groupStats } from '@/lib/insights';
 import { Sparkline, TrendDelta, lastChange } from '@/components/common/Sparkline';
 import {
   CATEGORY_LABELS,
@@ -61,6 +64,7 @@ import {
   type CampusStudentRow,
   type CampusTest,
   type SubjectTest,
+  type SyllabusModule,
   type TestCategory,
   type TestStatus,
 } from '@/lib/assessments';
@@ -560,7 +564,7 @@ function CampusView({
           />
           <HeroStat
             icon={CalendarDays}
-            label="Syllabus started"
+            label="Learning & Practice started"
             value={`${percent(summary.modules_started, summary.modules)}%`}
             note={`${summary.modules_started}/${summary.modules} modules`}
           />
@@ -594,7 +598,10 @@ function CampusView({
       </nav>
 
       {tab === 'overview' && (
-        <OverviewTab data={data} onOpen={open} onTab={(id) => set({ tab: id })} />
+        <>
+          {name && <CampusPainPoints campus={name} batch={search.batch} />}
+          <OverviewTab data={data} onOpen={open} onTab={(id) => set({ tab: id })} />
+        </>
       )}
       {tab === 'subject' && <SubjectTestsTab tests={data.subjectTests} onOpen={open} />}
       {tab === 'modules' && (
@@ -617,11 +624,119 @@ function CampusView({
   );
 }
 
+/**
+ * This campus's (and batch's) pain points, from the same 360° model as the 360° page: its
+ * students on all five fronts, with the batches compared when no batch is chosen.
+ */
+function CampusPainPoints({ campus, batch }: { campus: string; batch?: number }) {
+  const { rows, isPending } = useInsightRows();
+  const { points, scope } = useMemo(() => {
+    const scoped = rows.filter(
+      (row) => row.student.campus === campus && (!batch || row.student.batch === String(batch))
+    );
+    const stats = groupStats(campus, scoped);
+    const groups = batch
+      ? []
+      : groupBy(scoped, (row) => row.student.batch).filter((group) => group.students >= 5);
+    return { points: findPainPoints(stats, groups, 'batches'), scope: stats };
+  }, [rows, campus, batch]);
+
+  if (isPending) return <InlineLoader label="Finding pain points…" />;
+  if (!scope.students) return null;
+  return (
+    <PainPoints
+      points={points}
+      columns={2}
+      limit={4}
+      action={
+        <Link
+          to="/insights"
+          search={{ campus, batch: batch ? String(batch) : undefined }}
+          className="text-brand-700 dark:text-brand-300 inline-flex items-center gap-1 text-sm font-semibold hover:underline"
+        >
+          Full 360° view
+          <ChevronRight className="size-4" aria-hidden />
+        </Link>
+      }
+    />
+  );
+}
+
 function Count({ n }: { n: number }) {
   return (
     <span className="rounded-full bg-slate-100 px-1.5 text-[10px] font-semibold text-slate-600 tabular-nums">
       {n}
     </span>
+  );
+}
+
+/** The modules of a subject as a grid: the first three rows, the rest behind "Show all". */
+function ModuleGrid({ modules }: { modules: SyllabusModule[] }) {
+  const [all, setAll] = useState(false);
+  const FIRST = 9;
+  const shown = all ? modules : modules.slice(0, FIRST);
+  return (
+    <>
+      <ol className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        {shown.map((module, index) => {
+          const share = percent(module.released, module.total);
+          const state = !module.total
+            ? 'empty'
+            : module.released === module.total
+              ? 'done'
+              : module.started
+                ? 'progress'
+                : 'upcoming';
+          return (
+            <li key={module.name} className="rounded-xl border border-slate-200 p-3">
+              <div className="flex items-start gap-2.5">
+                <span
+                  className={cn(
+                    'mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
+                    state === 'done' && 'bg-emerald-500 text-white',
+                    state === 'progress' && 'bg-brand-700 text-white',
+                    (state === 'upcoming' || state === 'empty') && 'bg-slate-100 text-slate-500'
+                  )}
+                >
+                  {state === 'done' ? <Check className="size-3.5" aria-hidden /> : index + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold" title={module.name}>
+                    {module.name}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {module.total
+                      ? `${module.released} of ${module.total} tests released`
+                      : 'No tests yet'}
+                    {module.folders.length ? ` · ${module.folders.length} topics` : ''}
+                  </p>
+                  {module.total > 0 && (
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className={cn(
+                          'h-full rounded-full',
+                          state === 'done' ? 'bg-emerald-500' : 'bg-brand-600'
+                        )}
+                        style={{ width: `${share}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+      {modules.length > FIRST && (
+        <button
+          type="button"
+          onClick={() => setAll(!all)}
+          className="text-brand-700 dark:text-brand-300 mt-3 text-sm font-semibold hover:underline"
+        >
+          {all ? 'Show fewer' : `Show all ${modules.length} modules`}
+        </button>
+      )}
+    </>
   );
 }
 
@@ -788,7 +903,7 @@ function OverviewTab({
       <section className={cn(panel, 'p-5 lg:col-span-3')}>
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 className="text-lg font-bold">Syllabus</h2>
+            <h2 className="text-lg font-bold">Learning &amp; Practice</h2>
             <p className="text-sm text-slate-500">
               Each module of the PRIME domain subject: tests released out of all its tests.
             </p>
@@ -804,57 +919,7 @@ function OverviewTab({
         {data.subjects.map((subject) => (
           <div key={subject.key} className="mt-4">
             {data.subjects.length > 1 && <p className="mb-2 font-semibold">{subject.name}</p>}
-            <ol className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {subject.modules.map((module, index) => {
-                const share = percent(module.released, module.total);
-                const state = !module.total
-                  ? 'empty'
-                  : module.released === module.total
-                    ? 'done'
-                    : module.started
-                      ? 'progress'
-                      : 'upcoming';
-                return (
-                  <li key={module.name} className="rounded-xl border border-slate-200 p-3">
-                    <div className="flex items-start gap-2.5">
-                      <span
-                        className={cn(
-                          'mt-0.5 inline-flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
-                          state === 'done' && 'bg-emerald-500 text-white',
-                          state === 'progress' && 'bg-brand-700 text-white',
-                          (state === 'upcoming' || state === 'empty') &&
-                            'bg-slate-100 text-slate-500'
-                        )}
-                      >
-                        {state === 'done' ? <Check className="size-3.5" aria-hidden /> : index + 1}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold" title={module.name}>
-                          {module.name}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {module.total
-                            ? `${module.released} of ${module.total} tests released`
-                            : 'No tests yet'}
-                          {module.folders.length ? ` · ${module.folders.length} topics` : ''}
-                        </p>
-                        {module.total > 0 && (
-                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                            <div
-                              className={cn(
-                                'h-full rounded-full',
-                                state === 'done' ? 'bg-emerald-500' : 'bg-brand-600'
-                              )}
-                              style={{ width: `${share}%` }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
+            <ModuleGrid modules={subject.modules} />
           </div>
         ))}
       </section>
