@@ -113,7 +113,7 @@ function toReportRow(row: StudentRow, insight: StudentInsight): CampusReportRow 
       if (cell.kind === 'none' || cell.kind === 'invalid' || cell.kind === 'not_found') {
         return [platform, cell.kind];
       }
-      return [platform, 'error'];
+      return [platform, cell.kind === 'loading' ? 'loading' : 'error'];
     })
   ) as Record<PlatformId, ReportValue>;
   return {
@@ -123,7 +123,17 @@ function toReportRow(row: StudentRow, insight: StudentInsight): CampusReportRow 
     batch: row.student.batch,
     values,
     total: row.total,
-    zone: row.zone ?? { zone: 'none' },
+    // Still loading somewhere: placed by the platforms that have answered so far.
+    zone:
+      row.zone ??
+      zoneOf(
+        Object.fromEntries(
+          ZONE_BASIS.flatMap((platform) => {
+            const cell = row.cells[platform];
+            return cell.kind === 'ok' ? [[platform, cell.summary.value]] : [];
+          })
+        )
+      ),
     lastActive: row.lastActive?.day,
     insight,
     metrics: row.metrics,
@@ -201,13 +211,15 @@ export default function StudentsPage() {
   // attendance, tests and AMCAT, but goes ahead without them if they could not be loaded.
   const reportBlocker = search.q
     ? 'Clear the name search so the report includes every student.'
-    : // A few platform lookups can hang for a long time; past 99.5% the report goes ahead and
-      // those profiles show without numbers.
-      summaries.total - summaries.settled > Math.max(3, Math.floor(summaries.total * 0.005))
-      ? `Loading profiles: ${summaries.settled} of ${summaries.total}.`
-      : metrics.isPending
-        ? 'Loading attendance, tests and AMCAT.'
-        : undefined;
+    : metrics.isPending
+      ? 'Loading attendance, tests and AMCAT.'
+      : undefined;
+  // Coding numbers never hold the report up: saved ones show at once, and the few profiles
+  // still loading from the platforms are marked in the report.
+  const stillLoading = summaries.total - summaries.settled;
+  const reportNote = stillLoading
+    ? `${stillLoading.toLocaleString()} coding profiles still loading; they show as … in the report.`
+    : undefined;
 
   const downloadReport = async () => {
     setReportState('busy');
@@ -306,6 +318,7 @@ export default function StudentsPage() {
           onZone={(zone) => setSearch({ zone })}
           report={{
             blocker: reportBlocker,
+            note: reportNote,
             state: reportState,
             label: search.campus ? 'Download campus report' : 'Download all-campus report',
             onDownload: downloadReport,

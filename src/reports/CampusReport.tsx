@@ -21,7 +21,8 @@ import {
 } from '@/reports/shared';
 
 /** What a platform cell shows: a count, or why there is none. */
-export type ReportValue = number | 'none' | 'invalid' | 'not_found' | 'error';
+/** A solved count, or why there is none. "loading": the platform had not answered yet. */
+export type ReportValue = number | 'none' | 'invalid' | 'not_found' | 'error' | 'loading';
 
 export interface CampusReportRow {
   name: string;
@@ -94,6 +95,7 @@ function cellText(value: ReportValue) {
   if (value === 'invalid') return 'check';
   if (value === 'not_found') return 'not found';
   if (value === 'error') return 'n/a';
+  if (value === 'loading') return '…';
   return '—';
 }
 
@@ -183,6 +185,7 @@ function CampusPages({
       .sort((a, b) => (b.zone.count ?? 0) - (a.zone.count ?? 0) || b.total - a.total),
   }));
   const top = [...rows].sort((a, b) => b.total - a.total).slice(0, 5);
+  const pending = rows.filter((row) => Object.values(row.values).includes('loading')).length;
   const label = [data.title, ...data.filters].join(' · ');
 
   return (
@@ -201,6 +204,9 @@ function CampusPages({
               ...data.filters,
               `${formatNumber(rows.length)} students`,
               formatDate(data.generatedAt),
+              ...(pending
+                ? [`${formatNumber(pending)} coding profiles were still loading (shown as …)`]
+                : []),
             ].join('  ·  ')}
           </Text>
 

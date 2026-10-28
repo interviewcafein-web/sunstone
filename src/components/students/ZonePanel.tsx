@@ -34,6 +34,8 @@ interface ZonePanelProps {
   report: {
     /** Why the report cannot be downloaded yet, if it cannot. */
     blocker?: string;
+    /** Shown under the button without disabling it. */
+    note?: string;
     state: 'idle' | 'busy' | 'failed';
     /** Button text, e.g. "Download campus report". */
     label: string;
@@ -94,6 +96,9 @@ export function ZonePanel({ rows, active, onZone, report }: ZonePanelProps) {
             )}
             {report.state === 'busy' ? 'Preparing PDF…' : report.label}
           </button>
+          {report.note && !report.blocker && report.state !== 'failed' && (
+            <p className="mt-1 text-xs text-slate-500">{report.note}</p>
+          )}
           {(report.blocker || report.state === 'failed') && (
             <p
               className={cn(
