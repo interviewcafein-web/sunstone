@@ -1,4 +1,4 @@
-import { Link, Outlet, createRootRoute } from '@tanstack/react-router';
+import { Link, Outlet, createRootRoute, useRouterState } from '@tanstack/react-router';
 import { Building2, Library, LogIn, Radar, Users } from 'lucide-react';
 
 import { BrandLockup } from '@/components/common/BrandLockup';
@@ -30,6 +30,8 @@ function RootComponent() {
   const session = useSession();
   const logOut = useLogOut();
   const user = session.data;
+  // The login page is the sign-in form itself; a "Staff login" button there only repeats it.
+  const onLoginPage = useRouterState({ select: (state) => state.location.pathname === '/login' });
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -74,7 +76,7 @@ function RootComponent() {
             )}
 
             <div className="ml-auto flex items-center gap-1 md:ml-0">
-              {!user && !session.isPending && (
+              {!user && !session.isPending && !onLoginPage && (
                 <Link
                   to="/login"
                   className="bg-brand-700 hover:bg-brand-800 mr-1 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white"

@@ -141,7 +141,7 @@ function BrandPanel() {
       />
       <div
         aria-hidden
-        className="animate-float absolute top-10 right-8 -z-10 hidden size-24 md:block rounded-3xl border border-white/15 bg-white/5"
+        className="animate-float absolute right-6 bottom-6 -z-10 hidden size-20 md:block rounded-3xl border border-white/15 bg-white/5"
         style={{ animationDelay: '-6s' }}
       />
 
