@@ -340,7 +340,7 @@ export function Donut({
                 outerRadius={66}
                 paddingAngle={total ? 2 : 0}
                 stroke="none"
-                isAnimationActive={false}
+                animationDuration={900}
               >
                 {(total ? rows : [{ label: 'None', count: 1 }]).map((row) => (
                   <Cell key={row.label} fill={total ? row.color : ui.empty} />
@@ -407,12 +407,12 @@ export function DifficultyBreakdown({ rows }: { rows: DifficultyRow[] }) {
                   allowDecimals={false}
                 />
                 <Tooltip contentStyle={ui.tooltipStyle} cursor={{ fill: ui.cursor }} />
-                <Bar dataKey="Attempted" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                <Bar dataKey="Attempted" radius={[4, 4, 0, 0]} animationDuration={900}>
                   {data.map((row) => (
                     <Cell key={row.label} fill={row.color} fillOpacity={0.28} />
                   ))}
                 </Bar>
-                <Bar dataKey="Solved" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                <Bar dataKey="Solved" radius={[4, 4, 0, 0]} animationDuration={900}>
                   {data.map((row) => (
                     <Cell key={row.label} fill={row.color} />
                   ))}
@@ -512,7 +512,7 @@ export function RatingChart({ history, color }: { history: ContestPoint[]; color
             strokeWidth={2}
             fill={`url(#${gradientId})`}
             dot={sorted.length < 30 ? { r: 2.5, fill: color, strokeWidth: 0 } : false}
-            isAnimationActive={false}
+            animationDuration={900}
           />
         </AreaChart>
       </ResponsiveContainer>
@@ -600,7 +600,7 @@ export function RatingHistogram({ items }: { items: CountItem[] }) {
               formatter={(value) => [value, 'Solved']}
               labelFormatter={(label) => `Rating ${label}`}
             />
-            <Bar dataKey="count" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+            <Bar dataKey="count" radius={[4, 4, 0, 0]} animationDuration={900}>
               {items.map((item) => (
                 <Cell key={item.label} fill={cfColor(Number(item.label))} />
               ))}

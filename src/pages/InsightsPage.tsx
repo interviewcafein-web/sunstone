@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 
 import { Avatar } from '@/components/common/Avatar';
+import { AnimatedRing } from '@/components/common/AnimatedRing';
 import { CampusLogo } from '@/components/common/CampusLogo';
 import { PageLoader } from '@/components/common/PageLoader';
 import { Sparkline } from '@/components/common/Sparkline';
@@ -256,44 +257,19 @@ function OverallBadge({
   students: number;
 }) {
   const size = 92;
-  const radius = 38;
-  const circumference = 2 * Math.PI * radius;
   const color =
     value === null ? '#94a3b8' : value >= 70 ? '#34d399' : value >= 50 ? '#fbbf24' : '#f87171';
   return (
     <div className="flex items-center gap-4 rounded-xl border border-white/15 bg-white/10 p-3 pr-5 backdrop-blur-sm">
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden>
-        <circle
-          cx={46}
-          cy={46}
-          r={radius}
-          fill="none"
-          strokeWidth={8}
-          stroke="rgb(255 255 255 / 0.15)"
-        />
-        <circle
-          cx={46}
-          cy={46}
-          r={radius}
-          fill="none"
-          strokeWidth={8}
-          strokeLinecap="round"
-          stroke={color}
-          className="ring-fill"
-          strokeDasharray={`${((value ?? 0) / 100) * circumference} ${circumference}`}
-          transform="rotate(-90 46 46)"
-        />
-        <text
-          x="50%"
-          y="50%"
-          dominantBaseline="central"
-          textAnchor="middle"
-          fill="white"
-          className="text-xl font-bold"
-        >
-          {value ?? '—'}
-        </text>
-      </svg>
+      <AnimatedRing
+        value={value}
+        size={size}
+        stroke={8}
+        color={color}
+        trackColor="rgb(255 255 255 / 0.15)"
+        textColor="#ffffff"
+        suffix=""
+      />
       <div>
         <p className="text-sm font-semibold">Overall health</p>
         <p className="text-brand-100 text-xs">Average across all five fronts</p>
@@ -387,9 +363,10 @@ function DimensionCard({
         {own.histogram.map((count, index) => (
           <div key={index} className="group/bar flex h-full flex-1 flex-col justify-end">
             <div
-              className="spark-draw rounded-t-md transition-all group-hover/bar:opacity-80"
+              className="bar-grow rounded-t-md transition-opacity group-hover/bar:opacity-80"
               title={`${buckets[index]}: ${count} students`}
               style={{
+                animationDelay: `${index * 80}ms`,
                 height: `${Math.max(4, (count / peak) * 100)}%`,
                 background: `linear-gradient(180deg, ${dimension.color}, ${dimension.color}66)`,
               }}
@@ -424,7 +401,7 @@ function BandBar({ good, ok, risk }: { good: number; ok: number; risk: number })
           <span
             key={part.label}
             title={`${part.label}: ${part.value}`}
-            className="h-full transition-[width] duration-700"
+            className="bar-fill h-full transition-[width] duration-700"
             style={{ width: `${(part.value / total) * 100}%`, background: part.color }}
           />
         ))}

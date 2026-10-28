@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 
-const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+export const prefersReducedMotion = () =>
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** Runs `start` once the intro animation in index.html has gone, so counting happens in view. */
-function afterIntro(start: () => void): () => void {
+export function afterIntro(start: () => void): () => void {
   const root = document.documentElement;
   if (root.classList.contains('splash-gone')) {
     start();

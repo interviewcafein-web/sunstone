@@ -41,6 +41,7 @@ import {
 } from '@/components/assessments/CampusInsights';
 import { ExamsTab } from '@/components/assessments/ExamsSection';
 import { Avatar } from '@/components/common/Avatar';
+import { AnimatedRing } from '@/components/common/AnimatedRing';
 import { CampusLogo } from '@/components/common/CampusLogo';
 import { PainPoints } from '@/components/insights/PainPoints';
 import { useInsightRows } from '@/hooks/useInsightRows';
@@ -102,49 +103,15 @@ function Problem({ message }: { message: string }) {
   );
 }
 
-/** A small ring showing a percentage. */
+/** A small ring showing a percentage; it draws itself and counts up when it comes into view. */
 function Ring({ value, size = 56 }: { value: number | null; size?: number }) {
-  const radius = size / 2 - 5;
-  const circumference = 2 * Math.PI * radius;
-  const shown = value ?? 0;
+  // The arc turns from red through amber to green as it climbs, ending on the score's colour.
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox={`0 0 ${size} ${size}`}
-      aria-hidden
-      className="shrink-0"
-    >
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        fill="none"
-        strokeWidth={6}
-        className="stroke-slate-200"
-      />
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        fill="none"
-        strokeWidth={6}
-        strokeLinecap="round"
-        stroke={scoreFill(value)}
-        strokeDasharray={`${(shown / 100) * circumference} ${circumference}`}
-        className="ring-fill"
-        transform={`rotate(-90 ${size / 2} ${size / 2})`}
-      />
-      <text
-        x="50%"
-        y="50%"
-        dominantBaseline="central"
-        textAnchor="middle"
-        className="fill-slate-800 text-[13px] font-bold"
-      >
-        {value === null ? '—' : `${value}%`}
-      </text>
-    </svg>
+    <AnimatedRing
+      value={value}
+      size={size}
+      color={(shown) => scoreFill(value === null ? null : shown)}
+    />
   );
 }
 
@@ -336,7 +303,7 @@ function CampusCard({ campus }: { campus: CampusOverview }) {
             <div className="mt-1.5 flex items-center gap-2">
               <span className="h-1.5 w-12 shrink-0 overflow-hidden rounded-full bg-slate-200">
                 <span
-                  className="bg-brand-500 block h-full rounded-full"
+                  className="bar-fill bg-brand-500 block h-full rounded-full"
                   style={{ width: `${inPrime}%` }}
                 />
               </span>
@@ -714,7 +681,7 @@ function ModuleGrid({ modules }: { modules: SyllabusModule[] }) {
                     <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
                       <div
                         className={cn(
-                          'h-full rounded-full',
+                          'bar-fill h-full rounded-full',
                           state === 'done' ? 'bg-emerald-500' : 'bg-brand-600'
                         )}
                         style={{ width: `${share}%` }}
@@ -824,7 +791,7 @@ function OverviewTab({
                   dataKey="tests"
                   fill="#93c5fd"
                   radius={[6, 6, 0, 0]}
-                  isAnimationActive={false}
+                  animationDuration={900}
                 />
                 <Line
                   yAxisId="pct"
@@ -833,7 +800,7 @@ function OverviewTab({
                   stroke="#1a3e70"
                   strokeWidth={2.5}
                   dot={{ r: 3 }}
-                  isAnimationActive={false}
+                  animationDuration={900}
                 />
               </ComposedChart>
             </ResponsiveContainer>
@@ -1542,7 +1509,7 @@ function TestPanel({
                           }}
                           formatter={(value) => [value, 'Students']}
                         />
-                        <Bar dataKey="students" radius={[6, 6, 0, 0]} isAnimationActive={false}>
+                        <Bar dataKey="students" radius={[6, 6, 0, 0]} animationDuration={900}>
                           {bands.map((band) => (
                             <Cell key={band.label} fill={scoreFill(band.from + 1)} />
                           ))}

@@ -613,3 +613,33 @@ html.splash-gone .rise-stagger > * {
     animation: none;
   }
 }
+
+/* Bars in small hand-drawn charts grow up from the baseline. */
+@keyframes bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@utility bar-grow {
+  transform-origin: bottom;
+  animation: bar-grow 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* Horizontal bars (progress, shares) fill from the left. */
+@keyframes bar-fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@utility bar-fill {
+  transform-origin: left;
+  animation: bar-fill 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
