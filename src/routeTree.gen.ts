@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as AssessmentsRouteImport } from './routes/assessments'
+import { Route as CampusesRouteImport } from './routes/campuses'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProfileRouteImport } from './routes/profile'
@@ -33,6 +34,11 @@ const AccountRoute = AccountRouteImport.update({
 const AssessmentsRoute = AssessmentsRouteImport.update({
   id: '/assessments',
   path: '/assessments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CampusesRoute = CampusesRouteImport.update({
+  id: '/campuses',
+  path: '/campuses',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/assessments': typeof AssessmentsRoute
+  '/campuses': typeof CampusesRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -87,6 +94,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/assessments': typeof AssessmentsRoute
+  '/campuses': typeof CampusesRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -100,6 +108,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/assessments': typeof AssessmentsRoute
+  '/campuses': typeof CampusesRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/assessments'
+    | '/campuses'
     | '/login'
     | '/privacy'
     | '/profile'
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/assessments'
+    | '/campuses'
     | '/login'
     | '/privacy'
     | '/profile'
@@ -138,6 +149,7 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/assessments'
+    | '/campuses'
     | '/login'
     | '/privacy'
     | '/profile'
@@ -151,6 +163,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
   AssessmentsRoute: typeof AssessmentsRoute
+  CampusesRoute: typeof CampusesRoute
   LoginRoute: typeof LoginRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
@@ -181,6 +194,13 @@ declare module '@tanstack/react-router' {
       path: '/assessments'
       fullPath: '/assessments'
       preLoaderRoute: typeof AssessmentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/campuses': {
+      id: '/campuses'
+      path: '/campuses'
+      fullPath: '/campuses'
+      preLoaderRoute: typeof CampusesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -239,6 +259,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
   AssessmentsRoute: AssessmentsRoute,
+  CampusesRoute: CampusesRoute,
   LoginRoute: LoginRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,

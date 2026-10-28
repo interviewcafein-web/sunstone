@@ -130,10 +130,6 @@ export function ProfileMenu({ user, onLogOut }: { user: SessionInfo; onLogOut: (
                 Manage team
               </Link>
             )}
-            <Link to="/privacy" role="menuitem" className={item} onClick={() => setOpen(false)}>
-              <ShieldCheck className="size-4 text-slate-500" aria-hidden />
-              Privacy policy
-            </Link>
             <div className="my-1 border-t border-slate-100" />
             <button
               type="button"

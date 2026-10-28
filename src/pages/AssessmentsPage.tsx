@@ -68,7 +68,7 @@ import { chartColors, useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { InlineLoader, PageLoader } from '@/components/common/PageLoader';
 
-const route = getRouteApi('/assessments');
+const route = getRouteApi('/campuses');
 
 const heroClass =
   'hero-glow from-brand-700 via-brand-700 to-brand-900 relative overflow-hidden rounded-2xl bg-gradient-to-br p-5 text-white shadow-[0_20px_50px_-20px_rgb(16_38_70/0.6)] sm:p-7';
@@ -195,7 +195,7 @@ function HeroStat({
   );
 }
 
-/** PRIME domain assessments: every campus, then one campus's syllabus and tests. */
+/** Campuses: every campus at a glance, then one campus's PRIME journey. */
 export default function AssessmentsPage() {
   const search = route.useSearch();
   const navigate = route.useNavigate();
@@ -214,7 +214,7 @@ export default function AssessmentsPage() {
     const name = overview.data?.campuses.find((campus) => campus.id === search.campus)?.name;
     return <CampusView campusId={search.campus} name={name} />;
   }
-  if (overview.isPending) return <Loading label="Loading assessments…" />;
+  if (overview.isPending) return <Loading label="Loading campuses…" />;
   if (overview.isError) return <Problem message={overview.error.message} />;
 
   const { campuses, syncedAt } = overview.data;
@@ -231,15 +231,13 @@ export default function AssessmentsPage() {
   return (
     <div className="rise-stagger space-y-5">
       <section className={heroClass}>
-        <p className="text-brand-200 text-xs font-semibold tracking-[0.2em] uppercase">
-          PRIME domain assessments
-        </p>
+        <p className="text-brand-200 text-xs font-semibold tracking-[0.2em] uppercase">Campuses</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
-          Tests across campuses
+          Every campus at a glance
         </h1>
         <p className="text-brand-100 mt-2 max-w-2xl text-sm">
-          Prime Domain Coding tests from the Sunstone LMS: what has been released, who took part and
-          how they scored.{syncedAt && ` Updated ${lmsDate(syncedAt, true)}.`}
+          PRIME tests, attendance, exams and AMCAT for each campus, from the Sunstone LMS. Open a
+          campus for its full journey.{syncedAt && ` Updated ${lmsDate(syncedAt, true)}.`}
         </p>
         <dl className="relative mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
           <HeroStat
@@ -279,7 +277,7 @@ function CampusCard({ campus }: { campus: CampusOverview }) {
   const participation = campus.expected ? percent(campus.submissions, campus.expected) : null;
   return (
     <Link
-      to="/assessments"
+      to="/campuses"
       search={{ campus: campus.id }}
       className={cn(
         panel,
@@ -409,8 +407,8 @@ function CampusView({ campusId, name }: { campusId: number; name?: string }) {
     <div className="rise-stagger space-y-5">
       <section className={heroClass}>
         <nav aria-label="Breadcrumb" className="text-brand-100 flex items-center gap-1.5 text-sm">
-          <Link to="/assessments" className="hover:text-white hover:underline">
-            Assessments
+          <Link to="/campuses" className="hover:text-white hover:underline">
+            Campuses
           </Link>
           <ChevronRight className="size-3.5" aria-hidden />
           <span className="font-medium text-white">{name ?? 'Campus'}</span>
