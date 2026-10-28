@@ -393,7 +393,7 @@ const CATEGORIES: TestCategory[] = ['assignment', 'test', 'mcq', 'amcat_mock'];
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'subject', label: 'Subject tests', icon: Trophy },
+  { id: 'subject', label: 'Prime Mock Test', icon: Trophy },
   { id: 'modules', label: 'Module tests', icon: FolderTree },
   { id: 'exams', label: 'Exams', icon: NotebookPen },
   { id: 'attendance', label: 'Attendance', icon: CalendarCheck },
@@ -917,7 +917,7 @@ function SubjectTestsTab({
   if (!sorted.length) {
     return (
       <p className={cn(panel, 'p-5 text-sm text-slate-500')}>
-        No subject-level tests (such as AMCAT mocks) for this campus yet.
+        No Prime Mock Tests (such as AMCAT mocks) for this campus yet.
       </p>
     );
   }

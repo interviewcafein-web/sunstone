@@ -481,7 +481,7 @@ export function StudentAssessments({
           <Card className="overflow-hidden p-0">
             <div className="px-5 pt-4">
               <CardHeader
-                title="Subject tests"
+                title="Prime Mock Tests"
                 aside={
                   <span className="text-xs text-slate-500">
                     e.g. AMCAT mock tests, with rank in class
@@ -492,7 +492,7 @@ export function StudentAssessments({
             {subjectLevel.length ? (
               <ResultsTable tests={subjectLevel} showRank />
             ) : (
-              <p className="px-5 pb-5 text-sm text-slate-500">No subject-level tests yet.</p>
+              <p className="px-5 pb-5 text-sm text-slate-500">No Prime Mock Tests yet.</p>
             )}
           </Card>
 
