@@ -2,18 +2,26 @@ import { Fragment, useEffect, useState } from 'react';
 import { Link, getRouteApi } from '@tanstack/react-router';
 import type { UseQueryResult } from '@tanstack/react-query';
 import {
-  ClipboardList,
+  Award,
+  CalendarCheck,
   Check,
   ChevronRight,
+  ClipboardCheck,
+  ClipboardList,
+  Code2,
   FileDown,
   IdCard,
   LayoutGrid,
   Link2,
   Loader2,
+  NotebookPen,
   Pencil,
 } from 'lucide-react';
 
-import { StudentAssessments } from '@/components/assessments/StudentAssessments';
+import {
+  StudentAssessments,
+  type StudentSection,
+} from '@/components/assessments/StudentAssessments';
 import { Avatar } from '@/components/common/Avatar';
 import { CodingOverview } from '@/components/coding/CodingOverview';
 import { PlatformPanel } from '@/components/coding/PlatformPanel';
@@ -22,6 +30,7 @@ import { HandleForm } from '@/components/profile/HandleForm';
 import { PlatformLogo } from '@/components/profile/PlatformLogo';
 import { StatusTags } from '@/components/students/StatusTags';
 import { useCodingProfiles } from '@/hooks/useCodingProfiles';
+import { useTour } from '@/hooks/useTour';
 import { useStudents } from '@/hooks/useStudents';
 import { useSession } from '@/lib/session';
 import {
@@ -37,7 +46,30 @@ import { InlineLoader } from '@/components/common/PageLoader';
 
 const route = getRouteApi('/profile');
 
-type Tab = 'overview' | 'assessments' | PlatformId;
+type Tab = 'overview' | PlatformId;
+export type Category = 'coding' | 'assessments' | 'attendance';
+
+const CATEGORIES: { id: Category; label: string; hint: string; icon: typeof LayoutGrid }[] = [
+  { id: 'coding', label: 'Coding', hint: 'LeetCode, GeeksforGeeks, GitHub and more', icon: Code2 },
+  {
+    id: 'assessments',
+    label: 'Assessments',
+    hint: 'PRIME tests, internal exams, AMCAT',
+    icon: ClipboardList,
+  },
+  {
+    id: 'attendance',
+    label: 'Attendance',
+    hint: 'Classes, week by week and by subject',
+    icon: CalendarCheck,
+  },
+];
+
+const ASSESSMENT_TABS: { id: StudentSection; label: string; icon: typeof LayoutGrid }[] = [
+  { id: 'tests', label: 'PRIME tests', icon: ClipboardCheck },
+  { id: 'exams', label: 'Exams', icon: NotebookPen },
+  { id: 'amcat', label: 'AMCAT', icon: Award },
+];
 
 export default function ProfilesPage() {
   const { name, ...handles } = route.useSearch();
@@ -73,10 +105,13 @@ interface ProfileViewProps {
   /** The sheet row, when known: adds campus and batch, the short link and the coding card. */
   student?: Student;
   onSubmit: (handles: Handles) => void;
+  /** The open section, when the page keeps it in the address (?view=). */
+  view?: Category;
+  onView?: (view: Category) => void;
 }
 
 /** The whole profile: header, usernames, platform tabs and their panels. */
-export function ProfileView({ name, handles, student, onSubmit }: ProfileViewProps) {
+export function ProfileView({ name, handles, student, onSubmit, view, onView }: ProfileViewProps) {
   const [tab, setTab] = useState<Tab>('overview');
   const signedIn = Boolean(useSession().data);
 
@@ -85,12 +120,19 @@ export function ProfileView({ name, handles, student, onSubmit }: ProfileViewPro
   const hasHandles = results.length > 0;
   const active = results.find(({ platform }) => platform.id === tab);
   // Staff see a student's Sunstone assessments next to their coding profiles.
-  const showAssessments = Boolean(student) && signedIn;
-  const showTabs = hasHandles || showAssessments;
+  // Staff see three sections for a student: coding, assessments (LMS) and attendance.
+  const showCategories = Boolean(student) && signedIn;
+  const [ownCategory, setOwnCategory] = useState<Category>();
+  const category: Category = showCategories
+    ? (view ?? ownCategory ?? (hasHandles ? 'coding' : 'assessments'))
+    : 'coding';
+  const setCategory = (next: Category) => (onView ? onView(next) : setOwnCategory(next));
+  const [section, setSection] = useState<StudentSection>('tests');
+  useTour('student', showCategories);
 
   // A different person's handles: start again from the first tab.
   const handleKey = JSON.stringify(handles);
-  useEffect(() => setTab(hasHandles ? 'overview' : 'assessments'), [handleKey, hasHandles]);
+  useEffect(() => setTab('overview'), [handleKey]);
 
   const shareUrl = student ? `${window.location.origin}/s/${student.slug}` : undefined;
 
@@ -182,77 +224,144 @@ export function ProfileView({ name, handles, student, onSubmit }: ProfileViewPro
         </div>
       </section>
 
-      {/* Editing leads to the staff-only lookup page, so visitors without a login don't see it. */}
-      {hasHandles ? (
-        signedIn && (
-          <details className="group shadow-card rounded-2xl border border-slate-200 bg-surface">
-            <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-medium text-slate-600 hover:text-slate-900">
-              <Pencil className="size-4" aria-hidden />
-              Edit usernames
-            </summary>
-            <div className="border-t border-slate-100 p-1">
-              <HandleForm handles={handles} onSubmit={onSubmit} />
-            </div>
-          </details>
-        )
-      ) : student ? (
-        <Card>
-          <p className="text-sm text-slate-600">
-            No coding profiles linked yet. They appear here once {student.name.split(' ')[0]} fills
-            in the Sunstone PRIME coding profile form.
-          </p>
-        </Card>
-      ) : (
-        <HandleForm handles={handles} onSubmit={onSubmit} />
+      {showCategories && (
+        <nav
+          aria-label="Profile sections"
+          className="grid gap-3 sm:grid-cols-3"
+          data-tour="student-sections"
+        >
+          {CATEGORIES.map(({ id, label, hint, icon: Icon }) => {
+            const selected = category === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setCategory(id)}
+                aria-current={selected ? 'page' : undefined}
+                className={cn(
+                  'hover-lift group flex items-center gap-3 rounded-2xl border p-4 text-left transition',
+                  selected
+                    ? 'border-brand-600 from-brand-700 to-brand-900 bg-gradient-to-br text-white shadow-[0_14px_30px_-16px_rgb(16_38_70/0.7)]'
+                    : 'bg-surface border-slate-200 hover:border-slate-300'
+                )}
+              >
+                <span
+                  className={cn(
+                    'inline-flex size-10 shrink-0 items-center justify-center rounded-xl transition',
+                    selected
+                      ? 'bg-white/15 text-white'
+                      : 'bg-brand-50 text-brand-700 dark:bg-brand-900/40 dark:text-brand-200'
+                  )}
+                >
+                  <Icon className="size-5" aria-hidden />
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-semibold">{label}</span>
+                  <span
+                    className={cn(
+                      'block truncate text-xs',
+                      selected ? 'text-brand-100' : 'text-slate-500'
+                    )}
+                  >
+                    {hint}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </nav>
       )}
 
-      {showTabs && (
-        <>
+      {category === 'coding' && (
+        <div key="coding" className="animate-rise space-y-6">
+          {/* Editing leads to the staff-only lookup page, so visitors without a login don't see it. */}
+          {hasHandles ? (
+            signedIn && (
+              <details className="group shadow-card rounded-2xl border border-slate-200 bg-surface">
+                <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-medium text-slate-600 hover:text-slate-900">
+                  <Pencil className="size-4" aria-hidden />
+                  Edit usernames
+                </summary>
+                <div className="border-t border-slate-100 p-1">
+                  <HandleForm handles={handles} onSubmit={onSubmit} />
+                </div>
+              </details>
+            )
+          ) : student ? (
+            <Card>
+              <p className="text-sm text-slate-600">
+                No coding profiles linked yet. They appear here once {student.name.split(' ')[0]}{' '}
+                fills in the Sunstone PRIME coding profile form.
+              </p>
+            </Card>
+          ) : (
+            <HandleForm handles={handles} onSubmit={onSubmit} />
+          )}
+
+          {hasHandles && (
+            <>
+              <nav
+                aria-label="Platforms"
+                className="-mx-4 flex gap-1 overflow-x-auto border-b border-slate-200 px-4 scrollbar-none"
+              >
+                <TabButton selected={tab === 'overview'} onClick={() => setTab('overview')}>
+                  <LayoutGrid className="text-brand-700 dark:text-brand-300 size-4" aria-hidden />
+                  Overview
+                </TabButton>
+                {results.map(({ platform, query }) => (
+                  <TabButton
+                    key={platform.id}
+                    selected={tab === platform.id}
+                    onClick={() => setTab(platform.id)}
+                  >
+                    <PlatformLogo platform={platform.id} />
+                    {platform.name}
+                    <TabCount query={query} />
+                  </TabButton>
+                ))}
+              </nav>
+
+              {tab === 'overview' || !active ? (
+                loaded.length > 0 ? (
+                  <CodingOverview profiles={loaded} />
+                ) : results.some(({ query }) => query.isPending) ? (
+                  <LoadingCard label="Loading coding profiles…" />
+                ) : (
+                  <Card>
+                    <p className="text-sm text-slate-600">
+                      None of these profiles could be loaded.
+                    </p>
+                  </Card>
+                )
+              ) : (
+                <PlatformTab platform={active.platform} query={active.query} />
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {category === 'assessments' && student && (
+        <div key="assessments" className="animate-rise space-y-6">
           <nav
-            aria-label="Platforms"
+            aria-label="Assessments"
             className="-mx-4 flex gap-1 overflow-x-auto border-b border-slate-200 px-4 scrollbar-none"
           >
-            {hasHandles && (
-              <TabButton selected={tab === 'overview'} onClick={() => setTab('overview')}>
-                <LayoutGrid className="text-brand-700 dark:text-brand-300 size-4" aria-hidden />
-                Overview
-              </TabButton>
-            )}
-            {results.map(({ platform, query }) => (
-              <TabButton
-                key={platform.id}
-                selected={tab === platform.id}
-                onClick={() => setTab(platform.id)}
-              >
-                <PlatformLogo platform={platform.id} />
-                {platform.name}
-                <TabCount query={query} />
+            {ASSESSMENT_TABS.map(({ id, label, icon: Icon }) => (
+              <TabButton key={id} selected={section === id} onClick={() => setSection(id)}>
+                <Icon className="text-brand-700 dark:text-brand-300 size-4" aria-hidden />
+                {label}
               </TabButton>
             ))}
-            {showAssessments && (
-              <TabButton selected={tab === 'assessments'} onClick={() => setTab('assessments')}>
-                <ClipboardList className="text-brand-700 dark:text-brand-300 size-4" aria-hidden />
-                Assessments
-              </TabButton>
-            )}
           </nav>
+          <StudentAssessments username={student.slug} section={section} />
+        </div>
+      )}
 
-          {tab === 'assessments' && student ? (
-            <StudentAssessments username={student.slug} />
-          ) : !hasHandles ? null : tab === 'overview' || !active ? (
-            loaded.length > 0 ? (
-              <CodingOverview profiles={loaded} />
-            ) : results.some(({ query }) => query.isPending) ? (
-              <LoadingCard label="Loading coding profiles…" />
-            ) : (
-              <Card>
-                <p className="text-sm text-slate-600">None of these profiles could be loaded.</p>
-              </Card>
-            )
-          ) : (
-            <PlatformTab platform={active.platform} query={active.query} />
-          )}
-        </>
+      {category === 'attendance' && student && (
+        <div key="attendance" className="animate-rise">
+          <StudentAssessments username={student.slug} section="attendance" />
+        </div>
       )}
     </div>
   );

@@ -16,6 +16,7 @@ import {
 import { useStudents } from '@/hooks/useStudents';
 import { PLATFORM_IDS, SOLVING_PLATFORM_IDS } from '@/lib/coding-profiles/platforms';
 import { ProfileError, type PlatformId } from '@/lib/coding-profiles/types';
+import { useTour } from '@/hooks/useTour';
 import { useStudentMetrics, type StudentMetrics } from '@/lib/assessments';
 import { useSession } from '@/lib/session';
 import type { Student } from '@/lib/students/types';
@@ -158,6 +159,8 @@ export default function StudentsPage() {
   const students = useStudents();
   // Attendance, AMCAT and PRIME tests for the table (from the LMS copy in the database).
   const metrics = useStudentMetrics();
+  // First visit: a guided tour, once the list is on screen.
+  useTour('students', Boolean(students.data?.students.length));
   const all = useMemo(() => students.data?.students ?? [], [students.data]);
 
   const options = useMemo(
@@ -276,24 +279,30 @@ export default function StudentsPage() {
         onRefresh={refresh}
       />
 
-      <StudentFilters search={search} options={options} onChange={setSearch} />
+      <div data-tour="filters">
+        <StudentFilters search={search} options={options} onChange={setSearch} />
+      </div>
 
-      <ZonePanel
-        rows={rows}
-        active={search.zone}
-        onZone={(zone) => setSearch({ zone })}
-        report={{
-          blocker: reportBlocker,
-          state: reportState,
-          label: search.campus ? 'Download campus report' : 'Download all-campus report',
-          onDownload: downloadReport,
-        }}
-      />
+      <div data-tour="zones">
+        <ZonePanel
+          rows={rows}
+          active={search.zone}
+          onZone={(zone) => setSearch({ zone })}
+          report={{
+            blocker: reportBlocker,
+            state: reportState,
+            label: search.campus ? 'Download campus report' : 'Download all-campus report',
+            onDownload: downloadReport,
+          }}
+        />
+      </div>
 
       {!search.q && <TopPerformers rows={shown} />}
 
       {shown.length > 0 ? (
-        <StudentsTable rows={shown} sort={sort} onSort={(next) => setSearch({ sort: next })} />
+        <div data-tour="table">
+          <StudentsTable rows={shown} sort={sort} onSort={(next) => setSearch({ sort: next })} />
+        </div>
       ) : (
         <p className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-10 text-center text-sm text-slate-600">
           No students match these filters.

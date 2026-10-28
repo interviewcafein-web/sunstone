@@ -59,6 +59,7 @@ function RootComponent() {
                   <Link
                     key={to}
                     to={to}
+                    data-tour={`nav-${to === '/' ? 'students' : to.slice(1)}`}
                     className={navItem}
                     activeProps={navItemActive}
                     activeOptions={{ exact, includeSearch: false }}
@@ -80,7 +81,9 @@ function RootComponent() {
                   Staff login
                 </Link>
               )}
-              <ThemeToggle />
+              <span data-tour="theme" className="inline-flex">
+                <ThemeToggle />
+              </span>
               {user && (
                 <>
                   <span aria-hidden className="mx-1 h-6 w-px bg-slate-200" />

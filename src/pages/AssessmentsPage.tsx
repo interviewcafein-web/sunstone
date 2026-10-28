@@ -63,6 +63,7 @@ import {
   type TestCategory,
   type TestStatus,
 } from '@/lib/assessments';
+import { useTour } from '@/hooks/useTour';
 import { useSession } from '@/lib/session';
 import { chartColors, useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
@@ -392,6 +393,7 @@ function CampusView({ campusId, name }: { campusId: number; name?: string }) {
   const search = route.useSearch();
   const navigate = route.useNavigate();
   const detail = useCampusDetail(campusId, search.batch);
+  useTour('campus', Boolean(detail.data));
   const set = (patch: Partial<typeof search>) =>
     navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true });
   const tab = TABS.some((item) => item.id === search.tab) ? search.tab! : 'overview';
@@ -421,7 +423,12 @@ function CampusView({ campusId, name }: { campusId: number; name?: string }) {
         </p>
 
         {batches.length > 1 && (
-          <div className="mt-4 flex flex-wrap gap-1.5" role="group" aria-label="Batch">
+          <div
+            className="mt-4 flex flex-wrap gap-1.5"
+            role="group"
+            aria-label="Batch"
+            data-tour="campus-batches"
+          >
             {[undefined, ...batches].map((batch) => (
               <button
                 key={batch ?? 'all'}
@@ -440,7 +447,10 @@ function CampusView({ campusId, name }: { campusId: number; name?: string }) {
           </div>
         )}
 
-        <dl className="relative mt-5 grid grid-cols-2 gap-3 md:grid-cols-5">
+        <dl
+          className="relative mt-5 grid grid-cols-2 gap-3 md:grid-cols-5"
+          data-tour="campus-tiles"
+        >
           <HeroStat
             icon={BookOpenCheck}
             label="Tests held"
@@ -482,6 +492,7 @@ function CampusView({ campusId, name }: { campusId: number; name?: string }) {
 
       <nav
         aria-label="Campus sections"
+        data-tour="campus-tabs"
         className="flex gap-1 overflow-x-auto border-b border-slate-200 scrollbar-none"
       >
         {TABS.map(({ id, label, icon: Icon }) => (

@@ -11,6 +11,7 @@ const route = getRouteApi('/s/$slug');
 /** A student's profile from their link, /s/{username}. */
 export default function StudentProfilePage() {
   const { slug } = route.useParams();
+  const { view } = route.useSearch();
   const navigate = useNavigate();
   const lookup = useStudent(slug);
   const student = lookup.data ?? undefined;
@@ -18,9 +19,9 @@ export default function StudentProfilePage() {
   // An old address (from before usernames) found the student: show their current one.
   useEffect(() => {
     if (student && student.slug !== slug) {
-      navigate({ to: '/s/$slug', params: { slug: student.slug }, replace: true });
+      navigate({ to: '/s/$slug', params: { slug: student.slug }, search: { view }, replace: true });
     }
-  }, [student, slug, navigate]);
+  }, [student, slug, navigate, view]);
 
   if (!student) {
     if (lookup.isPending) return <PageLoader variant="profile" label="Loading the profile" />;
@@ -47,6 +48,10 @@ export default function StudentProfilePage() {
       handles={student.handles}
       student={student}
       onSubmit={(handles) => navigate({ to: '/profile', search: handles })}
+      view={view}
+      onView={(next) =>
+        navigate({ to: '/s/$slug', params: { slug }, search: { view: next }, replace: true })
+      }
     />
   );
 }

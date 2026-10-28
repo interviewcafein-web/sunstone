@@ -1,9 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from '@tanstack/react-router';
-import { Building2, ChevronDown, LogOut, ShieldCheck, UserRound, Users } from 'lucide-react';
+import { Link, useNavigate } from '@tanstack/react-router';
+import {
+  Building2,
+  ChevronDown,
+  Compass,
+  LogOut,
+  ShieldCheck,
+  UserRound,
+  Users,
+} from 'lucide-react';
 
 import { Avatar } from '@/components/common/Avatar';
 import { ROLE_LABELS } from '@/lib/roles';
+import { REPLAY_EVENT } from '@/lib/tour';
 import type { SessionInfo } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +46,7 @@ const item =
 /** The signed-in person's photo in the header; opens their account menu. */
 export function ProfileMenu({ user, onLogOut }: { user: SessionInfo; onLogOut: () => void }) {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -61,7 +71,7 @@ export function ProfileMenu({ user, onLogOut }: { user: SessionInfo; onLogOut: (
   const name = user.name ?? user.user;
 
   return (
-    <div ref={root} className="relative ml-1">
+    <div ref={root} className="relative ml-1" data-tour="account">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -130,6 +140,24 @@ export function ProfileMenu({ user, onLogOut }: { user: SessionInfo; onLogOut: (
                 Manage team
               </Link>
             )}
+            <button
+              type="button"
+              role="menuitem"
+              className={item}
+              onClick={() => {
+                setOpen(false);
+                const go = () =>
+                  window.dispatchEvent(new CustomEvent(REPLAY_EVENT, { detail: 'students' }));
+                if (window.location.pathname === '/') go();
+                else {
+                  void navigate({ to: '/' });
+                  setTimeout(go, 1200);
+                }
+              }}
+            >
+              <Compass className="size-4 text-slate-500" aria-hidden />
+              Take the tour
+            </button>
             <div className="my-1 border-t border-slate-100" />
             <button
               type="button"

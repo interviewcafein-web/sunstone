@@ -13,6 +13,8 @@ import {
   Award,
   BookOpenCheck,
   CalendarCheck,
+  CalendarDays,
+  GraduationCap,
   ChevronRight,
   ClipboardCheck,
   Folder,
@@ -76,7 +78,19 @@ function Kpi({
 }
 
 /** A student's Sunstone PRIME domain tests and AMCAT results. Staff only. */
-export function StudentAssessments({ username }: { username: string }) {
+export type StudentSection = 'tests' | 'exams' | 'amcat' | 'attendance';
+
+/**
+ * One student's LMS record, one section at a time: PRIME tests, internal exams, AMCAT or
+ * attendance. Every section shares one request (cached), so switching is instant.
+ */
+export function StudentAssessments({
+  username,
+  section = 'tests',
+}: {
+  username: string;
+  section?: StudentSection;
+}) {
   const query = useStudentAssessments(username);
   const colors = chartColors(useTheme());
 
@@ -123,6 +137,15 @@ export function StudentAssessments({ username }: { username: string }) {
   const primeAttendance = attended.primeSessions
     ? percent(attended.primePresent, attended.primeSessions)
     : null;
+  const recent = attendance.weeks.slice(-4);
+  const recentSessions = recent.reduce((sum, week) => sum + week.sessions, 0);
+  const lastWeeks = recentSessions
+    ? percent(
+        recent.reduce((sum, week) => sum + week.present, 0),
+        recentSessions
+      )
+    : null;
+  const lowSubjects = attendance.subjects.filter((subject) => (subject.pct ?? 0) < 75).length;
   const submitted = tests.filter((test) => test.submitted);
   const average = submitted.length
     ? Math.round(submitted.reduce((sum, test) => sum + (test.pct ?? 0), 0) / submitted.length)
@@ -147,6 +170,19 @@ export function StudentAssessments({ username }: { username: string }) {
     })
     .filter((score): score is number => score !== null);
 
+  // Each AMCAT section's score per sitting, for the progress chart.
+  const amcatSeries = (() => {
+    const sittings = [...amcat].sort((a, b) => (a.taken_at ?? '').localeCompare(b.taken_at ?? ''));
+    const sections = [
+      ...new Set(sittings.flatMap((sitting) => sitting.sections.map((part) => part.name))),
+    ];
+    const points = sittings.map((sitting) => ({
+      label: lmsDate(sitting.taken_at).replace(/ \d{4}$/, ''),
+      ...Object.fromEntries(sitting.sections.map((part) => [part.name, part.score])),
+    }));
+    return { sections, points };
+  })();
+
   const released = tests.filter((test) => test.status === 'completed' || test.status === 'live');
   const upcoming = tests
     .filter((test) => !test.submitted && (test.status === 'live' || test.status === 'scheduled'))
@@ -167,56 +203,98 @@ export function StudentAssessments({ username }: { username: string }) {
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Kpi
-          icon={BookOpenCheck}
-          label="PRIME tests released"
-          value={String(released.length)}
-          hint={upcoming.length ? `${upcoming.length} live or upcoming` : 'Prime Domain Coding'}
-        />
-        <Kpi
-          icon={ClipboardCheck}
-          label="Submitted"
-          value={`${submitted.length} of ${released.length}`}
-          hint={`${percent(submitted.length, released.length)}% participation`}
-          tone={scoreTone(percent(submitted.length, released.length))}
-        />
-        <Kpi
-          icon={Target}
-          label="Average score"
-          value={average === null ? '—' : `${average}%`}
-          hint={
-            gap === null
-              ? undefined
-              : `${gap >= 0 ? '+' : ''}${gap} pts vs class average (${classAverage}%)`
-          }
-          tone={scoreTone(average)}
-          trend={trend.map((point) => point.student)}
-        />
-        <Kpi
-          icon={CalendarCheck}
-          label="Attendance"
-          value={attendancePct === null ? '—' : `${attendancePct}%`}
-          hint={primeAttendance === null ? 'All classes' : `PRIME classes ${primeAttendance}%`}
-          tone={attendanceTone(attendancePct)}
-          trend={attendance.weeks.slice(-10).map((week) => week.pct)}
-        />
-        <Kpi
-          icon={Award}
-          label="AMCAT, latest"
-          value={amcatScores.length ? String(amcatScores[amcatScores.length - 1]) : '—'}
-          hint={
-            amcat.length
-              ? `${amcat.length} sitting${amcat.length === 1 ? '' : 's'} · ${lmsDate(amcat[0].taken_at)}`
-              : 'None yet'
-          }
-          tone={scoreTone(amcatScores[amcatScores.length - 1])}
-          trend={amcatScores}
-        />
-      </div>
+    <div className="animate-rise space-y-4" key={section}>
+      {section !== 'attendance' && (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <Kpi
+            icon={BookOpenCheck}
+            label="PRIME tests released"
+            value={String(released.length)}
+            hint={upcoming.length ? `${upcoming.length} live or upcoming` : 'Prime Domain Coding'}
+          />
+          <Kpi
+            icon={ClipboardCheck}
+            label="Submitted"
+            value={`${submitted.length} of ${released.length}`}
+            hint={`${percent(submitted.length, released.length)}% participation`}
+            tone={scoreTone(percent(submitted.length, released.length))}
+          />
+          <Kpi
+            icon={Target}
+            label="Average score"
+            value={average === null ? '—' : `${average}%`}
+            hint={
+              gap === null
+                ? undefined
+                : `${gap >= 0 ? '+' : ''}${gap} pts vs class average (${classAverage}%)`
+            }
+            tone={scoreTone(average)}
+            trend={trend.map((point) => point.student)}
+          />
+          <Kpi
+            icon={CalendarCheck}
+            label="Attendance"
+            value={attendancePct === null ? '—' : `${attendancePct}%`}
+            hint={primeAttendance === null ? 'All classes' : `PRIME classes ${primeAttendance}%`}
+            tone={attendanceTone(attendancePct)}
+            trend={attendance.weeks.slice(-10).map((week) => week.pct)}
+          />
+          <Kpi
+            icon={Award}
+            label="AMCAT, latest"
+            value={amcatScores.length ? String(amcatScores[amcatScores.length - 1]) : '—'}
+            hint={
+              amcat.length
+                ? `${amcat.length} sitting${amcat.length === 1 ? '' : 's'} · ${lmsDate(amcat[0].taken_at)}`
+                : 'None yet'
+            }
+            tone={scoreTone(amcatScores[amcatScores.length - 1])}
+            trend={amcatScores}
+          />
+        </div>
+      )}
 
-      {attendance.subjects.length > 0 && (
+      {section === 'attendance' && (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Kpi
+            icon={CalendarCheck}
+            label="All classes"
+            value={attendancePct === null ? '—' : `${attendancePct}%`}
+            hint={`${attended.present} of ${attended.sessions} classes`}
+            tone={attendanceTone(attendancePct)}
+            trend={attendance.weeks.slice(-10).map((week) => week.pct)}
+          />
+          <Kpi
+            icon={GraduationCap}
+            label="PRIME classes"
+            value={primeAttendance === null ? '—' : `${primeAttendance}%`}
+            hint={`${attended.primePresent} of ${attended.primeSessions} classes`}
+            tone={attendanceTone(primeAttendance)}
+          />
+          <Kpi
+            icon={CalendarDays}
+            label="Last 4 weeks"
+            value={lastWeeks === null ? '—' : `${lastWeeks}%`}
+            hint="Recent attendance"
+            tone={attendanceTone(lastWeeks)}
+          />
+          <Kpi
+            icon={BookOpenCheck}
+            label="Subjects"
+            value={String(attendance.subjects.length)}
+            hint={lowSubjects ? `${lowSubjects} below 75%` : 'All at 75% or more'}
+            tone={lowSubjects ? 'text-amber-600' : undefined}
+          />
+        </div>
+      )}
+
+      {section === 'attendance' && attendance.subjects.length === 0 && (
+        <Card>
+          <p className="text-sm text-slate-500">No attendance recorded for this student yet.</p>
+        </Card>
+      )}
+
+      {section === 'attendance' && attendance.subjects.length > 0 && (
         <Card>
           <CardHeader
             title={
@@ -228,7 +306,7 @@ export function StudentAssessments({ username }: { username: string }) {
             aside={<span className="text-xs text-slate-500">Classes since 1 July</span>}
           />
           <div className="grid gap-5 lg:grid-cols-2">
-            <div className="h-44">
+            <div className="h-60">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
                   data={attendance.weeks.map((week) => ({
@@ -273,7 +351,7 @@ export function StudentAssessments({ username }: { username: string }) {
                 </LineChart>
               </ResponsiveContainer>
             </div>
-            <ul className="max-h-44 space-y-2 overflow-y-auto pr-1">
+            <ul className="max-h-60 space-y-2 overflow-y-auto pr-1">
               {attendance.subjects.map((subject) => (
                 <li key={subject.subject}>
                   <div className="flex items-baseline justify-between gap-2 text-xs">
@@ -306,7 +384,7 @@ export function StudentAssessments({ username }: { username: string }) {
         </Card>
       )}
 
-      {trend.length > 1 && (
+      {section === 'tests' && trend.length > 1 && (
         <Card>
           <CardHeader
             title={
@@ -368,7 +446,7 @@ export function StudentAssessments({ username }: { username: string }) {
         </Card>
       )}
 
-      {upcoming.length > 0 && (
+      {section === 'tests' && upcoming.length > 0 && (
         <Card>
           <CardHeader
             title="Live and upcoming"
@@ -398,108 +476,186 @@ export function StudentAssessments({ username }: { username: string }) {
         </Card>
       )}
 
-      <Card className="overflow-hidden p-0">
-        <div className="px-5 pt-4">
+      {section === 'tests' && (
+        <>
+          <Card className="overflow-hidden p-0">
+            <div className="px-5 pt-4">
+              <CardHeader
+                title="Subject tests"
+                aside={
+                  <span className="text-xs text-slate-500">
+                    e.g. AMCAT mock tests, with rank in class
+                  </span>
+                }
+              />
+            </div>
+            {subjectLevel.length ? (
+              <ResultsTable tests={subjectLevel} showRank />
+            ) : (
+              <p className="px-5 pb-5 text-sm text-slate-500">No subject-level tests yet.</p>
+            )}
+          </Card>
+
+          <Card className="overflow-hidden p-0">
+            <div className="px-5 pt-4">
+              <CardHeader
+                title="Module tests"
+                aside={
+                  syncedAt && (
+                    <span className="text-xs text-slate-500">
+                      From the LMS · {lmsDate(syncedAt, true)}
+                    </span>
+                  )
+                }
+              />
+            </div>
+            {modules.length ? (
+              <div className="divide-y divide-slate-200 border-t border-slate-200">
+                {modules.map(([module, folders]) => {
+                  const all = [...folders.values()].flat();
+                  const done = all.filter((test) => test.submitted);
+                  const average = done.length
+                    ? Math.round(done.reduce((sum, test) => sum + (test.pct ?? 0), 0) / done.length)
+                    : null;
+                  return (
+                    <details key={module} open className="group">
+                      <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-3">
+                        <ChevronRight
+                          className="size-4 text-slate-400 transition group-open:rotate-90"
+                          aria-hidden
+                        />
+                        <FolderTree
+                          className="text-brand-700 dark:text-brand-300 size-4"
+                          aria-hidden
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold">{module}</span>
+                          <span className="block text-xs text-slate-500">
+                            {done.length} of {all.length} submitted
+                          </span>
+                        </span>
+                        <span className={cn('text-sm font-bold tabular-nums', scoreTone(average))}>
+                          {average === null ? '' : `${average}%`}
+                        </span>
+                      </summary>
+                      {[...folders.entries()].map(([folder, tests]) => (
+                        <div key={folder}>
+                          {folder && (
+                            <p className="flex items-center gap-2 bg-slate-50 px-5 py-1.5 text-xs font-semibold text-slate-600">
+                              <Folder className="size-3.5" aria-hidden />
+                              {folder}
+                            </p>
+                          )}
+                          <ResultsTable tests={tests} />
+                        </div>
+                      ))}
+                    </details>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="px-5 pb-5 text-sm text-slate-500">
+                No module tests have been released to this student's sections yet.
+              </p>
+            )}
+          </Card>
+        </>
+      )}
+
+      {section === 'exams' &&
+        (exams.length ? (
+          <StudentExams exams={exams} />
+        ) : (
+          <Card>
+            <p className="text-sm text-slate-500">No internal exam marks for this student yet.</p>
+          </Card>
+        ))}
+
+      {section === 'amcat' && amcatSeries.points.length > 1 && (
+        <Card>
           <CardHeader
-            title="Subject tests"
+            title={
+              <span className="flex items-center gap-2">
+                <TrendingUp className="text-brand-700 dark:text-brand-300 size-4" aria-hidden />
+                AMCAT progress
+              </span>
+            }
             aside={
               <span className="text-xs text-slate-500">
-                e.g. AMCAT mock tests, with rank in class
+                Each section across sittings, out of 100
               </span>
             }
           />
-        </div>
-        {subjectLevel.length ? (
-          <ResultsTable tests={subjectLevel} showRank />
-        ) : (
-          <p className="px-5 pb-5 text-sm text-slate-500">No subject-level tests yet.</p>
-        )}
-      </Card>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={amcatSeries.points}
+                margin={{ top: 8, right: 12, bottom: 0, left: -18 }}
+              >
+                <CartesianGrid stroke={colors.grid} strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 11, fill: colors.tick }}
+                  tickLine={false}
+                />
+                <YAxis
+                  domain={[0, 100]}
+                  tick={{ fontSize: 11, fill: colors.tick }}
+                  tickLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: colors.tooltip,
+                    border: `1px solid ${colors.grid}`,
+                    borderRadius: 12,
+                    color: colors.text,
+                    fontSize: 12,
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                {amcatSeries.sections.map((name, index) => (
+                  <Line
+                    key={name}
+                    type="monotone"
+                    dataKey={name}
+                    stroke={AMCAT_COLORS[index % AMCAT_COLORS.length]}
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    connectNulls
+                    isAnimationActive={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      )}
 
-      <Card className="overflow-hidden p-0">
-        <div className="px-5 pt-4">
+      {section === 'amcat' && (
+        <Card>
           <CardHeader
-            title="Module tests"
-            aside={
-              syncedAt && (
-                <span className="text-xs text-slate-500">
-                  From the LMS · {lmsDate(syncedAt, true)}
-                </span>
-              )
-            }
+            title="AMCAT"
+            aside={<span className="text-xs text-slate-500">Scores out of 100</span>}
           />
-        </div>
-        {modules.length ? (
-          <div className="divide-y divide-slate-200 border-t border-slate-200">
-            {modules.map(([module, folders]) => {
-              const all = [...folders.values()].flat();
-              const done = all.filter((test) => test.submitted);
-              const average = done.length
-                ? Math.round(done.reduce((sum, test) => sum + (test.pct ?? 0), 0) / done.length)
-                : null;
-              return (
-                <details key={module} open className="group">
-                  <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-3">
-                    <ChevronRight
-                      className="size-4 text-slate-400 transition group-open:rotate-90"
-                      aria-hidden
-                    />
-                    <FolderTree className="text-brand-700 dark:text-brand-300 size-4" aria-hidden />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold">{module}</span>
-                      <span className="block text-xs text-slate-500">
-                        {done.length} of {all.length} submitted
-                      </span>
-                    </span>
-                    <span className={cn('text-sm font-bold tabular-nums', scoreTone(average))}>
-                      {average === null ? '' : `${average}%`}
-                    </span>
-                  </summary>
-                  {[...folders.entries()].map(([folder, tests]) => (
-                    <div key={folder}>
-                      {folder && (
-                        <p className="flex items-center gap-2 bg-slate-50 px-5 py-1.5 text-xs font-semibold text-slate-600">
-                          <Folder className="size-3.5" aria-hidden />
-                          {folder}
-                        </p>
-                      )}
-                      <ResultsTable tests={tests} />
-                    </div>
-                  ))}
-                </details>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="px-5 pb-5 text-sm text-slate-500">
-            No module tests have been released to this student's sections yet.
-          </p>
-        )}
-      </Card>
-
-      <StudentExams exams={exams} />
-
-      <Card>
-        <CardHeader
-          title="AMCAT"
-          aside={<span className="text-xs text-slate-500">Scores out of 100</span>}
-        />
-        {amcat.length ? (
-          <div className="grid gap-3 md:grid-cols-2">
-            {amcat.map((sitting) => (
-              <AmcatCard key={sitting.id} sitting={sitting} />
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-slate-500">No AMCAT sittings yet.</p>
-        )}
-      </Card>
+          {amcat.length ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {amcat.map((sitting) => (
+                <AmcatCard key={sitting.id} sitting={sitting} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">No AMCAT sittings yet.</p>
+          )}
+        </Card>
+      )}
     </div>
   );
 }
 
 const place = (test: StudentTest) =>
   [test.module, test.lecture].filter(Boolean).join(' › ') || test.subject || 'Prime Domain Coding';
+
+const AMCAT_COLORS = ['#1a3e70', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#0ea5e9', '#64748b'];
 
 function StatusChip({ status }: { status: TestStatus }) {
   return (
