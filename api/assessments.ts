@@ -93,7 +93,8 @@ async function campuses(viewer: Viewer) {
        (select round(100.0 * sum(a.present) / nullif(sum(a.sessions), 0))::int
           from att_student_subject a join roster r2 using (lms_user_id)
           where r2.campus_id = c.campus_id) as attendance_pct,
-       (select at::text from last_test l where l.campus_id = c.campus_id) as last_test_at
+       (select at::text from last_test l where l.campus_id = c.campus_id) as last_test_at,
+       (select logo_url from campuses k where k.id = c.campus_id) as logo
      from roster c left join res on res.lms_user_id = c.lms_user_id and res.campus_id = c.campus_id
      group by c.campus_id, c.campus
      order by tests desc, c.campus`,

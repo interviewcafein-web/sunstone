@@ -91,6 +91,8 @@ export interface CampusOverview {
   scheduled: number;
   attendance_pct: number | null;
   last_test_at: string | null;
+  /** The campus logo from the LMS (a full https URL), if it has one. */
+  logo: string | null;
   /** Weekly attendance %, last ten weeks. */
   attendance_weeks: number[];
   /** Average test score % by week of release, last ten weeks. */

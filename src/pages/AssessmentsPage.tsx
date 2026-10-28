@@ -41,6 +41,7 @@ import {
 } from '@/components/assessments/CampusInsights';
 import { ExamsTab } from '@/components/assessments/ExamsSection';
 import { Avatar } from '@/components/common/Avatar';
+import { CampusLogo } from '@/components/common/CampusLogo';
 import { Sparkline, TrendDelta, lastChange } from '@/components/common/Sparkline';
 import {
   CATEGORY_LABELS,
@@ -213,8 +214,8 @@ export default function AssessmentsPage() {
   }, [search.campus, onlyCampus, navigate]);
 
   if (search.campus) {
-    const name = overview.data?.campuses.find((campus) => campus.id === search.campus)?.name;
-    return <CampusView campusId={search.campus} name={name} />;
+    const picked = overview.data?.campuses.find((campus) => campus.id === search.campus);
+    return <CampusView campusId={search.campus} name={picked?.name} logo={picked?.logo} />;
   }
   if (overview.isPending) return <Loading label="Loading campuses…" />;
   if (overview.isError) return <Problem message={overview.error.message} />;
@@ -281,29 +282,6 @@ const HEALTH = [
   { min: 0, label: 'At risk', chip: 'bg-red-50 text-red-700 ring-red-200' },
 ];
 
-/** Gradients for the campus monogram, picked by campus id so each keeps its colour. */
-const MONOGRAMS = [
-  'from-sky-500 to-indigo-600',
-  'from-violet-500 to-fuchsia-600',
-  'from-emerald-500 to-teal-600',
-  'from-amber-500 to-orange-600',
-  'from-rose-500 to-pink-600',
-  'from-cyan-500 to-blue-600',
-];
-
-const STOP_WORDS = new Set(['of', 'and', '&', 'the', 'college', 'group']);
-
-function monogram(name: string) {
-  const first = name.split(/[\s,]+/)[0] ?? '';
-  if (/^[A-Z]{2,4}$/.test(first)) return first;
-  const words = name.split(/[\s,]+/).filter((word) => word && !STOP_WORDS.has(word.toLowerCase()));
-  return words
-    .slice(0, 2)
-    .map((word) => word[0])
-    .join('')
-    .toUpperCase();
-}
-
 function CampusCard({ campus }: { campus: CampusOverview }) {
   const participation = campus.expected ? percent(campus.submissions, campus.expected) : null;
   const scores = [participation, campus.avg_pct, campus.attendance_pct].filter(
@@ -314,7 +292,6 @@ function CampusCard({ campus }: { campus: CampusOverview }) {
     : null;
   const health = overall === null ? undefined : HEALTH.find((level) => overall >= level.min);
   const accent = scoreFill(overall);
-  const initials = monogram(campus.name);
   const inPrime = campus.students ? (campus.in_prime / campus.students) * 100 : 0;
 
   return (
@@ -341,16 +318,7 @@ function CampusCard({ campus }: { campus: CampusOverview }) {
 
       <div className="p-5">
         <div className="flex items-start gap-3">
-          <span
-            aria-hidden
-            className={cn(
-              'flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-sm font-bold text-white shadow-md ring-2 ring-white/60',
-              MONOGRAMS[campus.id % MONOGRAMS.length],
-              initials.length > 3 && 'text-[11px] tracking-tight'
-            )}
-          >
-            {initials}
-          </span>
+          <CampusLogo name={campus.name} logo={campus.logo} className="size-12" />
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
               <p className="line-clamp-1 font-semibold text-slate-900" title={campus.name}>
@@ -487,7 +455,15 @@ function CategoryChip({ category }: { category: TestCategory }) {
   );
 }
 
-function CampusView({ campusId, name }: { campusId: number; name?: string }) {
+function CampusView({
+  campusId,
+  name,
+  logo,
+}: {
+  campusId: number;
+  name?: string;
+  logo?: string | null;
+}) {
   const search = route.useSearch();
   const navigate = route.useNavigate();
   const detail = useCampusDetail(campusId, search.batch);
@@ -513,7 +489,10 @@ function CampusView({ campusId, name }: { campusId: number; name?: string }) {
           <ChevronRight className="size-3.5" aria-hidden />
           <span className="font-medium text-white">{name ?? 'Campus'}</span>
         </nav>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">{name ?? 'Campus'}</h1>
+        <h1 className="mt-2 flex items-center gap-3 text-2xl font-bold tracking-tight sm:text-3xl">
+          {name && <CampusLogo name={name} logo={logo} className="size-12 sm:size-14" />}
+          {name ?? 'Campus'}
+        </h1>
         <p className="text-brand-100 mt-1 text-sm">
           PRIME domain journey ·{' '}
           {data.subjects.map((subject) => subject.name).join(', ') || 'Prime Domain Coding'}

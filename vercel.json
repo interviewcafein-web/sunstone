@@ -31,5 +31,20 @@
       "path": "/api/sync-sheet",
       "schedule": "30 0 * * *"
     }
-  ]
+  ],
+  "images": {
+    "sizes": [64, 128],
+    "formats": ["image/webp"],
+    "minimumCacheTTL": 604800,
+    "remotePatterns": [
+      {
+        "protocol": "https",
+        "hostname": "d3s27eh1wskpwv.cloudfront.net"
+      },
+      {
+        "protocol": "https",
+        "hostname": "offer-letter-assets-bucket.s3.ap-south-1.amazonaws.com"
+      }
+    ]
+  }
 }

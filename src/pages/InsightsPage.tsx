@@ -37,11 +37,12 @@ import {
 } from 'lucide-react';
 
 import { Avatar } from '@/components/common/Avatar';
+import { CampusLogo } from '@/components/common/CampusLogo';
 import { PageLoader } from '@/components/common/PageLoader';
 import { Sparkline } from '@/components/common/Sparkline';
 import { queryKeyFor } from '@/hooks/useStudentSummaries';
 import { useStudents } from '@/hooks/useStudents';
-import { useStudentMetrics } from '@/lib/assessments';
+import { useCampusOverview, useStudentMetrics } from '@/lib/assessments';
 import type { PlatformSummary } from '@/lib/coding-profiles/summaries';
 import {
   BAND_COLORS,
@@ -86,6 +87,11 @@ export default function InsightsPage() {
   const client = useQueryClient();
   const students = useStudents();
   const metrics = useStudentMetrics();
+  const overview = useCampusOverview();
+  const logos = useMemo(
+    () => new Map((overview.data?.campuses ?? []).map((campus) => [campus.name, campus.logo])),
+    [overview.data]
+  );
   // The saved coding numbers (the same query the students page uses, so usually cached).
   const saved = useQuery({
     queryKey: ['saved-summaries'],
@@ -230,6 +236,7 @@ export default function InsightsPage() {
       {groups.length > 1 && (
         <ComparisonHeatmap
           groups={groups}
+          logos={byCampus ? logos : undefined}
           noun={byCampus ? 'Campus' : 'Batch'}
           onPick={(key) =>
             byCampus ? setScope({ campus: key }) : setScope({ campus: search.campus, batch: key })
@@ -639,10 +646,13 @@ type SortKey = 'overall' | 'students' | 'critical' | DimensionId;
 /** Campuses (or batches) down the side, the five fronts across, each cell coloured by health. */
 function ComparisonHeatmap({
   groups,
+  logos,
   noun,
   onPick,
 }: {
   groups: GroupStats[];
+  /** Campus name → logo, when the rows are campuses. */
+  logos?: Map<string, string | null>;
   noun: string;
   onPick: (key: string) => void;
 }) {
@@ -730,6 +740,13 @@ function ComparisonHeatmap({
                     <span className="w-5 text-xs font-medium text-slate-400 tabular-nums">
                       {index + 1}
                     </span>
+                    {logos && (
+                      <CampusLogo
+                        name={group.key}
+                        logo={logos.get(group.key)}
+                        className="size-8 rounded-lg"
+                      />
+                    )}
                     <span className="max-w-64 truncate" title={group.key}>
                       {group.key}
                     </span>

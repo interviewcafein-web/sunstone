@@ -14,6 +14,7 @@
     "db:migrate": "tsx --env-file=.env.local scripts/migrate.ts",
     "db:import": "tsx --env-file=.env.local scripts/import-students.ts",
     "db:sync-sheet": "tsx --env-file=.env.local scripts/sync-sheet.ts",
+    "db:sync-campuses": "tsx --env-file=.env.local scripts/sync-campuses.ts",
     "staff": "tsx --env-file=.env.local scripts/staff.ts",
     "db:sync-assessments": "tsx --env-file=.env.local scripts/sync-assessments.ts",
     "db:sync-attendance": "tsx --env-file=.env.local scripts/sync-attendance.ts",

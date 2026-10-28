@@ -45,6 +45,9 @@ jobs:
       - name: Students from the LMS (+ form usernames)
         if: steps.secrets.outputs.ready == 'true'
         run: npx tsx scripts/import-students.ts
+      - name: Campus logos
+        if: steps.secrets.outputs.ready == 'true'
+        run: npx tsx scripts/sync-campuses.ts
       - name: PRIME domain assessments and AMCAT
         if: steps.secrets.outputs.ready == 'true'
         run: npx tsx scripts/sync-assessments.ts
