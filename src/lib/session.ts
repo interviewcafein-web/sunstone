@@ -13,6 +13,15 @@ export interface SessionInfo {
   name: string | null;
   /** Google profile photo, for staff who signed in with Google. */
   picture: string | null;
+  mobile: string | null;
+  /** e.g. "Campus Manager". */
+  designation: string | null;
+  /** A short description of themselves and what they look after. */
+  bio: string | null;
+  /** Milliseconds since 1970. */
+  lastLoginAt: number | null;
+  /** Bootstrap password accounts have no editable profile. */
+  hasProfile: boolean;
   role: Role;
   /** Campus staff: the campuses they see. Null for HQ and super admins (every campus). */
   campuses: { id: number; name: string }[] | null;
@@ -33,6 +42,25 @@ export function useSession() {
     staleTime: 5 * 60_000,
     retry: false,
   });
+}
+
+export interface ProfileUpdate {
+  name: string;
+  mobile: string;
+  designation: string;
+  bio: string;
+}
+
+/** Saves your own profile; resolves with the updated session. */
+export async function saveProfile(update: ProfileUpdate): Promise<SessionInfo> {
+  const response = await fetch('/api/me', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(update),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(body?.error ?? 'Could not save your profile.');
+  return body as SessionInfo;
 }
 
 export async function logIn(username: string, password: string): Promise<string> {

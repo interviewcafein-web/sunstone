@@ -23,6 +23,9 @@ import { cn } from '@/lib/utils';
 interface Member {
   email: string;
   name: string | null;
+  picture: string | null;
+  designation: string | null;
+  mobile: string | null;
   role: Role;
   campusIds: number[];
   addedBy: string | null;
@@ -47,6 +50,8 @@ interface TeamResponse {
 interface Draft {
   email: string;
   name: string;
+  designation: string;
+  mobile: string;
   role: Role;
   campusIds: number[];
   /** Editing an existing member (their email cannot change). */
@@ -111,6 +116,8 @@ export default function TeamPage() {
         action: 'save',
         email: value.email,
         name: value.name,
+        designation: value.designation,
+        mobile: value.mobile,
         role: value.role,
         campusIds: value.role === 'campus' ? value.campusIds : [],
       }),
@@ -189,7 +196,15 @@ export default function TeamPage() {
             onClick={() => {
               setNotice(undefined);
               save.reset();
-              setDraft({ email: '', name: '', role: 'campus', campusIds: [], existing: false });
+              setDraft({
+                email: '',
+                name: '',
+                designation: '',
+                mobile: '',
+                role: 'campus',
+                campusIds: [],
+                existing: false,
+              });
             }}
             className="text-brand-800 hover:bg-brand-50 inline-flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-2 text-sm font-semibold shadow-sm transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
@@ -251,7 +266,16 @@ export default function TeamPage() {
                 key={member.email}
                 className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-5"
               >
-                <Avatar name={member.name ?? member.email} />
+                {member.picture ? (
+                  <img
+                    src={member.picture}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                    className="size-9 shrink-0 rounded-full object-cover"
+                  />
+                ) : (
+                  <Avatar name={member.name ?? member.email} />
+                )}
                 <div className="min-w-0 flex-1 basis-56">
                   <p className="truncate font-semibold">
                     {member.name ?? member.email.split('@')[0]}
@@ -259,7 +283,9 @@ export default function TeamPage() {
                       <span className="ml-2 text-xs font-normal text-slate-500">(you)</span>
                     )}
                   </p>
-                  <p className="truncate text-xs text-slate-500">{member.email}</p>
+                  <p className="truncate text-xs text-slate-500">
+                    {[member.designation, member.email, member.mobile].filter(Boolean).join(' · ')}
+                  </p>
                 </div>
                 <span
                   className={cn(
@@ -303,6 +329,8 @@ export default function TeamPage() {
                           setDraft({
                             email: member.email,
                             name: member.name ?? '',
+                            designation: member.designation ?? '',
+                            mobile: member.mobile ?? '',
                             role: member.role,
                             campusIds: member.campusIds,
                             existing: true,
@@ -435,6 +463,34 @@ function MemberForm({
             value={draft.name}
             onChange={(event) => onChange({ ...draft, name: event.target.value })}
             placeholder="Full name"
+            className={field}
+          />
+        </div>
+        <div>
+          <label
+            htmlFor="member-designation"
+            className="mb-1 block text-xs font-medium text-slate-600"
+          >
+            Designation
+          </label>
+          <input
+            id="member-designation"
+            value={draft.designation}
+            onChange={(event) => onChange({ ...draft, designation: event.target.value })}
+            placeholder="e.g. Campus Manager"
+            className={field}
+          />
+        </div>
+        <div>
+          <label htmlFor="member-mobile" className="mb-1 block text-xs font-medium text-slate-600">
+            Mobile
+          </label>
+          <input
+            id="member-mobile"
+            type="tel"
+            value={draft.mobile}
+            onChange={(event) => onChange({ ...draft, mobile: event.target.value })}
+            placeholder="+91 98765 43210"
             className={field}
           />
         </div>

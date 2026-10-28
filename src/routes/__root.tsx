@@ -1,5 +1,5 @@
 import { Link, Outlet, createRootRoute } from '@tanstack/react-router';
-import { LogIn } from 'lucide-react';
+import { ClipboardList, Library, LogIn, Search, Users } from 'lucide-react';
 
 import { BrandLockup } from '@/components/common/BrandLockup';
 import { ProfileMenu } from '@/components/common/ProfileMenu';
@@ -11,10 +11,18 @@ export const Route = createRootRoute({
   component: RootComponent,
 });
 
-const navLink =
-  'hover:bg-brand-50 dark:hover:bg-brand-900/40 hover:text-brand-700 dark:hover:text-brand-300 rounded-md px-2.5 py-1.5 text-sm font-medium text-slate-600 transition-colors';
-const navLinkActive = {
-  className: 'bg-brand-50 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300',
+const NAV = [
+  { to: '/', label: 'Students', icon: Users, exact: true },
+  { to: '/assessments', label: 'Assessments', icon: ClipboardList, exact: false },
+  { to: '/profile', label: 'Profile lookup', icon: Search, exact: false },
+  { to: '/resources', label: 'Resources', icon: Library, exact: false },
+] as const;
+
+const navItem =
+  'flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-slate-600 transition-all hover:text-brand-700 dark:hover:text-brand-300';
+const navItemActive = {
+  className:
+    'bg-surface text-brand-700 shadow-[0_1px_3px_rgb(15_23_42/0.12)] ring-1 ring-slate-200 dark:text-brand-200',
 };
 
 function RootComponent() {
@@ -24,61 +32,64 @@ function RootComponent() {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-surface/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-          <Link to="/" className="flex items-center gap-3">
-            <BrandLockup />
-            <span className="flex items-center self-stretch border-l border-slate-300 pl-3">
-              <VertexLogo className="h-8" />
-            </span>
-          </Link>
-          <nav className="ml-auto flex flex-wrap items-center justify-end gap-1">
-            {user ? (
-              <>
+      <header className="sticky top-0 z-30 bg-surface/85 backdrop-blur-md">
+        {/* Navy-to-gold accent: the Sunstone PRIME and Vertex colours. */}
+        <div
+          aria-hidden
+          className="from-brand-700 via-brand-500 h-[3px] bg-gradient-to-r to-amber-400"
+        />
+        <div className="border-b border-slate-200/80 shadow-[0_8px_24px_-18px_rgb(15_23_42/0.35)]">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2.5">
+            <Link
+              to="/"
+              className="flex shrink-0 items-center gap-3"
+              aria-label="Sunstone PRIME Vertex home"
+            >
+              <BrandLockup logoClassName="h-4 sm:h-5" primeClassName="text-[7px] sm:text-[9px]" />
+              <span className="flex items-center self-stretch border-l border-slate-300 pl-3">
+                <VertexLogo className="h-6 sm:h-8" />
+              </span>
+            </Link>
+
+            {user && (
+              <nav
+                aria-label="Main"
+                className="order-last -mx-1 flex w-full gap-1 overflow-x-auto rounded-full bg-slate-100/80 p-1 scrollbar-none md:order-none md:mx-auto md:w-auto"
+              >
+                {NAV.map(({ to, label, icon: Icon, exact }) => (
+                  <Link
+                    key={to}
+                    to={to}
+                    className={navItem}
+                    activeProps={navItemActive}
+                    activeOptions={{ exact, includeSearch: false }}
+                  >
+                    <Icon className="size-4" aria-hidden />
+                    {label}
+                  </Link>
+                ))}
+              </nav>
+            )}
+
+            <div className="ml-auto flex items-center gap-1 md:ml-0">
+              {!user && !session.isPending && (
                 <Link
-                  to="/"
-                  className={navLink}
-                  activeProps={navLinkActive}
-                  activeOptions={{ exact: true, includeSearch: false }}
+                  to="/login"
+                  className="bg-brand-700 hover:bg-brand-800 mr-1 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white"
                 >
-                  Students
-                </Link>
-                <Link
-                  to="/assessments"
-                  className={navLink}
-                  activeProps={navLinkActive}
-                  activeOptions={{ includeSearch: false }}
-                >
-                  Assessments
-                </Link>
-                <Link
-                  to="/profile"
-                  className={navLink}
-                  activeProps={navLinkActive}
-                  activeOptions={{ includeSearch: false }}
-                >
-                  Look up a profile
-                </Link>
-                <Link
-                  to="/resources"
-                  className={navLink}
-                  activeProps={navLinkActive}
-                  activeOptions={{ includeSearch: false }}
-                >
-                  Resources
-                </Link>
-              </>
-            ) : (
-              !session.isPending && (
-                <Link to="/login" className={`${navLink} inline-flex items-center gap-1.5`}>
                   <LogIn className="size-4" aria-hidden />
                   Staff login
                 </Link>
-              )
-            )}
-            <ThemeToggle />
-            {user && <ProfileMenu user={user} onLogOut={logOut} />}
-          </nav>
+              )}
+              <ThemeToggle />
+              {user && (
+                <>
+                  <span aria-hidden className="mx-1 h-6 w-px bg-slate-200" />
+                  <ProfileMenu user={user} onLogOut={logOut} />
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </header>
 

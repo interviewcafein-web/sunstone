@@ -256,12 +256,13 @@ function PlatformCell({
     case 'none':
       return <span className="text-slate-300">—</span>;
     case 'invalid':
+      // Not a usable username in the form: shown like a missing profile, reason on hover.
       return (
         <span
-          title={`The sheet entry for ${platform.name} is not a username or a profile link.`}
-          className={cn(pill, 'bg-amber-100 text-amber-900')}
+          className="text-slate-300"
+          title={`The ${platform.name} entry in the form is not a username`}
         >
-          Check entry
+          —
         </span>
       );
     case 'loading':
@@ -275,10 +276,10 @@ function PlatformCell({
     case 'not_found':
       return (
         <span
-          title={`No ${platform.name} account named "${cell.handle}".`}
-          className={cn(pill, 'bg-red-100 text-red-800')}
+          className="text-slate-300"
+          title={`No ${platform.name} account named "${cell.handle}"`}
         >
-          Not found
+          —
         </span>
       );
     case 'error':

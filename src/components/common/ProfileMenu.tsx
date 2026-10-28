@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { Building2, ChevronDown, LogOut, ShieldCheck, Users } from 'lucide-react';
+import { Building2, ChevronDown, LogOut, ShieldCheck, UserRound, Users } from 'lucide-react';
 
 import { Avatar } from '@/components/common/Avatar';
 import { ROLE_LABELS } from '@/lib/roles';
@@ -10,7 +10,14 @@ import { cn } from '@/lib/utils';
 /** Their Google photo when they signed in with Google, otherwise their initials. */
 export function ProfilePhoto({ user, className }: { user: SessionInfo; className?: string }) {
   const [broken, setBroken] = useState(false);
-  const label = user.name ?? user.user;
+  // No name yet: initials from the email's letters ("93mishra@…" → "M", not "9").
+  const label =
+    user.name ??
+    (user.user
+      .split('@')[0]
+      .replace(/[^a-z]+/gi, ' ')
+      .trim() ||
+      user.user);
   if (!user.picture || broken) return <Avatar name={label} className={className} />;
   return (
     <img
@@ -82,6 +89,9 @@ export function ProfileMenu({ user, onLogOut }: { user: SessionInfo; onLogOut: (
             <ProfilePhoto user={user} className="size-12 text-sm ring-2 ring-white/30" />
             <div className="min-w-0">
               <p className="truncate font-semibold">{name}</p>
+              {user.designation && (
+                <p className="text-brand-100 truncate text-xs">{user.designation}</p>
+              )}
               {user.name && <p className="text-brand-100 truncate text-xs">{user.user}</p>}
               <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold">
                 <ShieldCheck className="size-3" aria-hidden />
@@ -110,6 +120,10 @@ export function ProfileMenu({ user, onLogOut }: { user: SessionInfo; onLogOut: (
           )}
 
           <div className="p-1.5">
+            <Link to="/account" role="menuitem" className={item} onClick={() => setOpen(false)}>
+              <UserRound className="size-4 text-slate-500" aria-hidden />
+              My profile
+            </Link>
             {user.managesTeam && (
               <Link to="/team" role="menuitem" className={item} onClick={() => setOpen(false)}>
                 <Users className="size-4 text-slate-500" aria-hidden />

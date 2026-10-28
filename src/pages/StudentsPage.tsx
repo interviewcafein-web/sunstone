@@ -240,12 +240,11 @@ export default function StudentsPage() {
   }
 
   const solved = rows.reduce((sum, row) => sum + row.total, 0);
-  const toFix = rows.reduce(
-    (count, row) =>
-      count +
-      PLATFORM_IDS.filter((id) => ['invalid', 'not_found'].includes(row.cells[id].kind)).length,
-    0
-  );
+  // Students with coding activity on any platform in the last 7 days.
+  const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+  const activeThisWeek = rows.filter(
+    (row) => row.lastActive && row.lastActive.day >= weekAgo
+  ).length;
   const scope =
     [search.campus, search.batch && `Batch ${search.batch}`, search.course]
       .filter(Boolean)
@@ -262,7 +261,7 @@ export default function StudentsPage() {
         totalStudents={all.length}
         solved={solved}
         linked={summaries.total}
-        toFix={toFix}
+        activeThisWeek={activeThisWeek}
         checkedAt={students.dataUpdatedAt}
         settled={summaries.settled}
         refreshing={summaries.refreshing}

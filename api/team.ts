@@ -1,7 +1,8 @@
 // The Team page: who has access and to what. Super admins and HQ only.
 //
 //   GET  /api/team                                          members + campuses to choose from
-//   POST /api/team { action: 'save', email, name, role, campusIds }   add or change someone
+//   POST /api/team { action: 'save', email, name, designation, mobile, role, campusIds }
+//                                                                     add or change someone
 //   POST /api/team { action: 'remove', email }                        end someone's access
 //
 // Super admins and HQ can add, change and remove HQ and campus staff. Nobody can change a
@@ -48,7 +49,7 @@ async function lockedReason(viewer: Viewer, email: string): Promise<string | nul
 
 async function list(viewer: Viewer): Promise<Response> {
   const rows = await db()`
-    select email, name, role, campus_ids, added_by,
+    select email, name, role, campus_ids, added_by, picture, designation, mobile,
            (extract(epoch from added_at) * 1000)::float8 as added_at,
            (extract(epoch from last_login_at) * 1000)::float8 as last_login_at
     from staff where active
@@ -60,6 +61,9 @@ async function list(viewer: Viewer): Promise<Response> {
     return {
       email,
       name: row.name ? String(row.name) : null,
+      picture: row.picture ? String(row.picture) : null,
+      designation: row.designation ? String(row.designation) : null,
+      mobile: row.mobile ? String(row.mobile) : null,
       role: superAdmin ? 'super_admin' : row.role,
       campusIds: (row.campus_ids as number[]) ?? [],
       addedBy: row.added_by ? String(row.added_by) : null,
@@ -74,6 +78,9 @@ async function list(viewer: Viewer): Promise<Response> {
       members.unshift({
         email,
         name: null,
+        picture: null,
+        designation: null,
+        mobile: null,
         role: 'super_admin',
         campusIds: [],
         addedBy: 'built-in',
@@ -94,6 +101,16 @@ async function save(viewer: Viewer, body: Record<string, unknown>): Promise<Resp
   const name =
     typeof body.name === 'string' && body.name.trim() ? body.name.trim().slice(0, 100) : null;
 
+  const designation =
+    typeof body.designation === 'string' && body.designation.trim()
+      ? body.designation.trim().slice(0, 80)
+      : null;
+  const mobile =
+    typeof body.mobile === 'string' && body.mobile.trim() ? body.mobile.trim().slice(0, 20) : null;
+  if (mobile && !/^\+?[\d\s-]{10,16}$/.test(mobile)) {
+    return json(400, { error: 'Enter a valid mobile number.' });
+  }
+
   const locked = await lockedReason(viewer, email);
   if (locked) return json(403, { error: locked });
 
@@ -106,10 +123,13 @@ async function save(viewer: Viewer, body: Record<string, unknown>): Promise<Resp
   }
 
   await db()`
-    insert into staff (email, name, role, campus_ids, added_by, active)
-    values (${email}, ${name}, ${role}, ${campusIds}::int[], ${normalizeEmail(viewer.user)}, true)
+    insert into staff (email, name, role, campus_ids, added_by, active, designation, mobile)
+    values (${email}, ${name}, ${role}, ${campusIds}::int[], ${normalizeEmail(viewer.user)}, true,
+            ${designation}, ${mobile})
     on conflict (email) do update set
       name = coalesce(excluded.name, staff.name),
+      designation = coalesce(excluded.designation, staff.designation),
+      mobile = coalesce(excluded.mobile, staff.mobile),
       role = excluded.role,
       campus_ids = excluded.campus_ids,
       active = true,

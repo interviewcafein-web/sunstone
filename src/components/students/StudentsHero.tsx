@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { AlertTriangle, CheckCircle2, Link2, RefreshCw, TrendingUp, Users } from 'lucide-react';
+import { Activity, CheckCircle2, Link2, RefreshCw, TrendingUp, Users } from 'lucide-react';
 
 import { CountUp } from '@/components/common/CountUp';
 import { cn } from '@/lib/utils';
@@ -11,7 +11,8 @@ interface StudentsHeroProps {
   totalStudents: number;
   solved: number;
   linked: number;
-  toFix: number;
+  /** Students with coding activity in the last 7 days. */
+  activeThisWeek: number;
   checkedAt: number;
   /** Platform profiles loaded so far, out of `linked`. */
   settled: number;
@@ -26,7 +27,7 @@ export function StudentsHero({
   totalStudents,
   solved,
   linked,
-  toFix,
+  activeThisWeek,
   checkedAt,
   settled,
   refreshing,
@@ -82,12 +83,7 @@ export function StudentsHero({
           value={students ? Math.round(solved / students) : 0}
         />
         <HeroStat icon={Link2} label="Profiles linked" value={linked} />
-        <HeroStat
-          icon={AlertTriangle}
-          label="Entries to fix"
-          value={toFix}
-          tone={toFix > 0 ? 'warn' : 'default'}
-        />
+        <HeroStat icon={Activity} label="Active this week" value={activeThisWeek} />
       </dl>
 
       {loading && (
