@@ -26,7 +26,6 @@ import {
   LayoutDashboard,
   NotebookPen,
   ClipboardCheck,
-  Loader2,
   Search,
   Target,
   Trophy,
@@ -67,6 +66,7 @@ import {
 import { useSession } from '@/lib/session';
 import { chartColors, useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
+import { InlineLoader, PageLoader } from '@/components/common/PageLoader';
 
 const route = getRouteApi('/assessments');
 
@@ -74,12 +74,17 @@ const heroClass =
   'hero-glow from-brand-700 via-brand-700 to-brand-900 relative overflow-hidden rounded-2xl bg-gradient-to-br p-5 text-white shadow-[0_20px_50px_-20px_rgb(16_38_70/0.6)] sm:p-7';
 const panel = 'shadow-card bg-surface rounded-2xl border border-slate-200';
 
-function Loading({ label }: { label: string }) {
-  return (
-    <p className="flex items-center gap-2 text-sm text-slate-600">
-      <Loader2 className="size-4 animate-spin" aria-hidden />
-      {label}
-    </p>
+function Loading({
+  label,
+  variant = 'cards',
+}: {
+  label: string;
+  variant?: 'cards' | 'table' | 'plain';
+}) {
+  return variant === 'plain' ? (
+    <InlineLoader label={label.replace(/…$/, '')} />
+  ) : (
+    <PageLoader variant={variant} label={label.replace(/…$/, '')} />
   );
 }
 
@@ -393,7 +398,7 @@ function CampusView({ campusId, name }: { campusId: number; name?: string }) {
     navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true });
   const tab = TABS.some((item) => item.id === search.tab) ? search.tab! : 'overview';
 
-  if (detail.isPending) return <Loading label="Loading the campus…" />;
+  if (detail.isPending) return <Loading variant="table" label="Loading the campus…" />;
   if (detail.isError) return <Problem message={detail.error.message} />;
 
   const data = detail.data;
@@ -1349,7 +1354,7 @@ function TestPanel({
 
         <div className="flex-1 overflow-y-auto p-5">
           {detail.isPending ? (
-            <Loading label="Loading results…" />
+            <Loading variant="plain" label="Loading results…" />
           ) : detail.isError ? (
             <Problem message={detail.error.message} />
           ) : (

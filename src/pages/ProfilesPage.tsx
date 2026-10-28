@@ -33,6 +33,7 @@ import {
 } from '@/lib/coding-profiles/types';
 import type { Student } from '@/lib/students/types';
 import { cn } from '@/lib/utils';
+import { InlineLoader } from '@/components/common/PageLoader';
 
 const route = getRouteApi('/profile');
 
@@ -429,10 +430,7 @@ function PlatformTab({
 export function LoadingCard({ label }: { label: string }) {
   return (
     <Card>
-      <p className="flex items-center gap-2 text-sm text-slate-600">
-        <Loader2 className="size-4 animate-spin" aria-hidden />
-        {label}
-      </p>
+      <InlineLoader label={label.replace(/…$/, '')} />
     </Card>
   );
 }

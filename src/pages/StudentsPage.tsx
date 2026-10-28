@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { getRouteApi } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2 } from 'lucide-react';
 
 import { StudentFilters } from '@/components/students/StudentFilters';
 import { StudentsHero } from '@/components/students/StudentsHero';
@@ -23,6 +22,7 @@ import type { Student } from '@/lib/students/types';
 import { ZONE_BASIS, zoneOf, type ZoneResult } from '@/lib/students/zones';
 import type { CampusReportRow, ReportValue } from '@/reports';
 import type { SortKey, StudentsSearch } from '@/routes/index';
+import { PageLoader } from '@/components/common/PageLoader';
 
 const route = getRouteApi('/');
 
@@ -228,12 +228,7 @@ export default function StudentsPage() {
   };
 
   if (students.isPending) {
-    return (
-      <p className="flex items-center gap-2 text-sm text-slate-600">
-        <Loader2 className="size-4 animate-spin" aria-hidden />
-        Loading the student list…
-      </p>
-    );
+    return <PageLoader label="Loading the student list" />;
   }
 
   if (students.isError && all.length === 0) {

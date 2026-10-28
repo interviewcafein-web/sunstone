@@ -19,6 +19,7 @@ import { Avatar } from '@/components/common/Avatar';
 import { ROLE_DESCRIPTIONS, ROLE_LABELS, type Role } from '@/lib/roles';
 import { useSession } from '@/lib/session';
 import { cn } from '@/lib/utils';
+import { PageLoader } from '@/components/common/PageLoader';
 
 interface Member {
   email: string;
@@ -154,12 +155,7 @@ export default function TeamPage() {
     );
   }
   if (team.isPending) {
-    return (
-      <p className="flex items-center gap-2 text-sm text-slate-600">
-        <Loader2 className="size-4 animate-spin" aria-hidden />
-        Loading the team…
-      </p>
-    );
+    return <PageLoader variant="profile" label="Loading the team" />;
   }
   if (team.isError) {
     return (

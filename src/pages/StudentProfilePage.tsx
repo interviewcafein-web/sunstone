@@ -3,7 +3,8 @@ import { Link, getRouteApi, useNavigate } from '@tanstack/react-router';
 
 import { Card } from '@/components/coding/ui';
 import { useStudent } from '@/hooks/useStudents';
-import { LoadingCard, ProfileView } from '@/pages/ProfilesPage';
+import { ProfileView } from '@/pages/ProfilesPage';
+import { PageLoader } from '@/components/common/PageLoader';
 
 const route = getRouteApi('/s/$slug');
 
@@ -22,7 +23,7 @@ export default function StudentProfilePage() {
   }, [student, slug, navigate]);
 
   if (!student) {
-    if (lookup.isPending) return <LoadingCard label="Loading profile…" />;
+    if (lookup.isPending) return <PageLoader variant="profile" label="Loading the profile" />;
     return (
       <Card>
         <p className="font-semibold">This profile could not be found.</p>

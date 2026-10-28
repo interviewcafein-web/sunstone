@@ -17,7 +17,6 @@ import {
   ClipboardCheck,
   Folder,
   FolderTree,
-  Loader2,
   Target,
   TrendingUp,
 } from 'lucide-react';
@@ -42,6 +41,7 @@ import {
 } from '@/lib/assessments';
 import { chartColors, useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
+import { InlineLoader } from '@/components/common/PageLoader';
 
 function Kpi({
   icon: Icon,
@@ -97,10 +97,7 @@ export function StudentAssessments({ username }: { username: string }) {
   if (query.isPending) {
     return (
       <Card>
-        <p className="flex items-center gap-2 text-sm text-slate-600">
-          <Loader2 className="size-4 animate-spin" aria-hidden />
-          Loading assessments…
-        </p>
+        <InlineLoader label="Loading tests, attendance and AMCAT" />
       </Card>
     );
   }
