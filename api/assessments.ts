@@ -710,8 +710,9 @@ async function student(viewer: Viewer, username: string) {
 }
 
 /**
- * For the students table: per student (by username) the viewer may see, attendance, AMCAT
- * sitting averages in date order (for the trend), and PRIME test average and counts.
+ * For the students table and the 360° view: per student (by username) the viewer may see,
+ * attendance, AMCAT sitting averages in date order (for the trend), PRIME test average and
+ * counts, and the internal exam average (Midterms and End-term; not Mock PI / GD).
  */
 async function metrics(viewer: Viewer) {
   const rows = await db().query(
@@ -754,6 +755,13 @@ async function metrics(viewer: Viewer) {
        group by ss.lms_user_id, d.test_id),
      tt as (
        select lms_user_id, json_agg(pct order by released) as list from scored group by lms_user_id),
+     ex as (
+       select m.lms_user_id,
+              round(avg(least(m.marks / nullif(e.max_marks, 0) * 100, 100)))::int as avg
+       from exm_marks m join exm_exams e on e.id = m.exam_id
+       where m.marks is not null and coalesce(e.kind, 'other') not in ('mock_pi', 'mock_gd')
+         and m.lms_user_id in (select lms_user_id from roster)
+       group by m.lms_user_id),
      tst as (
        select e.lms_user_id, count(*)::int as released, count(*) filter (where tr.submitted)::int as submitted,
               round(avg(tr.marks / nullif(coalesce(tr.max_marks, t.max_marks), 0) * 100)
@@ -765,11 +773,12 @@ async function metrics(viewer: Viewer) {
             round(100.0 * att.p / nullif(att.s, 0))::int as attendance,
             round(100.0 * att.pp / nullif(att.ps, 0))::int as prime_attendance,
             am.list as amcat, tst.avg as test_avg, tst.submitted, tst.released,
-            aw.list as attendance_weeks, tt.list as test_trend
+            aw.list as attendance_weeks, tt.list as test_trend, ex.avg as exam_avg
      from roster r
      left join att using (lms_user_id) left join am using (lms_user_id) left join tst using (lms_user_id)
-     left join aw using (lms_user_id) left join tt using (lms_user_id)
-     where att.lms_user_id is not null or am.lms_user_id is not null or tst.lms_user_id is not null`,
+     left join aw using (lms_user_id) left join tt using (lms_user_id) left join ex using (lms_user_id)
+     where att.lms_user_id is not null or am.lms_user_id is not null or tst.lms_user_id is not null
+       or ex.lms_user_id is not null`,
     [viewer.campusIds]
   );
   return {

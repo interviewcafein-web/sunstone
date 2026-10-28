@@ -13,7 +13,11 @@ export type SummaryQuery = UseQueryResult<PlatformSummary, Error>;
 
 export const summaryKey = (platform: PlatformId, handle: string) => `${platform}:${handle}`;
 
-const queryKeyFor = (platform: PlatformId, handle: string) => [SUMMARY_QUERY_KEY, platform, handle];
+export const queryKeyFor = (platform: PlatformId, handle: string) => [
+  SUMMARY_QUERY_KEY,
+  platform,
+  handle,
+];
 
 /**
  * One query per (platform, handle) across the given students, keyed by `summaryKey`.

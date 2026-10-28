@@ -409,6 +409,8 @@ export interface StudentMetrics {
   attendance_weeks: number[] | null;
   /** Score % on each PRIME test taken, in release order (last ten). */
   test_trend: number[] | null;
+  /** Average % in internal exams (Midterms, End-term). */
+  exam_avg: number | null;
 }
 
 export const useStudentMetrics = () =>

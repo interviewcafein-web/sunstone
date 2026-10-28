@@ -1,5 +1,5 @@
 import { Link, Outlet, createRootRoute } from '@tanstack/react-router';
-import { Building2, Library, LogIn, Users } from 'lucide-react';
+import { Building2, Library, LogIn, Radar, Users } from 'lucide-react';
 
 import { BrandLockup } from '@/components/common/BrandLockup';
 import { ProfileMenu } from '@/components/common/ProfileMenu';
@@ -14,6 +14,7 @@ export const Route = createRootRoute({
 const NAV = [
   { to: '/', label: 'Students', icon: Users, exact: true },
   { to: '/campuses', label: 'Campuses', icon: Building2, exact: false },
+  { to: '/insights', label: '360° view', icon: Radar, exact: false },
   { to: '/resources', label: 'Resources', icon: Library, exact: false },
 ] as const;
 

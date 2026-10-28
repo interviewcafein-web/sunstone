@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as AssessmentsRouteImport } from './routes/assessments'
 import { Route as CampusesRouteImport } from './routes/campuses'
+import { Route as InsightsRouteImport } from './routes/insights'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProfileRouteImport } from './routes/profile'
@@ -41,6 +42,11 @@ const CampusesRoute = CampusesRouteImport.update({
   path: '/campuses',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/campuses.lazy').then((d) => d.Route))
+const InsightsRoute = InsightsRouteImport.update({
+  id: '/insights',
+  path: '/insights',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/insights.lazy').then((d) => d.Route))
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -82,6 +88,7 @@ export interface FileRoutesByFullPath {
   '/account': typeof AccountRoute
   '/assessments': typeof AssessmentsRoute
   '/campuses': typeof CampusesRoute
+  '/insights': typeof InsightsRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -95,6 +102,7 @@ export interface FileRoutesByTo {
   '/account': typeof AccountRoute
   '/assessments': typeof AssessmentsRoute
   '/campuses': typeof CampusesRoute
+  '/insights': typeof InsightsRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -109,6 +117,7 @@ export interface FileRoutesById {
   '/account': typeof AccountRoute
   '/assessments': typeof AssessmentsRoute
   '/campuses': typeof CampusesRoute
+  '/insights': typeof InsightsRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -124,6 +133,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/assessments'
     | '/campuses'
+    | '/insights'
     | '/login'
     | '/privacy'
     | '/profile'
@@ -137,6 +147,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/assessments'
     | '/campuses'
+    | '/insights'
     | '/login'
     | '/privacy'
     | '/profile'
@@ -150,6 +161,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/assessments'
     | '/campuses'
+    | '/insights'
     | '/login'
     | '/privacy'
     | '/profile'
@@ -164,6 +176,7 @@ export interface RootRouteChildren {
   AccountRoute: typeof AccountRoute
   AssessmentsRoute: typeof AssessmentsRoute
   CampusesRoute: typeof CampusesRoute
+  InsightsRoute: typeof InsightsRoute
   LoginRoute: typeof LoginRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
@@ -201,6 +214,13 @@ declare module '@tanstack/react-router' {
       path: '/campuses'
       fullPath: '/campuses'
       preLoaderRoute: typeof CampusesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/insights': {
+      id: '/insights'
+      path: '/insights'
+      fullPath: '/insights'
+      preLoaderRoute: typeof InsightsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -260,6 +280,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountRoute: AccountRoute,
   AssessmentsRoute: AssessmentsRoute,
   CampusesRoute: CampusesRoute,
+  InsightsRoute: InsightsRoute,
   LoginRoute: LoginRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
