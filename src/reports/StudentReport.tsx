@@ -35,7 +35,7 @@ export interface StudentReportData {
   insight?: StudentInsight;
   /** The student's line in the LMS metrics (attendance, tests, AMCAT, exams). */
   metrics?: StudentMetrics;
-  /** PRIME tests, exams, AMCAT sittings and attendance from the LMS. */
+  /** PRIME tests, AMCAT sittings, exams and attendance from the LMS. */
   assessments?: StudentAssessmentsData;
 }
 

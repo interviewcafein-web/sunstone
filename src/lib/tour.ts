@@ -93,7 +93,7 @@ const TOURS: Record<TourId, Step[]> = {
     {
       target: 'student-sections',
       title: 'Everything about this student',
-      text: 'Coding profiles, Assessments (PRIME tests, internal exams, AMCAT) and Attendance, each in its own section.',
+      text: 'Coding profiles, Assessments (PRIME tests, AMCAT, internal exams) and Attendance, each in its own section.',
       side: 'bottom',
     },
   ],

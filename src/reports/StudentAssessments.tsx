@@ -1,4 +1,4 @@
-// The LMS half of the student report: PRIME tests, internal exams, AMCAT and attendance,
+// The LMS half of the student report: PRIME tests, AMCAT, internal exams and attendance,
 // laid out like the student's Assessments and Attendance tabs on the website.
 
 import { Page, Text, View } from '@react-pdf/renderer';
@@ -61,7 +61,7 @@ export function AssessmentPages({
   );
 }
 
-/** Title, then PRIME tests, internal exams, AMCAT and attendance. */
+/** Title, then PRIME tests, AMCAT, internal exams and attendance. */
 export function AssessmentSections({
   assessments,
   metrics,
@@ -79,12 +79,12 @@ export function AssessmentSections({
         Assessments and attendance
       </Text>
       <Text style={{ fontSize: 8.5, color: MUTED, marginTop: 3 }}>
-        PRIME tests, internal exams, AMCAT and class attendance from the LMS
+        PRIME tests, AMCAT, internal exams and class attendance from the LMS
         {syncedAt ? `, as of ${lmsDate(syncedAt, true)}` : ''}.
       </Text>
       <TestsSection tests={assessments.tests} />
-      <ExamsSection exams={assessments.exams} average={metrics?.exam_avg ?? null} />
       <AmcatSection sittings={assessments.amcat} />
+      <ExamsSection exams={assessments.exams} average={metrics?.exam_avg ?? null} />
       <AttendanceSection attendance={assessments.attendance} />
     </>
   );
