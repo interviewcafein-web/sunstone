@@ -85,7 +85,7 @@ const TOURS: Record<TourId, Step[]> = {
     {
       target: 'campus-tabs',
       title: 'The full journey',
-      text: 'Overview, Prime Mock Tests (with leaderboards), Practice Test and MCQs, exams, AMCAT, attendance, and Students, where the attendance-vs-score chart shows who to follow up with.',
+      text: 'Overview, Prime Mock Tests (with leaderboards), Practice Test and MCQs, AMCAT, exams, attendance, and Students, where the attendance-vs-score chart shows who to follow up with.',
       side: 'bottom',
     },
   ],

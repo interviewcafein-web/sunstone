@@ -43,6 +43,7 @@ import {
 import { ExamsTab } from '@/components/assessments/ExamsSection';
 import { Avatar } from '@/components/common/Avatar';
 import { AnimatedRing } from '@/components/common/AnimatedRing';
+import { PeriodFilter, inPeriod, type PeriodChoice } from '@/components/assessments/PeriodFilter';
 import { CampusLogo } from '@/components/common/CampusLogo';
 import { PainPoints } from '@/components/insights/PainPoints';
 import { useInsightRows } from '@/hooks/useInsightRows';
@@ -397,8 +398,8 @@ const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'subject', label: 'Prime Mock Test', icon: Trophy },
   { id: 'modules', label: 'Practice Test and MCQs', icon: FolderTree },
-  { id: 'exams', label: 'Exams', icon: NotebookPen },
   { id: 'amcat', label: 'AMCAT', icon: Award },
+  { id: 'exams', label: 'Exams', icon: NotebookPen },
   { id: 'attendance', label: 'Attendance', icon: CalendarCheck },
   { id: 'students', label: 'Students', icon: Users },
 ] as const;
@@ -482,6 +483,9 @@ function CampusView({
   const set = (patch: Partial<typeof search>) =>
     navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true });
   const tab = TABS.some((item) => item.id === search.tab) ? search.tab! : 'overview';
+  // Year, term and name filters shared by the test tabs (kept in the address).
+  const choice: PeriodChoice = { year: search.year, term: search.term, q: search.q };
+  const setChoice = (next: PeriodChoice) => set({ year: next.year, term: next.term, q: next.q });
 
   if (detail.isPending) return <Loading variant="table" label="Loading the campus…" />;
   if (detail.isError) return <Problem message={detail.error.message} />;
@@ -611,13 +615,27 @@ function CampusView({
           <OverviewTab data={data} onOpen={open} onTab={(id) => set({ tab: id })} />
         </>
       )}
-      {tab === 'subject' && <SubjectTestsTab tests={data.subjectTests} onOpen={open} />}
+      {tab === 'subject' && (
+        <SubjectTestsTab
+          tests={data.subjectTests}
+          onOpen={open}
+          choice={choice}
+          onChoice={setChoice}
+        />
+      )}
       {tab === 'modules' && (
-        <ModulesTab data={data} onOpen={open} type={search.type} onType={(type) => set({ type })} />
+        <ModulesTab
+          data={data}
+          onOpen={open}
+          type={search.type}
+          onType={(type) => set({ type })}
+          choice={choice}
+          onChoice={setChoice}
+        />
       )}
       {tab === 'exams' && <ExamsTab data={data.exams} />}
       {tab === 'attendance' && <AttendanceTab data={data.attendance} />}
-      {tab === 'amcat' && <AmcatTab data={data.amcat} />}
+      {tab === 'amcat' && <AmcatTab data={data.amcat} choice={choice} onChoice={setChoice} />}
       {tab === 'students' && <StudentsTab students={data.students} />}
 
       {search.test && (
@@ -696,6 +714,14 @@ function CampusPainPoints({
         </Link>
       }
     />
+  );
+}
+
+function NothingInPeriod() {
+  return (
+    <p className={cn(panel, 'p-5 text-sm text-slate-500')}>
+      Nothing in this period. Pick another year or term, or clear the filter.
+    </p>
   );
 }
 
@@ -974,18 +1000,24 @@ const PODIUM = [
 function SubjectTestsTab({
   tests,
   onOpen,
+  choice,
+  onChoice,
 }: {
   tests: SubjectTest[];
   onOpen: (test: CampusTest) => void;
+  choice: PeriodChoice;
+  onChoice: (next: PeriodChoice) => void;
 }) {
   const order: TestStatus[] = ['live', 'completed', 'scheduled', 'unscheduled'];
-  const sorted = [...tests].sort(
-    (a, b) =>
-      order.indexOf(a.status) - order.indexOf(b.status) ||
-      (b.released_at ?? '').localeCompare(a.released_at ?? '') ||
-      a.name.localeCompare(b.name, undefined, { numeric: true })
-  );
-  if (!sorted.length) {
+  const sorted = tests
+    .filter((test) => inPeriod(test.released_at, test.name, choice))
+    .sort(
+      (a, b) =>
+        order.indexOf(a.status) - order.indexOf(b.status) ||
+        (b.released_at ?? '').localeCompare(a.released_at ?? '') ||
+        a.name.localeCompare(b.name, undefined, { numeric: true })
+    );
+  if (!tests.length) {
     return (
       <p className={cn(panel, 'p-5 text-sm text-slate-500')}>
         No Prime Mock Tests (such as AMCAT mocks) for this campus yet.
@@ -993,98 +1025,108 @@ function SubjectTestsTab({
     );
   }
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {sorted.map((test) => {
-        const out = isOut(test);
-        const participation = percent(test.submitted, test.eligible);
-        return (
-          <article
-            key={test.ids.join(',')}
-            className={cn(
-              panel,
-              'flex flex-col p-5',
-              out
-                ? 'cursor-pointer transition hover:-translate-y-0.5 hover:shadow-lg'
-                : 'opacity-80'
-            )}
-            onClick={() => onOpen(test)}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <h3 className="truncate font-bold">{test.name}</h3>
-                <p className="text-xs text-slate-500">
-                  {test.max_marks ? `${Number(test.max_marks)} marks` : ''}
-                  {test.minutes ? ` · ${test.minutes} min` : ''}
-                </p>
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-1">
-                <StatusChip status={test.status} />
-                <IntegrityBadge integrity={test.integrity} />
-              </div>
-            </div>
-            <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-600">
-              <CalendarDays className="size-3.5 text-slate-400" aria-hidden />
-              {test.status === 'unscheduled'
-                ? 'Created, not scheduled for this campus yet'
-                : test.status === 'scheduled'
-                  ? `Opens ${lmsDate(test.released_at, true)}`
-                  : `Released ${lmsDate(test.released_at)}${test.due_at ? ` · due ${lmsDate(test.due_at)}` : ''}`}
-            </p>
-            {test.last_release_at && test.last_release_at !== test.released_at && out && (
-              <p className="mt-0.5 text-[11px] text-slate-500">
-                More sections from {lmsDate(test.last_release_at)}
-              </p>
-            )}
-
-            {out && (
-              <>
-                <div className="mt-4 flex items-center gap-4">
-                  <div className="flex flex-col items-center">
-                    <Ring value={participation} size={52} />
-                    <span className="mt-1 text-[10px] text-slate-500">
-                      {test.submitted}/{test.eligible} took it
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <Ring value={test.avg_pct} size={52} />
-                    <span className="mt-1 text-[10px] text-slate-500">Average</span>
-                  </div>
+    <div className="space-y-4">
+      <PeriodFilter
+        dates={tests.map((test) => test.released_at)}
+        choice={choice}
+        onChange={onChoice}
+        shown={sorted.length}
+        total={tests.length}
+      />
+      {!sorted.length && <NothingInPeriod />}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {sorted.map((test) => {
+          const out = isOut(test);
+          const participation = percent(test.submitted, test.eligible);
+          return (
+            <article
+              key={test.ids.join(',')}
+              className={cn(
+                panel,
+                'flex flex-col p-5',
+                out
+                  ? 'cursor-pointer transition hover:-translate-y-0.5 hover:shadow-lg'
+                  : 'opacity-80'
+              )}
+              onClick={() => onOpen(test)}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="truncate font-bold">{test.name}</h3>
+                  <p className="text-xs text-slate-500">
+                    {test.max_marks ? `${Number(test.max_marks)} marks` : ''}
+                    {test.minutes ? ` · ${test.minutes} min` : ''}
+                  </p>
                 </div>
-                {test.leaders.length > 0 && (
-                  <ol className="mt-4 space-y-1.5 border-t border-dotted border-slate-200 pt-3">
-                    {test.leaders.map((leader, index) => (
-                      <li key={leader.username} className="flex items-center gap-2 text-sm">
-                        <span
-                          className={cn(
-                            'inline-flex size-5 items-center justify-center rounded-full text-[10px] font-bold',
-                            PODIUM[index]
-                          )}
-                        >
-                          {index + 1}
-                        </span>
-                        <Link
-                          to="/s/$slug"
-                          params={{ slug: leader.username }}
-                          onClick={(event) => event.stopPropagation()}
-                          className="min-w-0 flex-1 truncate font-medium hover:underline"
-                        >
-                          {leader.name}
-                        </Link>
-                        <span className={cn('font-bold tabular-nums', scoreTone(leader.pct))}>
-                          {leader.pct}%
-                        </span>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-                <p className="text-brand-700 dark:text-brand-300 mt-auto pt-3 text-xs font-semibold">
-                  Full leaderboard →
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <StatusChip status={test.status} />
+                  <IntegrityBadge integrity={test.integrity} />
+                </div>
+              </div>
+              <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-600">
+                <CalendarDays className="size-3.5 text-slate-400" aria-hidden />
+                {test.status === 'unscheduled'
+                  ? 'Created, not scheduled for this campus yet'
+                  : test.status === 'scheduled'
+                    ? `Opens ${lmsDate(test.released_at, true)}`
+                    : `Released ${lmsDate(test.released_at)}${test.due_at ? ` · due ${lmsDate(test.due_at)}` : ''}`}
+              </p>
+              {test.last_release_at && test.last_release_at !== test.released_at && out && (
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  More sections from {lmsDate(test.last_release_at)}
                 </p>
-              </>
-            )}
-          </article>
-        );
-      })}
+              )}
+
+              {out && (
+                <>
+                  <div className="mt-4 flex items-center gap-4">
+                    <div className="flex flex-col items-center">
+                      <Ring value={participation} size={52} />
+                      <span className="mt-1 text-[10px] text-slate-500">
+                        {test.submitted}/{test.eligible} took it
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <Ring value={test.avg_pct} size={52} />
+                      <span className="mt-1 text-[10px] text-slate-500">Average</span>
+                    </div>
+                  </div>
+                  {test.leaders.length > 0 && (
+                    <ol className="mt-4 space-y-1.5 border-t border-dotted border-slate-200 pt-3">
+                      {test.leaders.map((leader, index) => (
+                        <li key={leader.username} className="flex items-center gap-2 text-sm">
+                          <span
+                            className={cn(
+                              'inline-flex size-5 items-center justify-center rounded-full text-[10px] font-bold',
+                              PODIUM[index]
+                            )}
+                          >
+                            {index + 1}
+                          </span>
+                          <Link
+                            to="/s/$slug"
+                            params={{ slug: leader.username }}
+                            onClick={(event) => event.stopPropagation()}
+                            className="min-w-0 flex-1 truncate font-medium hover:underline"
+                          >
+                            {leader.name}
+                          </Link>
+                          <span className={cn('font-bold tabular-nums', scoreTone(leader.pct))}>
+                            {leader.pct}%
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                  <p className="text-brand-700 dark:text-brand-300 mt-auto pt-3 text-xs font-semibold">
+                    Full leaderboard →
+                  </p>
+                </>
+              )}
+            </article>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1094,11 +1136,15 @@ function ModulesTab({
   onOpen,
   type,
   onType,
+  choice,
+  onChoice,
 }: {
   data: CampusDetail;
   onOpen: (test: CampusTest) => void;
   type?: string;
   onType: (type: string | undefined) => void;
+  choice: PeriodChoice;
+  onChoice: (next: PeriodChoice) => void;
 }) {
   const moduleTests = data.subjects.flatMap((subject) =>
     subject.modules.flatMap((module) => [
@@ -1106,17 +1152,28 @@ function ModulesTab({
       ...module.folders.flatMap((folder) => folder.tests),
     ])
   );
-  const keep = (test: CampusTest) => !type || test.category === type;
+  // The period filter narrows the list first; the type chips count what is left.
+  const inChoice = (test: CampusTest) => inPeriod(test.released_at, test.name, choice);
+  const periodTests = moduleTests.filter(inChoice);
+  const keep = (test: CampusTest) => inChoice(test) && (!type || test.category === type);
   const counts = CATEGORIES.map((category) => ({
     category,
-    count: moduleTests.filter((test) => test.category === category).length,
+    count: periodTests.filter((test) => test.category === category).length,
   }));
+  const shown = periodTests.filter(keep).length;
 
   return (
     <div className="space-y-3">
+      <PeriodFilter
+        dates={moduleTests.map((test) => test.released_at)}
+        choice={choice}
+        onChange={onChoice}
+        shown={shown}
+        total={moduleTests.length}
+      />
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Test type">
         <FilterChip active={!type} onClick={() => onType(undefined)}>
-          All · {moduleTests.length}
+          All · {periodTests.length}
         </FilterChip>
         {counts
           .filter(({ count }) => count > 0)
@@ -1126,6 +1183,7 @@ function ModulesTab({
             </FilterChip>
           ))}
       </div>
+      {!shown && <NothingInPeriod />}
       {data.subjects.map((subject) =>
         subject.modules
           .filter((module) => module.total > 0)
@@ -1146,7 +1204,7 @@ function ModulesTab({
             return (
               <details
                 key={`${subject.key}:${module.name}`}
-                open={module.started}
+                open={module.started || Boolean(choice.year || choice.term || choice.q)}
                 className={cn(panel, 'group overflow-hidden')}
               >
                 <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4">

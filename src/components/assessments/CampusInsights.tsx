@@ -35,6 +35,7 @@ import {
 } from '@/lib/assessments';
 import { chartColors, useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
+import { PeriodFilter, inPeriod, type PeriodChoice } from '@/components/assessments/PeriodFilter';
 
 const panel = 'shadow-card bg-surface rounded-2xl border border-slate-200';
 
@@ -264,7 +265,15 @@ export function AttendanceTab({ data }: { data: CampusAttendance }) {
 
 // --- AMCAT --------------------------------------------------------------------------------
 
-export function AmcatTab({ data }: { data: CampusAmcat }) {
+export function AmcatTab({
+  data,
+  choice,
+  onChoice,
+}: {
+  data: CampusAmcat;
+  choice: PeriodChoice;
+  onChoice: (next: PeriodChoice) => void;
+}) {
   if (!data.rounds.length) {
     return (
       <p className={cn(panel, 'p-5 text-sm text-slate-500')}>
@@ -272,35 +281,77 @@ export function AmcatTab({ data }: { data: CampusAmcat }) {
       </p>
     );
   }
+  const filtering = Boolean(choice.year || choice.term || choice.q);
+  const rounds = data.rounds.filter((round) =>
+    inPeriod(round.last_at ?? round.first_at, round.test_name, choice)
+  );
+  // Section averages over the chosen rounds, weighted by how many scores each round has.
+  const sections = filtering
+    ? [...new Set(rounds.flatMap((round) => (round.sections ?? []).map((section) => section.name)))]
+        .map((name) => {
+          const parts = rounds.flatMap((round) =>
+            (round.sections ?? []).filter(
+              (section) => section.name === name && section.avg !== null
+            )
+          );
+          const takers = parts.reduce((sum, part) => sum + part.takers, 0);
+          return {
+            name,
+            takers,
+            avg: takers
+              ? Math.round(parts.reduce((sum, part) => sum + part.avg! * part.takers, 0) / takers)
+              : null,
+          };
+        })
+        .filter((section) => section.takers > 0)
+        .sort((a, b) => b.takers - a.takers)
+    : data.sections;
+
   return (
     <div className="space-y-5">
-      <section className={cn(panel, 'p-5')}>
-        <h2 className="text-lg font-bold">AMCAT section averages</h2>
-        <p className="text-sm text-slate-500">
-          All rounds taken by these students, from the AMCAT platform (scores out of 100).
+      <PeriodFilter
+        dates={data.rounds.map((round) => round.last_at ?? round.first_at)}
+        choice={choice}
+        onChange={onChoice}
+        shown={rounds.length}
+        total={data.rounds.length}
+        noun="rounds"
+      />
+      {!rounds.length && (
+        <p className={cn(panel, 'p-5 text-sm text-slate-500')}>
+          No AMCAT rounds in this period. Pick another year or term, or clear the filter.
         </p>
-        <ul className="mt-4 grid gap-x-8 gap-y-3 md:grid-cols-2">
-          {data.sections.map((section) => (
-            <li key={section.name}>
-              <div className="flex items-baseline justify-between text-sm">
-                <span className="font-medium">{section.name}</span>
-                <span className={cn('font-bold tabular-nums', scoreTone(section.avg))}>
-                  {section.avg ?? '—'}
-                </span>
-              </div>
-              <div className="mt-1 flex items-center gap-2">
-                <Bar pct={section.avg} fill={scoreFill(section.avg)} />
-                <span className="shrink-0 text-[11px] text-slate-500 tabular-nums">
-                  {section.takers} scores
-                </span>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
+      )}
+      {sections.length > 0 && (
+        <section className={cn(panel, 'p-5')}>
+          <h2 className="text-lg font-bold">AMCAT section averages</h2>
+          <p className="text-sm text-slate-500">
+            {filtering ? 'The chosen rounds' : 'All rounds'} taken by these students, from the AMCAT
+            platform (scores out of 100).
+          </p>
+          <ul className="mt-4 grid gap-x-8 gap-y-3 md:grid-cols-2">
+            {sections.map((section) => (
+              <li key={section.name}>
+                <div className="flex items-baseline justify-between text-sm">
+                  <span className="font-medium">{section.name}</span>
+                  <span className={cn('font-bold tabular-nums', scoreTone(section.avg))}>
+                    {section.avg ?? '—'}
+                  </span>
+                </div>
+                <div className="mt-1 flex items-center gap-2">
+                  <Bar pct={section.avg} fill={scoreFill(section.avg)} />
+                  <span className="shrink-0 text-[11px] text-slate-500 tabular-nums">
+                    {section.takers} scores
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2">
-        {data.rounds.map((round) => (
+        {rounds.map((round) => (
           <article key={round.test_name} className={cn(panel, 'p-5')}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">

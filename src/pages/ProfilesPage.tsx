@@ -69,8 +69,8 @@ const CATEGORIES: { id: Category; label: string; hint: string; icon: typeof Layo
 
 const ASSESSMENT_TABS: { id: StudentSection; label: string; icon: typeof LayoutGrid }[] = [
   { id: 'tests', label: 'PRIME tests', icon: ClipboardCheck },
-  { id: 'exams', label: 'Exams', icon: NotebookPen },
   { id: 'amcat', label: 'AMCAT', icon: Award },
+  { id: 'exams', label: 'Exams', icon: NotebookPen },
 ];
 
 export default function ProfilesPage() {

@@ -11,6 +11,11 @@ export interface AssessmentsSearch {
   type?: string;
   /** Campus tab: overview, subject, modules, students. */
   tab?: string;
+  /** Test lists: the year and term (1 = Jan–Jun, 2 = Jul–Dec) they were released in, and a
+   *  name search. */
+  year?: number;
+  term?: 1 | 2;
+  q?: string;
 }
 
 const positive = (value: unknown) => {
@@ -30,5 +35,13 @@ export const Route = createFileRoute('/campuses')({
           : undefined,
     type: typeof search.type === 'string' ? search.type : undefined,
     tab: typeof search.tab === 'string' ? search.tab : undefined,
+    year: positive(search.year),
+    term:
+      search.term === 1 || search.term === '1'
+        ? 1
+        : search.term === 2 || search.term === '2'
+          ? 2
+          : undefined,
+    q: typeof search.q === 'string' && search.q ? search.q : undefined,
   }),
 });
