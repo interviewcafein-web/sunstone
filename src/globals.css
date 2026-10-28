@@ -555,3 +555,33 @@ html.splash-gone .rise-stagger > * {
     animation: sheen 0.9s ease-out;
   }
 }
+
+/* A slow diagonal glint across the top performer's card. */
+@keyframes glint {
+  0%,
+  70% {
+    transform: translateX(-120%) skewX(-20deg);
+  }
+  100% {
+    transform: translateX(320%) skewX(-20deg);
+  }
+}
+
+@utility shimmer-sweep {
+  overflow: hidden;
+  pointer-events: none;
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 35%;
+    background: linear-gradient(90deg, transparent, rgb(251 191 36 / 0.18), transparent);
+    animation: glint 5s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &::before {
+      animation: none;
+      display: none;
+    }
+  }
+}
