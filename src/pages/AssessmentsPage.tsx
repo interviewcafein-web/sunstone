@@ -24,6 +24,7 @@ import {
   Folder,
   FolderTree,
   LayoutDashboard,
+  NotebookPen,
   ClipboardCheck,
   Loader2,
   Search,
@@ -39,6 +40,7 @@ import {
   InsightsPanel,
   attendanceTone,
 } from '@/components/assessments/CampusInsights';
+import { ExamsTab } from '@/components/assessments/ExamsSection';
 import { Avatar } from '@/components/common/Avatar';
 import {
   CATEGORY_LABELS,
@@ -300,6 +302,7 @@ const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'subject', label: 'Subject tests', icon: Trophy },
   { id: 'modules', label: 'Module tests', icon: FolderTree },
+  { id: 'exams', label: 'Exams', icon: NotebookPen },
   { id: 'attendance', label: 'Attendance', icon: CalendarCheck },
   { id: 'amcat', label: 'AMCAT', icon: Award },
   { id: 'students', label: 'Students', icon: Users },
@@ -449,6 +452,7 @@ function CampusView({ campusId, name }: { campusId: number; name?: string }) {
       {tab === 'modules' && (
         <ModulesTab data={data} onOpen={open} type={search.type} onType={(type) => set({ type })} />
       )}
+      {tab === 'exams' && <ExamsTab data={data.exams} />}
       {tab === 'attendance' && <AttendanceTab data={data.attendance} />}
       {tab === 'amcat' && <AmcatTab data={data.amcat} />}
       {tab === 'students' && <StudentsTab students={data.students} />}
@@ -1034,7 +1038,9 @@ function StudentsTab({ students }: { students: CampusStudentRow[] }) {
                 <th className="px-3 py-2 font-medium">Tests taken</th>
                 <th className="px-3 py-2 text-right font-medium">Average</th>
                 <th className="px-3 py-2 text-right font-medium">Attendance</th>
+                <th className="px-3 py-2 text-right font-medium">Exams avg</th>
                 <th className="px-3 py-2 text-right font-medium">Attendance</th>
+                <th className="px-3 py-2 text-right font-medium">Exams avg</th>
                 <th className="px-3 py-2 font-medium">Last submission</th>
                 <th className="px-5 py-2 text-right font-medium">AMCAT avg</th>
               </tr>
@@ -1100,6 +1106,14 @@ function StudentsTab({ students }: { students: CampusStudentRow[] }) {
                           PRIME {student.prime_attendance_pct}%
                         </span>
                       )}
+                    </td>
+                    <td
+                      className={cn(
+                        'px-3 py-2.5 text-right font-semibold tabular-nums',
+                        scoreTone(student.exam_avg)
+                      )}
+                    >
+                      {student.exam_avg === null ? '—' : `${student.exam_avg}%`}
                     </td>
                     <td className="px-3 py-2.5 text-xs whitespace-nowrap text-slate-600">
                       {lmsDate(student.last_submitted_at)}

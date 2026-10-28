@@ -8,6 +8,7 @@
 import { neon } from '@neondatabase/serverless';
 
 import { batchInserts } from './_insert';
+import { subjectName } from './_names';
 import { redash } from './_redash';
 
 const FROM = process.env.ATTENDANCE_FROM ?? '2026-07-01';
@@ -88,13 +89,6 @@ const perWeek = await redash<{
          count(*) sessions, sum(ttsm.is_present = '1') present
   ${BASE}
   group by ttsm.student_id, week`);
-
-/** "PRIME_COMMUNICATION", "Prime_aptitude " → "Prime Communication", "Prime Aptitude". */
-function subjectName(raw: string): string {
-  const name = raw.replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
-  if (name !== name.toUpperCase() && name !== name.toLowerCase()) return name;
-  return name.toLowerCase().replace(/\b\p{L}/gu, (letter) => letter.toUpperCase());
-}
 
 const day = (value: string | null) => (value ? String(value).slice(0, 10) : null);
 

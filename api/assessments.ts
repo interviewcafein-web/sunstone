@@ -308,6 +308,11 @@ async function campus(campusId: number, batch: number | null) {
               sum(present) filter (where ${PRIME_SUBJECT})::int as prime_present
        from att_student_subject where lms_user_id in (select lms_user_id from roster)
        group by lms_user_id),
+     exams as (
+       select m.lms_user_id, round(avg(m.marks / nullif(e.max_marks, 0) * 100))::int as exam_avg
+       from exm_marks m join exm_exams e on e.id = m.exam_id
+       where e.kind = 'other' and m.lms_user_id in (select lms_user_id from roster)
+       group by m.lms_user_id),
      amcat as (
        select a.lms_user_id, count(distinct a.id)::int as sittings,
               round(avg((x->>'score')::numeric) filter (where x->>'score' ~ '^[0-9.]+$'))::int as avg_score
@@ -320,12 +325,14 @@ async function campus(campusId: number, batch: number | null) {
             round(100.0 * at.present / nullif(at.sessions, 0))::int as attendance_pct,
             coalesce(at.sessions, 0) as sessions,
             round(100.0 * at.prime_present / nullif(at.prime_sessions, 0))::int as prime_attendance_pct,
-            coalesce(am.sittings, 0) as amcat, am.avg_score as amcat_avg
+            coalesce(am.sittings, 0) as amcat, am.avg_score as amcat_avg, ex.exam_avg
      from roster r
      left join tests t using (lms_user_id)
      left join att at using (lms_user_id)
      left join amcat am using (lms_user_id)
+     left join exams ex using (lms_user_id)
      where t.lms_user_id is not null or at.lms_user_id is not null or am.lms_user_id is not null
+        or ex.lms_user_id is not null
      order by t.avg_pct desc nulls last, t.submitted desc nulls last, r.name`,
     params
   );
@@ -355,6 +362,7 @@ async function campus(campusId: number, batch: number | null) {
     students,
     attendance: await attendance(campusId, batch),
     amcat: await amcatRounds(campusId, batch),
+    exams: await internalExams(campusId, batch),
     batches,
     now,
     syncedAt: await lastSync(),
@@ -423,6 +431,90 @@ async function attendance(campusId: number, batch: number | null) {
     faculty,
     syncedAt: synced,
   };
+}
+
+// An exam's event and half-year term, e.g. "midterm_1:2026-2" (Midterm 1, Jul-Dec 2026), so
+// this term's Midterm 1 is not merged with last term's.
+const EXAM_EVENT = `coalesce(x.exam_type, 'other') || ':' ||
+  to_char(coalesce(e.exam_date, x.start_date, x.end_date), 'YYYY') || '-' ||
+  case when extract(month from coalesce(e.exam_date, x.start_date, x.end_date)) >= 7 then '2' else '1' end`;
+
+// One campus's (and batch's) internal exam marks, with the exam, its event and the score %.
+const EXAM_MARKS = `
+  roster as (
+    select lms_user_id, name, username from students
+    where on_platform and campus_id = $1 and ($2::int is null or admission_year = $2)),
+  mk as (
+    select m.*, e.subject, e.title, e.kind, e.exam_date, e.max_marks,
+           ${EXAM_EVENT} as event,
+           m.marks / nullif(e.max_marks, 0) * 100 as pct
+    from exm_marks m join roster r using (lms_user_id)
+    join exm_exams e on e.id = m.exam_id
+    left join exm_examinations x on x.id = e.examination_id)`;
+
+/** Internal exams (Midterms, End-term) and Mock PI / GD for one campus and batch. */
+async function internalExams(campusId: number, batch: number | null) {
+  const params = [campusId, batch];
+  const events = await db().query(
+    `with ${EXAM_MARKS}
+     select event, kind, count(distinct lms_user_id)::int as students,
+            count(distinct lower(coalesce(subject, title)))::int as subjects,
+            count(*)::int as marks, count(pct)::int as scored,
+            round(avg(pct))::int as avg_pct,
+            round(100.0 * count(*) filter (where pct >= 40) / nullif(count(pct), 0))::int as pass_pct,
+            count(*) filter (where pct is null and (grade_text is null or upper(grade_text) in ('AB', 'ABSENT')))::int as absent,
+            min(exam_date)::text as first_date, max(exam_date)::text as last_date
+     from mk group by event, kind
+     order by case kind when 'other' then 0 else 1 end, event desc`,
+    params
+  );
+  const subjects = await db().query(
+    `with ${EXAM_MARKS}
+     select event, kind, min(coalesce(subject, title)) as subject,
+            count(distinct lms_user_id)::int as students,
+            round(avg(pct))::int as avg_pct,
+            round(100.0 * count(*) filter (where pct >= 40) / nullif(count(pct), 0))::int as pass_pct,
+            max(max_marks) as max_marks, max(exam_date)::text as exam_date,
+            lower(coalesce(subject, title)) as subject_key
+     from mk group by event, kind, lower(coalesce(subject, title))
+     order by event, avg_pct nulls last`,
+    params
+  );
+  // Letter grades (subjects graded A+, A, B…), counted per subject.
+  const grades = await db().query(
+    `with ${EXAM_MARKS}
+     select event, kind, lower(coalesce(subject, title)) as subject_key, grade_text as grade,
+            count(*)::int as n
+     from mk where pct is null and grade_text is not null and grade_text <> ''
+       and upper(grade_text) not in ('AB', 'ABSENT')
+     group by 1, 2, 3, 4 order by n desc`,
+    params
+  );
+  for (const subject of subjects) {
+    subject.grades = grades
+      .filter(
+        (grade) =>
+          grade.event === subject.event &&
+          grade.kind === subject.kind &&
+          grade.subject_key === subject.subject_key
+      )
+      .slice(0, 5)
+      .map(({ grade, n }) => ({ grade, n }));
+  }
+  const criteria = await db().query(
+    `with ${EXAM_MARKS}
+     select kind, c->>'name' as name,
+            round(avg((c->>'marks')::numeric / nullif((c->>'max')::numeric, 0) * 100))::int as avg_pct,
+            count(*)::int as scores
+     from mk cross join lateral jsonb_array_elements(
+       case when jsonb_typeof(criteria) = 'array' then criteria else '[]'::jsonb end) c
+     where kind in ('mock_pi', 'mock_gd') and c->>'marks' ~ '^[0-9.]+$'
+     group by kind, c->>'name' order by kind, min(c->>'name')`,
+    params
+  );
+  const [{ synced }] = await db()`
+    select (select ran_at::text from sync_state where name = 'exams') as synced`;
+  return { events, subjects, criteria, syncedAt: synced };
 }
 
 /** AMCAT rounds (from the AMCAT platform) taken by one campus's students. */
@@ -547,9 +639,25 @@ async function student(viewer: Viewer, username: string) {
     select week::text as week, sessions, present,
            round(100.0 * present / nullif(sessions, 0))::int as pct
     from att_student_week where lms_user_id = ${person.lms_user_id} order by week`;
+  const exams = await db()`
+    select e.id,
+           coalesce(x.exam_type, 'other') || ':' ||
+             to_char(coalesce(e.exam_date, x.start_date, x.end_date), 'YYYY') || '-' ||
+             case when extract(month from coalesce(e.exam_date, x.start_date, x.end_date)) >= 7
+                  then '2' else '1' end as event,
+           e.kind, coalesce(e.subject, e.title) as subject,
+           e.title, e.exam_date::text as exam_date, e.max_marks, m.marks, m.grade_text, m.criteria,
+           round(m.marks / nullif(e.max_marks, 0) * 100)::int as pct,
+           (select round(avg(o.marks / nullif(e.max_marks, 0) * 100))::int
+              from exm_marks o where o.exam_id = e.id) as class_avg_pct
+    from exm_marks m join exm_exams e on e.id = m.exam_id
+    left join exm_examinations x on x.id = e.examination_id
+    where m.lms_user_id = ${person.lms_user_id}
+    order by e.exam_date desc nulls last, subject`;
   return {
     tests,
     amcat,
+    exams,
     attendance: { subjects: attendanceSubjects, weeks: attendanceWeeks },
     now,
     syncedAt: await lastSync(),

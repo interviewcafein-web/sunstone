@@ -143,6 +143,7 @@ export interface CampusStudentRow {
   sessions: number;
   amcat: number;
   amcat_avg: number | null;
+  exam_avg: number | null;
 }
 
 export interface CampusAttendance {
@@ -181,6 +182,70 @@ export interface AmcatRound {
   top: { name: string; username: string; avg: number }[] | null;
 }
 
+/** "midterm_1:2026-2" → "Midterm 1 · Jul–Dec 2026", "endterm:2026-1" → "End-term · Jan–Jun 2026". */
+export function examEventLabel(event: string, withTerm = true): string {
+  const [type, term] = event.split(':');
+  const midterm = type.match(/^midterm_(\d+)$/);
+  const name = midterm ? `Midterm ${midterm[1]}` : type === 'endterm' ? 'End-term' : 'Other exams';
+  const half = term?.match(/^(\d{4})-([12])$/);
+  if (!withTerm || !half) return name;
+  return `${name} · ${half[2] === '2' ? 'Jul–Dec' : 'Jan–Jun'} ${half[1]}`;
+}
+
+export const EXAM_KIND_LABELS: Record<string, string> = {
+  other: 'Subject exams',
+  mock_pi: 'Mock interview (PI)',
+  mock_gd: 'Group discussion (GD)',
+};
+
+export interface ExamEvent {
+  event: string;
+  kind: string;
+  students: number;
+  subjects: number;
+  marks: number;
+  scored: number;
+  avg_pct: number | null;
+  pass_pct: number | null;
+  absent: number;
+  first_date: string | null;
+  last_date: string | null;
+}
+
+export interface ExamSubject {
+  event: string;
+  kind: string;
+  subject: string;
+  students: number;
+  avg_pct: number | null;
+  pass_pct: number | null;
+  max_marks: string | null;
+  exam_date: string | null;
+  grades: { grade: string; n: number }[];
+}
+
+export interface CampusExams {
+  events: ExamEvent[];
+  subjects: ExamSubject[];
+  criteria: { kind: string; name: string; avg_pct: number | null; scores: number }[];
+  syncedAt: string | null;
+}
+
+export interface StudentExam {
+  id: number;
+  event: string;
+  kind: string;
+  subject: string;
+  title: string | null;
+  exam_date: string | null;
+  max_marks: string | null;
+  marks: string | null;
+  grade_text: string | null;
+  criteria: { name: string; marks: number | null; max: number | null }[] | null;
+  pct: number | null;
+  class_avg_pct: number | null;
+}
+
 export interface CampusAmcat {
   rounds: AmcatRound[];
   sections: { name: string; avg: number | null; takers: number }[];
@@ -205,6 +270,7 @@ export interface CampusDetail {
   students: CampusStudentRow[];
   attendance: CampusAttendance;
   amcat: CampusAmcat;
+  exams: CampusExams;
   batches: number[];
   now: string;
   syncedAt: string | null;
@@ -267,6 +333,7 @@ export interface AmcatSitting {
 export interface StudentAssessmentsData {
   tests: StudentTest[];
   amcat: AmcatSitting[];
+  exams: StudentExam[];
   attendance: {
     subjects: {
       subject: string;

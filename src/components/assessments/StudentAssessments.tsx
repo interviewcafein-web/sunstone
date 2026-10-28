@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 
 import { attendanceFill, attendanceTone } from '@/components/assessments/CampusInsights';
+import { StudentExams } from '@/components/assessments/ExamsSection';
 import { Card, CardHeader } from '@/components/coding/ui';
 import {
   CATEGORY_LABELS,
@@ -103,7 +104,7 @@ export function StudentAssessments({ username }: { username: string }) {
     );
   }
 
-  const { tests, amcat, attendance, syncedAt } = query.data;
+  const { tests, amcat, attendance, exams, syncedAt } = query.data;
   const attended = attendance.subjects.reduce(
     (sum, subject) => ({
       sessions: sum.sessions + subject.sessions,
@@ -451,6 +452,8 @@ export function StudentAssessments({ username }: { username: string }) {
           </p>
         )}
       </Card>
+
+      <StudentExams exams={exams} />
 
       <Card>
         <CardHeader
