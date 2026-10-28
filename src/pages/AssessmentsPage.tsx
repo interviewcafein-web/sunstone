@@ -127,6 +127,7 @@ function Ring({ value, size = 56 }: { value: number | null; size?: number }) {
         strokeLinecap="round"
         stroke={scoreFill(value)}
         strokeDasharray={`${(shown / 100) * circumference} ${circumference}`}
+        className="ring-fill"
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
       />
       <text
@@ -274,80 +275,177 @@ export default function AssessmentsPage() {
   );
 }
 
+const HEALTH = [
+  { min: 75, label: 'On track', chip: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+  { min: 50, label: 'Needs attention', chip: 'bg-amber-50 text-amber-700 ring-amber-200' },
+  { min: 0, label: 'At risk', chip: 'bg-red-50 text-red-700 ring-red-200' },
+];
+
+/** Gradients for the campus monogram, picked by campus id so each keeps its colour. */
+const MONOGRAMS = [
+  'from-sky-500 to-indigo-600',
+  'from-violet-500 to-fuchsia-600',
+  'from-emerald-500 to-teal-600',
+  'from-amber-500 to-orange-600',
+  'from-rose-500 to-pink-600',
+  'from-cyan-500 to-blue-600',
+];
+
+const STOP_WORDS = new Set(['of', 'and', '&', 'the', 'college', 'group']);
+
+function monogram(name: string) {
+  const first = name.split(/[\s,]+/)[0] ?? '';
+  if (/^[A-Z]{2,4}$/.test(first)) return first;
+  const words = name.split(/[\s,]+/).filter((word) => word && !STOP_WORDS.has(word.toLowerCase()));
+  return words
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join('')
+    .toUpperCase();
+}
+
 function CampusCard({ campus }: { campus: CampusOverview }) {
   const participation = campus.expected ? percent(campus.submissions, campus.expected) : null;
+  const scores = [participation, campus.avg_pct, campus.attendance_pct].filter(
+    (value): value is number => value !== null
+  );
+  const overall = scores.length
+    ? Math.round(scores.reduce((sum, value) => sum + value, 0) / scores.length)
+    : null;
+  const health = overall === null ? undefined : HEALTH.find((level) => overall >= level.min);
+  const accent = scoreFill(overall);
+  const initials = monogram(campus.name);
+  const inPrime = campus.students ? (campus.in_prime / campus.students) * 100 : 0;
+
   return (
     <Link
       to="/campuses"
       search={{ campus: campus.id }}
       className={cn(
         panel,
-        'group hover:border-brand-300 block p-5 transition hover:-translate-y-0.5 hover:shadow-lg',
-        !campus.tests && 'opacity-70'
+        'group hover:border-brand-300 relative isolate block overflow-hidden transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_48px_-24px_rgb(16_38_70/0.45)]',
+        !campus.tests && 'opacity-75'
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate font-semibold" title={campus.name}>
-            {campus.name}
-          </p>
-          <p className="mt-0.5 text-xs text-slate-500">
-            {campus.in_prime} of {campus.students} students in PRIME sections
-          </p>
-        </div>
-        <ChevronRight
-          className="group-hover:text-brand-600 size-4 shrink-0 text-slate-300 transition"
-          aria-hidden
-        />
-      </div>
-      {campus.tests ? (
-        <div className="mt-4 flex items-center gap-4">
-          <div className="flex flex-col items-center">
-            <Ring value={participation} />
-            <span className="mt-1 text-[10px] text-slate-500">Participation</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <Ring value={campus.avg_pct} />
-            <span className="mt-1 text-[10px] text-slate-500">Avg score</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <Ring value={campus.attendance_pct} />
-            <span className="mt-1 text-[10px] text-slate-500">Attendance</span>
-          </div>
-          <dl className="ml-auto text-right text-xs text-slate-500">
-            <dt>Tests</dt>
-            <dd className="text-lg font-bold text-slate-800 tabular-nums">{campus.tests}</dd>
-            <dt className="mt-1">Last test</dt>
-            <dd className="font-medium text-slate-700">{lmsDate(campus.last_test_at)}</dd>
-          </dl>
-        </div>
-      ) : null}
-      {(campus.attendance_weeks.length > 1 || campus.test_weeks.length > 1) && (
-        <div className="mt-4 grid grid-cols-2 gap-3 border-t border-dotted border-slate-200 pt-3">
-          {[
-            { label: 'Attendance, weekly', values: campus.attendance_weeks },
-            { label: 'Test average, weekly', values: campus.test_weeks },
-          ].map(({ label, values }) => (
-            <div key={label}>
-              <p className="flex items-center justify-between text-[11px] text-slate-500">
-                {label}
-                <TrendDelta values={values} unit="%" />
+      {/* Health colour: a strip along the top and a soft glow in the corner. */}
+      <span
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-1"
+        style={{ background: `linear-gradient(90deg, ${accent}, ${accent}55)` }}
+      />
+      <span
+        aria-hidden
+        className="absolute -top-20 -right-16 -z-10 size-48 rounded-full opacity-[0.13] blur-2xl transition-opacity duration-300 group-hover:opacity-25"
+        style={{ background: accent }}
+      />
+
+      <div className="p-5">
+        <div className="flex items-start gap-3">
+          <span
+            aria-hidden
+            className={cn(
+              'flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-sm font-bold text-white shadow-md ring-2 ring-white/60',
+              MONOGRAMS[campus.id % MONOGRAMS.length],
+              initials.length > 3 && 'text-[11px] tracking-tight'
+            )}
+          >
+            {initials}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <p className="line-clamp-1 font-semibold text-slate-900" title={campus.name}>
+                {campus.name}
               </p>
-              {values.length > 1 ? (
-                <Sparkline values={values} width={150} height={28} className="mt-1 w-full" />
-              ) : (
-                <p className="mt-1 text-xs text-slate-400">Not enough weeks yet</p>
+              <ChevronRight
+                className="group-hover:text-brand-600 mt-0.5 size-4 shrink-0 text-slate-300 transition group-hover:translate-x-0.5"
+                aria-hidden
+              />
+            </div>
+            <div className="mt-1.5 flex items-center gap-2">
+              <span className="h-1.5 w-12 shrink-0 overflow-hidden rounded-full bg-slate-200">
+                <span
+                  className="bg-brand-500 block h-full rounded-full"
+                  style={{ width: `${inPrime}%` }}
+                />
+              </span>
+              <span className="truncate text-xs text-slate-500 tabular-nums">
+                {campus.in_prime.toLocaleString('en-IN')} of{' '}
+                {campus.students.toLocaleString('en-IN')} in PRIME
+              </span>
+              {health && (
+                <span
+                  className={cn(
+                    'ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1',
+                    health.chip
+                  )}
+                >
+                  {health.label}
+                </span>
               )}
             </div>
-          ))}
+          </div>
         </div>
-      )}
-      {campus.tests ? null : (
-        <p className="mt-4 flex items-center gap-2 text-sm text-slate-500">
-          <CircleDashed className="size-4" aria-hidden />
-          No PRIME domain tests released yet
-        </p>
-      )}
+
+        {campus.tests ? (
+          <>
+            <div className="mt-5 grid grid-cols-3 gap-2">
+              {[
+                { label: 'Participation', value: participation, icon: Users },
+                { label: 'Avg score', value: campus.avg_pct, icon: Target },
+                { label: 'Attendance', value: campus.attendance_pct, icon: CalendarCheck },
+              ].map(({ label, value, icon: Icon }) => (
+                <div
+                  key={label}
+                  className="flex flex-col items-center rounded-xl bg-slate-50 px-1 pt-3 pb-2 ring-1 ring-slate-100 transition group-hover:bg-slate-100/70"
+                >
+                  <Ring value={value} size={60} />
+                  <span className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-slate-600">
+                    <Icon className="size-3 text-slate-400" aria-hidden />
+                    {label}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+              <span className="bg-brand-500/10 text-brand-700 dark:text-brand-200 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold">
+                <BookOpenCheck className="size-3.5" aria-hidden />
+                {campus.tests} tests
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
+                <CalendarDays className="size-3.5" aria-hidden />
+                Last test {lmsDate(campus.last_test_at)}
+              </span>
+            </div>
+          </>
+        ) : (
+          <p className="mt-5 flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-500">
+            <CircleDashed className="size-4" aria-hidden />
+            No PRIME domain tests released yet
+          </p>
+        )}
+
+        {(campus.attendance_weeks.length > 1 || campus.test_weeks.length > 1) && (
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            {[
+              { label: 'Attendance, weekly', values: campus.attendance_weeks },
+              { label: 'Tests, weekly', values: campus.test_weeks },
+            ].map(({ label, values }) => (
+              <div key={label} className="rounded-xl border border-slate-200/80 px-3 pt-2 pb-1">
+                <p className="flex items-center justify-between gap-1 text-[11px] text-slate-500">
+                  <span className="truncate">{label}</span>
+                  <TrendDelta values={values} unit="%" />
+                </p>
+                {values.length > 1 ? (
+                  <Sparkline values={values} width={150} height={32} className="mt-1 w-full" />
+                ) : (
+                  <p className="py-2 text-xs text-slate-400">Not enough weeks yet</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </Link>
   );
 }

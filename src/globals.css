@@ -477,3 +477,17 @@ html.splash-gone .rise-stagger > * {
   background-size: 32px 32px;
   mask-image: radial-gradient(ellipse at 30% 40%, black 30%, transparent 75%);
 }
+
+/* Score rings fill up from empty once. */
+@keyframes ring-fill {
+  from {
+    stroke-dasharray: 0 1000;
+  }
+}
+
+@utility ring-fill {
+  animation: ring-fill 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
