@@ -42,6 +42,7 @@ import {
 } from '@/components/assessments/CampusInsights';
 import { ExamsTab } from '@/components/assessments/ExamsSection';
 import { Avatar } from '@/components/common/Avatar';
+import { Sparkline, TrendDelta, lastChange } from '@/components/common/Sparkline';
 import {
   CATEGORY_LABELS,
   CATEGORY_STYLES,
@@ -53,6 +54,7 @@ import {
   scoreTone,
   useCampusDetail,
   useCampusOverview,
+  useStudentMetrics,
   useTestDetail,
   type CampusDetail,
   type CampusOverview,
@@ -139,22 +141,51 @@ function HeroStat({
   label,
   value,
   note,
+  trend,
+  percentTrend = true,
 }: {
   icon: typeof Users;
   label: string;
   value: string;
   note?: string;
+  /** Week by week (oldest first): drawn as a line with the change since last week. */
+  trend?: (number | null)[];
+  percentTrend?: boolean;
 }) {
+  const change = trend ? lastChange(trend) : null;
   return (
-    <div className="hover-lift flex flex-col-reverse rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur-sm">
+    <div className="hover-lift relative flex flex-col-reverse overflow-hidden rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur-sm">
       <dt className="text-brand-100 mt-0.5 flex items-center gap-1.5 text-xs">
         <Icon className="text-brand-200 size-3.5" aria-hidden />
         {label}
+        {change !== null && change !== 0 && (
+          <span
+            className={cn(
+              'ml-auto font-semibold',
+              change > 0 ? 'text-emerald-300' : 'text-red-300'
+            )}
+            title="Change since last week"
+          >
+            {change > 0 ? '▲' : '▼'} {Math.abs(change)}
+            {percentTrend ? '%' : ''}
+          </span>
+        )}
       </dt>
       <dd className="text-2xl font-bold tabular-nums">
         {value}
         {note && <span className="text-brand-200 ml-1 text-sm font-medium">{note}</span>}
       </dd>
+      {trend && trend.filter((point) => point !== null).length > 1 && (
+        <Sparkline
+          values={trend}
+          width={200}
+          height={30}
+          percent={percentTrend}
+          stretch
+          color="rgb(255 255 255 / 0.9)"
+          className="pointer-events-none absolute inset-x-0 bottom-0 opacity-30"
+        />
+      )}
     </div>
   );
 }
@@ -286,7 +317,28 @@ function CampusCard({ campus }: { campus: CampusOverview }) {
             <dd className="font-medium text-slate-700">{lmsDate(campus.last_test_at)}</dd>
           </dl>
         </div>
-      ) : (
+      ) : null}
+      {(campus.attendance_weeks.length > 1 || campus.test_weeks.length > 1) && (
+        <div className="mt-4 grid grid-cols-2 gap-3 border-t border-dotted border-slate-200 pt-3">
+          {[
+            { label: 'Attendance, weekly', values: campus.attendance_weeks },
+            { label: 'Test average, weekly', values: campus.test_weeks },
+          ].map(({ label, values }) => (
+            <div key={label}>
+              <p className="flex items-center justify-between text-[11px] text-slate-500">
+                {label}
+                <TrendDelta values={values} unit="%" />
+              </p>
+              {values.length > 1 ? (
+                <Sparkline values={values} width={150} height={28} className="mt-1 w-full" />
+              ) : (
+                <p className="mt-1 text-xs text-slate-400">Not enough weeks yet</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {campus.tests ? null : (
         <p className="mt-4 flex items-center gap-2 text-sm text-slate-500">
           <CircleDashed className="size-4" aria-hidden />
           No PRIME domain tests released yet
@@ -391,17 +443,21 @@ function CampusView({ campusId, name }: { campusId: number; name?: string }) {
             label="Tests held"
             value={String(summary.tests)}
             note={summary.scheduled ? `+${summary.scheduled} scheduled` : undefined}
+            trend={data.timeline.map((week) => week.tests)}
+            percentTrend={false}
           />
           <HeroStat
             icon={Users}
             label="Participation"
             value={`${percent(summary.submissions, summary.expected)}%`}
             note={`${summary.submissions.toLocaleString('en-IN')} subs`}
+            trend={data.timeline.map((week) => week.participation)}
           />
           <HeroStat
             icon={Target}
             label="Average score"
             value={summary.avg_pct === null ? '—' : `${summary.avg_pct}%`}
+            trend={data.timeline.map((week) => week.avg_pct)}
           />
           <HeroStat
             icon={CalendarCheck}
@@ -410,6 +466,7 @@ function CampusView({ campusId, name }: { campusId: number; name?: string }) {
             note={
               data.attendance.prime_pct === null ? undefined : `PRIME ${data.attendance.prime_pct}%`
             }
+            trend={data.attendance.weeks.slice(-10).map((week) => week.pct)}
           />
           <HeroStat
             icon={CalendarDays}
@@ -999,6 +1056,8 @@ function TestRow({ test, onOpen }: { test: CampusTest; onOpen: () => void }) {
 }
 
 function StudentsTab({ students }: { students: CampusStudentRow[] }) {
+  // Week-by-week attendance and per-test scores, for the trend lines.
+  const trends = useStudentMetrics().data?.students;
   const [query, setQuery] = useState('');
   const needle = query.trim().toLowerCase();
   const shown = students.filter(
@@ -1091,6 +1150,12 @@ function StudentsTab({ students }: { students: CampusStudentRow[] }) {
                       )}
                     >
                       {student.avg_pct === null ? '—' : `${student.avg_pct}%`}
+                      <Sparkline
+                        values={trends?.[student.username]?.test_trend ?? []}
+                        width={60}
+                        height={16}
+                        className="mt-0.5 ml-auto block"
+                      />
                     </td>
                     <td className="px-3 py-2.5 text-right whitespace-nowrap">
                       <span
@@ -1106,6 +1171,12 @@ function StudentsTab({ students }: { students: CampusStudentRow[] }) {
                           PRIME {student.prime_attendance_pct}%
                         </span>
                       )}
+                      <Sparkline
+                        values={trends?.[student.username]?.attendance_weeks ?? []}
+                        width={60}
+                        height={16}
+                        className="mt-0.5 ml-auto block"
+                      />
                     </td>
                     <td
                       className={cn(

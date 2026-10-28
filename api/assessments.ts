@@ -99,7 +99,42 @@ async function campuses(viewer: Viewer) {
      order by tests desc, c.campus`,
     [viewer.campusIds]
   );
-  return { campuses: rows, syncedAt: await lastSync() };
+  // Weekly trends per campus over the last ten weeks: attendance, and the average score on
+  // tests released that week.
+  const attendanceWeeks = await db().query(
+    `select s.campus_id, w.week, round(100.0 * sum(w.present) / nullif(sum(w.sessions), 0))::int as pct
+     from att_student_week w join students s using (lms_user_id)
+     where s.on_platform and ($1::int[] is null or s.campus_id = any($1::int[]))
+       and w.week >= current_date - 77 and w.week < date_trunc('week', current_date)::date
+     group by s.campus_id, w.week order by w.week`,
+    [viewer.campusIds]
+  );
+  const testWeeks = await db().query(
+    `with scored as (
+       select s.campus_id, date_trunc('week', min(r.release_at)) as week,
+              max(tr.marks / nullif(coalesce(tr.max_marks, t.max_marks), 0) * 100) as pct
+       from lms_test_results tr
+       join students s on s.lms_user_id = tr.lms_user_id
+       join lms_section_students ss on ss.lms_user_id = tr.lms_user_id
+       join lms_test_releases r on r.test_id = tr.test_id and r.section_id = ss.section_id and r.visible
+       join lms_tests t on t.id = tr.test_id
+       where tr.submitted and s.on_platform and ($1::int[] is null or s.campus_id = any($1::int[]))
+       group by s.campus_id, tr.test_id, tr.lms_user_id)
+     select campus_id, week, round(avg(pct))::int as pct from scored
+     where week >= current_date - 77 and week < date_trunc('week', current_date)
+     group by campus_id, week order by week`,
+    [viewer.campusIds]
+  );
+  const series = (rows2: Record<string, unknown>[], campusId: unknown) =>
+    rows2.filter((row) => row.campus_id === campusId).map((row) => Number(row.pct));
+  return {
+    campuses: rows.map((campus) => ({
+      ...campus,
+      attendance_weeks: series(attendanceWeeks, campus.id),
+      test_weeks: series(testWeeks, campus.id),
+    })),
+    syncedAt: await lastSync(),
+  };
 }
 
 interface GroupRow {
@@ -269,14 +304,18 @@ async function campus(campusId: number, batch: number | null) {
   const allModules = subjects.flatMap((subject) => subject.modules);
 
   // Tests released per week, with the week's average score.
-  const weeks = new Map<string, { week: string; tests: number; submitted: number; pct: number }>();
+  const weeks = new Map<
+    string,
+    { week: string; tests: number; submitted: number; eligible: number; pct: number }
+  >();
   for (const test of out) {
     const day = new Date(`${test.released_at!.slice(0, 10)}T00:00:00Z`);
     day.setUTCDate(day.getUTCDate() - ((day.getUTCDay() + 6) % 7)); // Monday
     const week = day.toISOString().slice(0, 10);
-    const entry = weeks.get(week) ?? { week, tests: 0, submitted: 0, pct: 0 };
+    const entry = weeks.get(week) ?? { week, tests: 0, submitted: 0, eligible: 0, pct: 0 };
     entry.tests += 1;
     entry.submitted += test.submitted;
+    entry.eligible += test.eligible;
     entry.pct += (test.avg_pct ?? 0) * test.submitted;
     weeks.set(week, entry);
   }
@@ -286,6 +325,7 @@ async function campus(campusId: number, batch: number | null) {
       week: week.week,
       tests: week.tests,
       avg_pct: week.submitted ? Math.round(week.pct / week.submitted) : null,
+      participation: week.eligible ? Math.round((100 * week.submitted) / week.eligible) : null,
     }));
 
   const [counts] = await db().query(
@@ -393,7 +433,9 @@ async function attendance(campusId: number, batch: number | null) {
     `with ${ROSTER}
      select week::text as week, sum(sessions)::int as marks,
             round(100.0 * sum(present) / nullif(sum(sessions), 0))::int as pct
-     from att_student_week where lms_user_id in (select lms_user_id from roster)
+     from att_student_week
+     where lms_user_id in (select lms_user_id from roster)
+       and week < date_trunc('week', current_date)::date
      group by week order by week`,
     params
   );
@@ -639,7 +681,9 @@ async function student(viewer: Viewer, username: string) {
   const attendanceWeeks = await db()`
     select week::text as week, sessions, present,
            round(100.0 * present / nullif(sessions, 0))::int as pct
-    from att_student_week where lms_user_id = ${person.lms_user_id} order by week`;
+    from att_student_week
+    where lms_user_id = ${person.lms_user_id} and week < date_trunc('week', current_date)::date
+    order by week`;
   const exams = await db()`
     select e.id,
            coalesce(x.exam_type, 'other') || ':' ||
@@ -689,10 +733,27 @@ async function metrics(viewer: Viewer) {
        select lms_user_id, json_agg(json_build_array(taken_at::date::text, score) order by taken_at) as list
        from sittings group by lms_user_id),
      done as (
-       select test_id, section_id from lms_test_releases where visible and release_at <= ${NOW}),
+       select test_id, section_id, release_at from lms_test_releases
+       where visible and release_at <= ${NOW}),
      eligible as (
        select distinct d.test_id, ss.lms_user_id from done d join lms_section_students ss using (section_id)
        where ss.lms_user_id in (select lms_user_id from roster)),
+     aw as (
+       select lms_user_id, json_agg(round(100.0 * present / nullif(sessions, 0))::int order by week) as list
+       from att_student_week
+       where lms_user_id in (select lms_user_id from roster) and week >= current_date - 77
+         and week < date_trunc('week', current_date)::date
+       group by lms_user_id),
+     scored as (
+       select ss.lms_user_id, d.test_id, min(d.release_at) as released,
+              round(max(tr.marks / nullif(coalesce(tr.max_marks, t.max_marks), 0) * 100))::int as pct
+       from done d join lms_section_students ss using (section_id)
+       join lms_tests t on t.id = d.test_id
+       join lms_test_results tr on tr.test_id = d.test_id and tr.lms_user_id = ss.lms_user_id and tr.submitted
+       where ss.lms_user_id in (select lms_user_id from roster)
+       group by ss.lms_user_id, d.test_id),
+     tt as (
+       select lms_user_id, json_agg(pct order by released) as list from scored group by lms_user_id),
      tst as (
        select e.lms_user_id, count(*)::int as released, count(*) filter (where tr.submitted)::int as submitted,
               round(avg(tr.marks / nullif(coalesce(tr.max_marks, t.max_marks), 0) * 100)
@@ -703,9 +764,11 @@ async function metrics(viewer: Viewer) {
      select r.username,
             round(100.0 * att.p / nullif(att.s, 0))::int as attendance,
             round(100.0 * att.pp / nullif(att.ps, 0))::int as prime_attendance,
-            am.list as amcat, tst.avg as test_avg, tst.submitted, tst.released
+            am.list as amcat, tst.avg as test_avg, tst.submitted, tst.released,
+            aw.list as attendance_weeks, tt.list as test_trend
      from roster r
      left join att using (lms_user_id) left join am using (lms_user_id) left join tst using (lms_user_id)
+     left join aw using (lms_user_id) left join tt using (lms_user_id)
      where att.lms_user_id is not null or am.lms_user_id is not null or tst.lms_user_id is not null`,
     [viewer.campusIds]
   );

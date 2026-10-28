@@ -1,17 +1,9 @@
 import { Link } from '@tanstack/react-router';
-import {
-  ArrowDown,
-  ArrowDownRight,
-  ArrowRight,
-  ArrowUpRight,
-  CalendarCheck,
-  ClipboardCheck,
-  Crown,
-  Award,
-} from 'lucide-react';
+import { ArrowDown, CalendarCheck, ClipboardCheck, Crown, Award } from 'lucide-react';
 
 import { Avatar } from '@/components/common/Avatar';
 import { PlatformLogo } from '@/components/profile/PlatformLogo';
+import { Sparkline, TrendDelta } from '@/components/common/Sparkline';
 import { Medal } from '@/components/students/Medal';
 import { StatusTags } from '@/components/students/StatusTags';
 import { PLATFORMS } from '@/lib/coding-profiles/platforms';
@@ -505,15 +497,26 @@ function MiniBar({ pct, fill }: { pct: number; fill: string }) {
 function AttendanceCell({ metrics }: { metrics?: StudentMetrics }) {
   const pct = metrics?.attendance;
   if (pct == null) return empty;
+  const weeks = metrics?.attendance_weeks ?? [];
   return (
-    <span className="inline-flex flex-col items-end" title="Classes attended since 1 July">
-      <span className={cn('text-base font-bold tabular-nums', attendanceTone(pct))}>{pct}%</span>
+    <span
+      className="inline-flex flex-col items-end"
+      title="Classes attended since 1 July; the line is week by week"
+    >
+      <span className="inline-flex items-center gap-1">
+        <span className={cn('text-base font-bold tabular-nums', attendanceTone(pct))}>{pct}%</span>
+        <TrendDelta values={weeks} unit="%" title="This week vs last week" />
+      </span>
       {metrics?.prime_attendance != null && (
         <span className="text-xs whitespace-nowrap text-slate-500">
           PRIME {metrics.prime_attendance}%
         </span>
       )}
-      <MiniBar pct={pct} fill={attendanceFill(pct)} />
+      {weeks.length > 1 ? (
+        <Sparkline values={weeks} width={68} height={18} className="mt-0.5" />
+      ) : (
+        <MiniBar pct={pct} fill={attendanceFill(pct)} />
+      )}
     </span>
   );
 }
@@ -524,17 +527,6 @@ function AmcatCell({ metrics }: { metrics?: StudentMetrics }) {
   if (!sittings.length) return empty;
   const scores = sittings.map(([, score]) => score);
   const latest = scores[scores.length - 1];
-  const change = scores.length > 1 ? latest - scores[scores.length - 2] : null;
-  const width = 64;
-  const height = 18;
-  const points = scores
-    .map((score, index) => {
-      const x = scores.length === 1 ? width / 2 : (index / (scores.length - 1)) * width;
-      return `${x.toFixed(1)},${(height - (score / 100) * height).toFixed(1)}`;
-    })
-    .join(' ');
-  const Trend =
-    change === null || change === 0 ? ArrowRight : change > 0 ? ArrowUpRight : ArrowDownRight;
   return (
     <span
       className="inline-flex flex-col items-end"
@@ -542,42 +534,16 @@ function AmcatCell({ metrics }: { metrics?: StudentMetrics }) {
     >
       <span className="inline-flex items-center gap-1">
         <span className={cn('text-base font-bold tabular-nums', scoreTone(latest))}>{latest}</span>
-        {change !== null && (
-          <span
-            className={cn(
-              'inline-flex items-center text-[11px] font-semibold tabular-nums',
-              change > 0 ? 'text-emerald-600' : change < 0 ? 'text-red-600' : 'text-slate-400'
-            )}
-          >
-            <Trend className="size-3" aria-hidden />
-            {change > 0 ? `+${change}` : change < 0 ? change : ''}
-          </span>
-        )}
+        <TrendDelta values={scores} title="Latest sitting vs the one before" />
       </span>
-      <svg
-        width={width}
-        height={height}
-        viewBox={`0 0 ${width} ${height}`}
-        className="mt-0.5 overflow-visible"
-        aria-hidden
-      >
-        {scores.length > 1 && (
-          <polyline
-            points={points}
-            fill="none"
-            stroke={scoreFill(latest)}
-            strokeWidth={1.75}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
-        )}
-        {points.split(' ').map((point, index) => {
-          const [x, y] = point.split(',');
-          return index === scores.length - 1 || scores.length === 1 ? (
-            <circle key={index} cx={x} cy={y} r={2.5} fill={scoreFill(latest)} />
-          ) : null;
-        })}
-      </svg>
+      {scores.length > 1 ? (
+        <Sparkline values={scores} width={68} height={18} className="mt-0.5" />
+      ) : (
+        <span
+          className="mt-1 inline-block size-2 rounded-full"
+          style={{ background: scoreFill(latest) }}
+        />
+      )}
       <span className="text-[11px] whitespace-nowrap text-slate-500">
         {sittings.length} sitting{sittings.length === 1 ? '' : 's'}
       </span>
@@ -588,18 +554,26 @@ function AmcatCell({ metrics }: { metrics?: StudentMetrics }) {
 function TestsCell({ metrics }: { metrics?: StudentMetrics }) {
   if (!metrics?.released) return empty;
   const taken = Math.round(((metrics.submitted ?? 0) / metrics.released) * 100);
+  const trend = metrics.test_trend ?? [];
   return (
     <span
       className="inline-flex flex-col items-end"
-      title="Prime Domain Coding tests: average score, and tests taken out of released"
+      title="Prime Domain Coding tests: average score, tests taken out of released; the line is the score on each test"
     >
-      <span className={cn('text-base font-bold tabular-nums', scoreTone(metrics.test_avg))}>
-        {metrics.test_avg == null ? '—' : `${metrics.test_avg}%`}
+      <span className="inline-flex items-center gap-1">
+        <span className={cn('text-base font-bold tabular-nums', scoreTone(metrics.test_avg))}>
+          {metrics.test_avg == null ? '—' : `${metrics.test_avg}%`}
+        </span>
+        <TrendDelta values={trend} unit="%" title="Latest test vs the one before" />
       </span>
       <span className="text-xs whitespace-nowrap text-slate-500">
         {metrics.submitted ?? 0}/{metrics.released} taken
       </span>
-      <MiniBar pct={taken} fill={scoreFill(taken)} />
+      {trend.length > 1 ? (
+        <Sparkline values={trend} width={68} height={18} className="mt-0.5" />
+      ) : (
+        <MiniBar pct={taken} fill={scoreFill(taken)} />
+      )}
     </span>
   );
 }

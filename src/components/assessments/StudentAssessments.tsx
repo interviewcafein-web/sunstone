@@ -24,6 +24,7 @@ import {
 
 import { attendanceFill, attendanceTone } from '@/components/assessments/CampusInsights';
 import { StudentExams } from '@/components/assessments/ExamsSection';
+import { Sparkline, TrendDelta } from '@/components/common/Sparkline';
 import { Card, CardHeader } from '@/components/coding/ui';
 import {
   CATEGORY_LABELS,
@@ -48,20 +49,27 @@ function Kpi({
   value,
   hint,
   tone,
+  trend,
 }: {
   icon: typeof Award;
   label: string;
   value: string;
   hint?: string;
   tone?: string;
+  /** Oldest first: weeks, tests or sittings. */
+  trend?: (number | null)[];
 }) {
   return (
-    <div className="shadow-card bg-surface rounded-2xl border border-slate-200 p-4">
+    <div className="shadow-card bg-surface hover-lift rounded-2xl border border-slate-200 p-4">
       <p className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
         <Icon className="size-3.5" aria-hidden />
         {label}
+        {trend && <TrendDelta values={trend} className="ml-auto" />}
       </p>
-      <p className={cn('mt-1 text-2xl font-bold tabular-nums', tone)}>{value}</p>
+      <div className="mt-1 flex items-end justify-between gap-2">
+        <p className={cn('text-2xl font-bold tabular-nums', tone)}>{value}</p>
+        {trend && <Sparkline values={trend} width={72} height={24} />}
+      </div>
       {hint && <p className="mt-0.5 text-xs text-slate-500">{hint}</p>}
     </div>
   );
@@ -131,6 +139,17 @@ export function StudentAssessments({ username }: { username: string }) {
     : null;
   const gap = average !== null && classAverage !== null ? average - classAverage : null;
 
+  // Average section score of each AMCAT sitting, oldest first.
+  const amcatScores = [...amcat]
+    .sort((a, b) => (a.taken_at ?? '').localeCompare(b.taken_at ?? ''))
+    .map((sitting) => {
+      const scores = sitting.sections
+        .map((section) => section.score)
+        .filter((score): score is number => typeof score === 'number');
+      return scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
+    })
+    .filter((score): score is number => score !== null);
+
   const released = tests.filter((test) => test.status === 'completed' || test.status === 'live');
   const upcoming = tests
     .filter((test) => !test.submitted && (test.status === 'live' || test.status === 'scheduled'))
@@ -176,6 +195,7 @@ export function StudentAssessments({ username }: { username: string }) {
               : `${gap >= 0 ? '+' : ''}${gap} pts vs class average (${classAverage}%)`
           }
           tone={scoreTone(average)}
+          trend={trend.map((point) => point.student)}
         />
         <Kpi
           icon={CalendarCheck}
@@ -183,12 +203,19 @@ export function StudentAssessments({ username }: { username: string }) {
           value={attendancePct === null ? '—' : `${attendancePct}%`}
           hint={primeAttendance === null ? 'All classes' : `PRIME classes ${primeAttendance}%`}
           tone={attendanceTone(attendancePct)}
+          trend={attendance.weeks.slice(-10).map((week) => week.pct)}
         />
         <Kpi
           icon={Award}
-          label="AMCAT sittings"
-          value={String(amcat.length)}
-          hint={amcat[0] ? `Latest ${lmsDate(amcat[0].taken_at)}` : 'None yet'}
+          label="AMCAT, latest"
+          value={amcatScores.length ? String(amcatScores[amcatScores.length - 1]) : '—'}
+          hint={
+            amcat.length
+              ? `${amcat.length} sitting${amcat.length === 1 ? '' : 's'} · ${lmsDate(amcat[0].taken_at)}`
+              : 'None yet'
+          }
+          tone={scoreTone(amcatScores[amcatScores.length - 1])}
+          trend={amcatScores}
         />
       </div>
 

@@ -91,6 +91,10 @@ export interface CampusOverview {
   scheduled: number;
   attendance_pct: number | null;
   last_test_at: string | null;
+  /** Weekly attendance %, last ten weeks. */
+  attendance_weeks: number[];
+  /** Average test score % by week of release, last ten weeks. */
+  test_weeks: number[];
 }
 
 /** A test as one campus sees it (its section copies merged). */
@@ -266,7 +270,12 @@ export interface CampusDetail {
   };
   subjectTests: SubjectTest[];
   subjects: { key: string; name: string; modules: SyllabusModule[] }[];
-  timeline: { week: string; tests: number; avg_pct: number | null }[];
+  timeline: {
+    week: string;
+    tests: number;
+    avg_pct: number | null;
+    participation: number | null;
+  }[];
   students: CampusStudentRow[];
   attendance: CampusAttendance;
   amcat: CampusAmcat;
@@ -396,6 +405,10 @@ export interface StudentMetrics {
   test_avg: number | null;
   submitted: number | null;
   released: number | null;
+  /** Attendance % per week, last ten weeks (oldest first). */
+  attendance_weeks: number[] | null;
+  /** Score % on each PRIME test taken, in release order (last ten). */
+  test_trend: number[] | null;
 }
 
 export const useStudentMetrics = () =>
