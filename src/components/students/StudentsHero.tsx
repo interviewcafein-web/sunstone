@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import { Activity, Check, CheckCircle2, Link2, RefreshCw, TrendingUp, Users } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { CountUp } from '@/components/common/CountUp';
 import { cn } from '@/lib/utils';
@@ -166,75 +166,83 @@ function RefreshButton({ onRefresh, loading, settled, linked, refreshing }: Refr
     wasSyncing.current = syncing;
   }, [syncing]);
 
-  const radius = 9;
+  const gradient = `refresh-${useId().replace(/:/g, '')}`;
+  const radius = 15;
   const circumference = 2 * Math.PI * radius;
+  const pct = Math.round(progress * 100);
 
+  // Colours are fixed hex values: the button stays white in both themes, while the
+  // theme's amber and slate scales flip in dark mode.
   return (
     <button
       type="button"
       onClick={onRefresh}
       aria-busy={syncing}
       className={cn(
-        'group relative isolate inline-flex min-w-44 items-center gap-2.5 overflow-hidden rounded-xl py-2 pr-4 pl-2.5 text-sm font-semibold shadow-lg transition-all duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white',
-        syncing
-          ? 'bg-white/15 text-white ring-1 ring-white/30 backdrop-blur'
-          : justFinished
-            ? 'bg-emerald-500 text-white ring-1 ring-emerald-300/60'
-            : 'sheen text-brand-800 bg-white hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0'
+        'group relative isolate inline-flex min-w-48 items-center gap-3 overflow-hidden rounded-xl py-1.5 pr-4 pl-1.5 text-sm font-semibold shadow-lg transition-all duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white',
+        justFinished && !syncing ? 'bg-[#10b981] text-white' : 'text-brand-800 bg-white',
+        !syncing &&
+          !justFinished &&
+          'sheen hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0'
       )}
     >
-      {syncing && (
-        <span
-          aria-hidden
-          className="absolute inset-y-0 left-0 -z-10 bg-gradient-to-r from-sky-400/70 to-sky-300/80 transition-[width] duration-500 ease-out"
-          style={{ width: `${Math.max(progress * 100, 6)}%` }}
-        >
-          <span className="progress-stripes absolute inset-0" />
-        </span>
-      )}
-
-      <span className="relative flex size-6 shrink-0 items-center justify-center">
+      <span className="relative flex size-9 shrink-0 items-center justify-center">
         {syncing ? (
           <>
-            <svg viewBox="0 0 24 24" className="absolute inset-0 -rotate-90" aria-hidden>
+            <svg viewBox="0 0 36 36" className="absolute inset-0 -rotate-90" aria-hidden>
+              <defs>
+                <linearGradient id={gradient} x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stopColor="#fbbf24" />
+                  <stop offset="100%" stopColor="#f97316" />
+                </linearGradient>
+              </defs>
+              <circle cx="18" cy="18" r={radius} fill="none" strokeWidth="3.5" stroke="#eef2f7" />
               <circle
-                cx="12"
-                cy="12"
+                cx="18"
+                cy="18"
                 r={radius}
                 fill="none"
-                strokeWidth="2.5"
-                className="stroke-white/25"
-              />
-              <circle
-                cx="12"
-                cy="12"
-                r={radius}
-                fill="none"
-                strokeWidth="2.5"
+                strokeWidth="3.5"
                 strokeLinecap="round"
-                className="stroke-white transition-[stroke-dasharray] duration-500"
-                strokeDasharray={`${Math.max(progress, 0.08) * circumference} ${circumference}`}
+                stroke={`url(#${gradient})`}
+                className="transition-[stroke-dasharray] duration-500 ease-out"
+                strokeDasharray={`${Math.max(progress, 0.04) * circumference} ${circumference}`}
               />
             </svg>
-            <RefreshCw className="size-3 animate-spin [animation-duration:1.6s]" aria-hidden />
+            <span className="text-brand-800 text-[10px] font-bold tabular-nums">{pct}%</span>
           </>
         ) : justFinished ? (
-          <Check className="animate-pop size-5" strokeWidth={3} aria-hidden />
+          <span className="flex size-8 items-center justify-center rounded-full bg-white/20">
+            <Check className="animate-pop size-5" strokeWidth={3} aria-hidden />
+          </span>
         ) : (
-          <RefreshCw
-            className="size-4 transition-transform duration-500 group-hover:rotate-180"
-            aria-hidden
-          />
+          <span className="bg-brand-50 flex size-8 items-center justify-center rounded-lg">
+            <RefreshCw
+              className="size-4 transition-transform duration-500 group-hover:rotate-180"
+              aria-hidden
+            />
+          </span>
         )}
       </span>
 
       <span className="flex flex-col items-start leading-tight">
         {syncing ? (
           <>
-            <span>Syncing stats</span>
-            <span className="text-[11px] font-medium text-white/80 tabular-nums">
+            <span className="flex items-center gap-1.5">
+              Syncing stats
+              <span aria-hidden className="flex gap-0.5">
+                {[0, 1, 2].map((dot) => (
+                  <span
+                    key={dot}
+                    className="loader-dot size-1 rounded-full bg-[#f59e0b]"
+                    style={{ animationDelay: `${dot * 0.15}s` }}
+                  />
+                ))}
+              </span>
+            </span>
+            <span className="text-brand-500 text-[11px] font-medium tabular-nums">
               {total
-                ? `${done.toLocaleString('en-IN')} / ${total.toLocaleString('en-IN')} profiles`
+                ? `${done.toLocaleString('en-IN')} of ${total.toLocaleString('en-IN')} profiles`
                 : 'Starting…'}
             </span>
           </>
@@ -244,12 +252,18 @@ function RefreshButton({ onRefresh, loading, settled, linked, refreshing }: Refr
           <span>Refresh stats</span>
         )}
       </span>
+
+      {syncing && (
+        <span aria-hidden className="absolute inset-x-0 bottom-0 h-[3px] bg-[#eef2f7]">
+          <span
+            className="animate-shimmer block h-full rounded-r-full bg-gradient-to-r from-[#fbbf24] via-[#fde68a] to-[#f97316] bg-[length:200%_100%] transition-[width] duration-500 ease-out"
+            style={{ width: `${Math.max(pct, 3)}%` }}
+          />
+        </span>
+      )}
+
       <span className="sr-only" role="status">
-        {syncing
-          ? `Syncing, ${Math.round(progress * 100)} percent`
-          : justFinished
-            ? 'Stats up to date'
-            : ''}
+        {syncing ? `Syncing, ${pct} percent` : justFinished ? 'Stats up to date' : ''}
       </span>
     </button>
   );
