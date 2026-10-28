@@ -12,6 +12,8 @@ export interface AssessmentsSearch {
   test?: string;
   /** Test type filter. */
   type?: string;
+  /** Campus tab: overview, subject, modules, students. */
+  tab?: string;
 }
 
 const positive = (value: unknown) => {
@@ -30,6 +32,7 @@ export const Route = createFileRoute('/assessments')({
           ? String(search.test)
           : undefined,
     type: typeof search.type === 'string' ? search.type : undefined,
+    tab: typeof search.tab === 'string' ? search.tab : undefined,
   }),
   component: () => (
     <RequireLogin>

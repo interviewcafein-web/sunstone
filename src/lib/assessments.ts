@@ -3,6 +3,21 @@
 import { useQuery } from '@tanstack/react-query';
 
 export type TestCategory = 'assignment' | 'test' | 'mcq' | 'amcat_mock';
+export type TestStatus = 'completed' | 'live' | 'scheduled' | 'unscheduled';
+
+export const STATUS_LABELS: Record<TestStatus, string> = {
+  completed: 'Completed',
+  live: 'Live',
+  scheduled: 'Scheduled',
+  unscheduled: 'Not scheduled',
+};
+
+export const STATUS_STYLES: Record<TestStatus, string> = {
+  completed: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300',
+  live: 'bg-sky-100 text-sky-800 dark:bg-sky-500/15 dark:text-sky-300',
+  scheduled: 'bg-violet-100 text-violet-800 dark:bg-violet-500/15 dark:text-violet-300',
+  unscheduled: 'bg-slate-100 text-slate-600',
+};
 
 export const CATEGORY_LABELS: Record<TestCategory, string> = {
   assignment: 'Assignment',
@@ -72,39 +87,56 @@ export interface CampusOverview {
   submissions: number;
   expected: number;
   avg_pct: number | null;
+  scheduled: number;
   last_test_at: string | null;
 }
 
+/** A test as one campus sees it (its section copies merged). */
 export interface CampusTest {
   ids: number[];
   name: string;
   category: TestCategory;
+  status: TestStatus;
+  subject: string;
+  module: string | null;
+  lecture: string | null;
   max_marks: string | null;
   minutes: number | null;
   released_at: string | null;
+  /** Later release to more sections, if any. */
+  last_release_at: string | null;
   due_at: string | null;
-  module: string | null;
   eligible: number;
   submitted: number;
   avg_pct: number | null;
   top_pct: number | null;
 }
 
-export interface SyllabusModule {
-  id: number;
-  name: string;
-  started: boolean;
-  tests: number;
+export interface SubjectTest extends CampusTest {
+  leaders: { name: string; username: string; pct: number | null }[];
 }
 
-export interface CampusSubject {
-  id: number;
+export interface SyllabusModule {
   name: string;
-  modules: number;
-  lectures: number;
-  students: number;
-  tests: number;
-  modules_list: SyllabusModule[];
+  /** Tests on the module itself. */
+  tests: CampusTest[];
+  /** Sub-folders (lectures) that hold tests. */
+  folders: { title: string; tests: CampusTest[] }[];
+  total: number;
+  released: number;
+  started: boolean;
+}
+
+export interface CampusStudentRow {
+  name: string;
+  username: string;
+  admission_year: number | null;
+  program: string;
+  released: number;
+  submitted: number;
+  avg_pct: number | null;
+  last_submitted_at: string | null;
+  amcat: number;
 }
 
 export interface CampusDetail {
@@ -112,13 +144,20 @@ export interface CampusDetail {
     students: number;
     in_prime: number;
     tests: number;
+    scheduled: number;
+    unscheduled: number;
     submissions: number;
     expected: number;
     avg_pct: number | null;
+    modules: number;
+    modules_started: number;
   };
-  tests: CampusTest[];
-  subjects: CampusSubject[];
+  subjectTests: SubjectTest[];
+  subjects: { key: string; name: string; modules: SyllabusModule[] }[];
+  timeline: { week: string; tests: number; avg_pct: number | null }[];
+  students: CampusStudentRow[];
   batches: number[];
+  now: string;
   syncedAt: string | null;
 }
 
@@ -150,9 +189,16 @@ export interface StudentTest {
   id: number;
   name: string;
   category: TestCategory;
+  status: TestStatus;
   max_marks: string | null;
   released_at: string | null;
+  due_at: string | null;
+  subject: string | null;
   module: string | null;
+  lecture: string | null;
+  /** Position among classmates who submitted, and how many did. */
+  rank: number | null;
+  takers: number;
   marks: string | null;
   submitted: boolean;
   attempts: number | null;
@@ -172,6 +218,7 @@ export interface AmcatSitting {
 export interface StudentAssessmentsData {
   tests: StudentTest[];
   amcat: AmcatSitting[];
+  now: string;
   syncedAt: string | null;
 }
 

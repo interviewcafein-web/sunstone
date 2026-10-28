@@ -9,18 +9,32 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Award, BookOpenCheck, ClipboardCheck, Loader2, Target, TrendingUp } from 'lucide-react';
+import {
+  Award,
+  BookOpenCheck,
+  ChevronRight,
+  ClipboardCheck,
+  Folder,
+  FolderTree,
+  Loader2,
+  Target,
+  TrendingUp,
+} from 'lucide-react';
 
 import { Card, CardHeader } from '@/components/coding/ui';
 import {
   CATEGORY_LABELS,
   CATEGORY_STYLES,
+  STATUS_LABELS,
+  STATUS_STYLES,
   lmsDate,
   percent,
   scoreFill,
   scoreTone,
   useStudentAssessments,
   type AmcatSitting,
+  type StudentTest,
+  type TestStatus,
 } from '@/lib/assessments';
 import { chartColors, useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
@@ -101,21 +115,40 @@ export function StudentAssessments({ username }: { username: string }) {
     : null;
   const gap = average !== null && classAverage !== null ? average - classAverage : null;
 
+  const released = tests.filter((test) => test.status === 'completed' || test.status === 'live');
+  const upcoming = tests
+    .filter((test) => !test.submitted && (test.status === 'live' || test.status === 'scheduled'))
+    .sort((a, b) =>
+      (a.due_at ?? a.released_at ?? '').localeCompare(b.due_at ?? b.released_at ?? '')
+    );
+  const subjectLevel = released.filter((test) => !test.module);
+  // module > sub-folder ('' = tests on the module itself) > tests, in release order
+  const modules = [
+    ...released
+      .filter((test) => test.module)
+      .reduce((tree, test) => {
+        const folders = tree.get(test.module!) ?? new Map<string, StudentTest[]>();
+        folders.set(test.lecture ?? '', [...(folders.get(test.lecture ?? '') ?? []), test]);
+        return tree.set(test.module!, folders);
+      }, new Map<string, Map<string, StudentTest[]>>())
+      .entries(),
+  ];
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi
           icon={BookOpenCheck}
           label="PRIME tests released"
-          value={String(tests.length)}
-          hint="Prime Domain Coding"
+          value={String(released.length)}
+          hint={upcoming.length ? `${upcoming.length} live or upcoming` : 'Prime Domain Coding'}
         />
         <Kpi
           icon={ClipboardCheck}
           label="Submitted"
-          value={`${submitted.length} of ${tests.length}`}
-          hint={`${percent(submitted.length, tests.length)}% participation`}
-          tone={scoreTone(percent(submitted.length, tests.length))}
+          value={`${submitted.length} of ${released.length}`}
+          hint={`${percent(submitted.length, released.length)}% participation`}
+          tone={scoreTone(percent(submitted.length, released.length))}
         />
         <Kpi
           icon={Target}
@@ -198,10 +231,58 @@ export function StudentAssessments({ username }: { username: string }) {
         </Card>
       )}
 
+      {upcoming.length > 0 && (
+        <Card>
+          <CardHeader
+            title="Live and upcoming"
+            aside={<span className="text-xs text-slate-500">Not submitted yet</span>}
+          />
+          <ul className="grid gap-2 md:grid-cols-2">
+            {upcoming.map((test) => (
+              <li
+                key={test.id}
+                className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 p-3"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold">{test.name}</span>
+                  <span className="block truncate text-xs text-slate-500">{place(test)}</span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <StatusChip status={test.status} />
+                  <span className="mt-0.5 block text-[11px] text-slate-500">
+                    {test.status === 'live'
+                      ? `Due ${lmsDate(test.due_at, true)}`
+                      : `Opens ${lmsDate(test.released_at, true)}`}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
       <Card className="overflow-hidden p-0">
         <div className="px-5 pt-4">
           <CardHeader
-            title="Sunstone PRIME domain tests"
+            title="Subject tests"
+            aside={
+              <span className="text-xs text-slate-500">
+                e.g. AMCAT mock tests, with rank in class
+              </span>
+            }
+          />
+        </div>
+        {subjectLevel.length ? (
+          <ResultsTable tests={subjectLevel} showRank />
+        ) : (
+          <p className="px-5 pb-5 text-sm text-slate-500">No subject-level tests yet.</p>
+        )}
+      </Card>
+
+      <Card className="overflow-hidden p-0">
+        <div className="px-5 pt-4">
+          <CardHeader
+            title="Module tests"
             aside={
               syncedAt && (
                 <span className="text-xs text-slate-500">
@@ -211,67 +292,50 @@ export function StudentAssessments({ username }: { username: string }) {
             }
           />
         </div>
-        {tests.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs text-slate-500">
-                <tr className="border-y border-slate-200">
-                  <th className="px-5 py-2 font-medium">Test</th>
-                  <th className="px-3 py-2 font-medium">Released</th>
-                  <th className="px-3 py-2 text-right font-medium">Score</th>
-                  <th className="px-5 py-2 text-right font-medium">Class avg</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tests.map((test) => (
-                  <tr
-                    key={test.id}
-                    className="border-b border-dotted border-slate-200 last:border-0"
-                  >
-                    <td className="px-5 py-2.5">
-                      <p className="font-medium">{test.name}</p>
-                      <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
-                        <span
-                          className={cn(
-                            'rounded-full px-1.5 py-px text-[10px] font-semibold',
-                            CATEGORY_STYLES[test.category]
-                          )}
-                        >
-                          {CATEGORY_LABELS[test.category]}
-                        </span>
-                        {test.module}
-                      </p>
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-slate-600">
-                      {lmsDate(test.released_at)}
-                    </td>
-                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                      {test.submitted ? (
-                        <>
-                          <span className={cn('font-bold tabular-nums', scoreTone(test.pct))}>
-                            {test.pct ?? '—'}%
-                          </span>
-                          <span className="block text-xs text-slate-500 tabular-nums">
-                            {Number(test.marks ?? 0)} / {Number(test.max_marks ?? 0)}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-300">
-                          Not submitted
-                        </span>
+        {modules.length ? (
+          <div className="divide-y divide-slate-200 border-t border-slate-200">
+            {modules.map(([module, folders]) => {
+              const all = [...folders.values()].flat();
+              const done = all.filter((test) => test.submitted);
+              const average = done.length
+                ? Math.round(done.reduce((sum, test) => sum + (test.pct ?? 0), 0) / done.length)
+                : null;
+              return (
+                <details key={module} open className="group">
+                  <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-3">
+                    <ChevronRight
+                      className="size-4 text-slate-400 transition group-open:rotate-90"
+                      aria-hidden
+                    />
+                    <FolderTree className="text-brand-700 dark:text-brand-300 size-4" aria-hidden />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold">{module}</span>
+                      <span className="block text-xs text-slate-500">
+                        {done.length} of {all.length} submitted
+                      </span>
+                    </span>
+                    <span className={cn('text-sm font-bold tabular-nums', scoreTone(average))}>
+                      {average === null ? '' : `${average}%`}
+                    </span>
+                  </summary>
+                  {[...folders.entries()].map(([folder, tests]) => (
+                    <div key={folder}>
+                      {folder && (
+                        <p className="flex items-center gap-2 bg-slate-50 px-5 py-1.5 text-xs font-semibold text-slate-600">
+                          <Folder className="size-3.5" aria-hidden />
+                          {folder}
+                        </p>
                       )}
-                    </td>
-                    <td className="px-5 py-2.5 text-right text-slate-600 tabular-nums">
-                      {test.class_avg_pct === null ? '—' : `${test.class_avg_pct}%`}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <ResultsTable tests={tests} />
+                    </div>
+                  ))}
+                </details>
+              );
+            })}
           </div>
         ) : (
           <p className="px-5 pb-5 text-sm text-slate-500">
-            No PRIME domain tests have been released to this student's sections yet.
+            No module tests have been released to this student's sections yet.
           </p>
         )}
       </Card>
@@ -291,6 +355,80 @@ export function StudentAssessments({ username }: { username: string }) {
           <p className="text-sm text-slate-500">No AMCAT sittings yet.</p>
         )}
       </Card>
+    </div>
+  );
+}
+
+const place = (test: StudentTest) =>
+  [test.module, test.lecture].filter(Boolean).join(' › ') || test.subject || 'Prime Domain Coding';
+
+function StatusChip({ status }: { status: TestStatus }) {
+  return (
+    <span
+      className={cn('rounded-full px-1.5 py-px text-[10px] font-semibold', STATUS_STYLES[status])}
+    >
+      {STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+function ResultsTable({ tests, showRank = false }: { tests: StudentTest[]; showRank?: boolean }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <tbody>
+          {tests.map((test) => (
+            <tr key={test.id} className="border-b border-dotted border-slate-200 last:border-0">
+              <td className="px-5 py-2.5">
+                <p className="font-medium">{test.name}</p>
+                <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                  <span
+                    className={cn(
+                      'rounded-full px-1.5 py-px text-[10px] font-semibold',
+                      CATEGORY_STYLES[test.category]
+                    )}
+                  >
+                    {CATEGORY_LABELS[test.category]}
+                  </span>
+                  {test.status === 'live' && <StatusChip status="live" />}
+                  <span>Released {lmsDate(test.released_at)}</span>
+                </p>
+              </td>
+              {showRank && (
+                <td className="px-3 py-2.5 text-right text-xs whitespace-nowrap text-slate-600">
+                  {test.rank ? (
+                    <>
+                      <span className="text-sm font-bold text-slate-800">#{test.rank}</span> of{' '}
+                      {test.takers}
+                    </>
+                  ) : (
+                    '—'
+                  )}
+                </td>
+              )}
+              <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                {test.submitted ? (
+                  <>
+                    <span className={cn('font-bold tabular-nums', scoreTone(test.pct))}>
+                      {test.pct ?? '—'}%
+                    </span>
+                    <span className="block text-xs text-slate-500 tabular-nums">
+                      {Number(test.marks ?? 0)} / {Number(test.max_marks ?? 0)}
+                    </span>
+                  </>
+                ) : (
+                  <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-500/10 dark:text-red-300">
+                    {test.status === 'live' ? 'Pending' : 'Not submitted'}
+                  </span>
+                )}
+              </td>
+              <td className="w-24 px-5 py-2.5 text-right text-xs text-slate-500 tabular-nums">
+                Class {test.class_avg_pct === null ? '—' : `${test.class_avg_pct}%`}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

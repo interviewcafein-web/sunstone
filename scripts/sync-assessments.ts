@@ -32,37 +32,56 @@ if (!ids.length) throw new Error('No students in the database yet: run npm run d
 const idList = ids.join(',');
 const list = (values: Iterable<number>) => [...new Set(values)].join(',') || 'null';
 
-console.log(`Reading PRIME domain tests for ${ids.length} students…`);
-interface Release {
+console.log(`Reading PRIME domain subjects for ${ids.length} students…`);
+
+// 1. The PRIME subjects (LMS courses) our students' sections take, and those sections.
+const courseSections = await redash<{ course_id: number; section_id: number }>(`
+  select distinct ssm.subject_id course_id, ssm.section_id
+  from subject_section_mapping ssm
+  join course c on c.id = ssm.subject_id and c.status = '1'
+  where ssm.status = '1' and ${PRIME_DOMAIN}
+    and exists (select 1 from student_section_mapping m
+                where m.section_id = ssm.section_id and m.status = '1' and m.student_id in (${idList}))`);
+const courseIds = list(courseSections.map((row) => row.course_id));
+const sectionIds = list(courseSections.map((row) => row.section_id));
+
+// 2. Every test placed in those subjects: on the subject, a module, or a module's sub-folder.
+interface Placement {
+  aid: number;
+  course_id: number;
+  module_id: number | null;
+  lecture_id: number | null;
+  name: string;
+  maximum_marks: number | null;
+  minutes: number | null;
+}
+const placements = await redash<Placement>(`
+  select am.academic_assessment_id aid, am.course_id,
+         coalesce(am.academic_module_id, l.academic_module_id) module_id, am.academic_lecture_id lecture_id,
+         trim(a.name) name, a.maximum_marks, a.total_time_minutes minutes
+  from academic_assessment_mapping am
+  join academic_assessment a on a.id = am.academic_assessment_id and a.status = '1'
+  left join academic_lectures l on l.id = am.academic_lecture_id
+  where am.status = '1' and am.course_id in (${courseIds})`);
+const testIds = list(placements.map((placement) => placement.aid));
+
+// 3. Their releases to our sections, past and scheduled.
+const releases = await redash<{
   aid: number;
   course_id: number;
   module_id: number | null;
   section_id: number;
   release_at: string | null;
   due_date: string | null;
-  name: string;
-  maximum_marks: number | null;
-  minutes: number | null;
-  course_name: string;
-}
-const releases = await redash<Release>(`
-  select am.academic_assessment_id aid, am.course_id, am.academic_module_id module_id,
-         ssm.section_id, max(s.release_at) release_at, max(s.due_date) due_date,
-         trim(a.name) name, a.maximum_marks, a.total_time_minutes minutes, trim(c.course_name) course_name
+  visible: number;
+}>(`
+  select am.academic_assessment_id aid, am.course_id, am.academic_module_id module_id, ssm.section_id,
+         max(s.release_at) release_at, max(s.due_date) due_date, max(s.is_visible = '1') visible
   from academic_assessment_section_scope s
   join academic_assessment_mapping am on am.id = s.base_mapping_id and am.status = '1'
-  join academic_assessment a on a.id = am.academic_assessment_id and a.status = '1'
-  join course c on c.id = am.course_id and c.status = '1'
   join subject_section_mapping ssm on ssm.id = s.subject_section_mapping_id and ssm.status = '1'
-  where s.status = '1' and s.is_visible = '1' and s.release_at <= now() and ${PRIME_DOMAIN}
-    and exists (select 1 from student_section_mapping m
-                where m.section_id = ssm.section_id and m.status = '1' and m.student_id in (${idList}))
-  group by am.academic_assessment_id, am.course_id, am.academic_module_id, ssm.section_id,
-           a.name, a.maximum_marks, a.total_time_minutes, c.course_name`);
-
-const sectionIds = list(releases.map((release) => release.section_id));
-const testIds = list(releases.map((release) => release.aid));
-const courseIds = list(releases.map((release) => release.course_id));
+  where s.status = '1' and am.course_id in (${courseIds}) and ssm.section_id in (${sectionIds})
+  group by am.academic_assessment_id, am.course_id, am.academic_module_id, ssm.section_id`);
 
 const members = await redash<{ section_id: number; student_id: number }>(`
   select distinct section_id, student_id from student_section_mapping
@@ -99,6 +118,16 @@ const modules = await redash<{
   select id, course_id, trim(name) name, parent_module_priority position
   from academic_modules where status = '1' and course_id in (${courseIds})`);
 
+const lectures = await redash<{
+  id: number;
+  course_id: number;
+  module_id: number | null;
+  title: string;
+  position: number | null;
+}>(`
+  select id, course_id, academic_module_id module_id, trim(title) title, position_to_render position
+  from academic_lectures where status = '1' and course_id in (${courseIds})`);
+
 console.log('Reading AMCAT results…');
 const sittings = await redash<{
   id: number;
@@ -130,8 +159,8 @@ const number = (value: unknown) =>
     ? null
     : Number(value);
 
-const tests = new Map<number, Release>();
-for (const release of releases) tests.set(release.aid, release);
+const tests = new Map<number, Placement>();
+for (const placement of placements) tests.set(placement.aid, placement);
 
 const scoresBySitting = new Map<
   number,
@@ -168,6 +197,15 @@ function inserts<T extends Record<string, unknown>>(table: string, rows: T[]) {
 }
 
 const counts = {
+  subjects: courses.length,
+  sectionsTakingSubjects: courseSections.length,
+  placements: placements.length,
+  lectures: lectures.length,
+  scheduled: releases.filter(
+    (release) =>
+      release.release_at &&
+      release.release_at > new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 19)
+  ).length,
   tests: tests.size,
   releases: releases.length,
   sections: new Set(releases.map((release) => release.section_id)).size,
@@ -184,6 +222,9 @@ await sql.transaction([
   sql`delete from lms_tests`,
   sql`delete from lms_test_releases`,
   sql`delete from lms_section_students`,
+  sql`delete from lms_lectures`,
+  sql`delete from lms_test_placements`,
+  sql`delete from lms_course_sections`,
   sql`delete from lms_test_results`,
   sql`delete from amcat_sittings`,
   ...inserts(
@@ -223,7 +264,31 @@ await sql.transaction([
       module_id: release.module_id,
       release_at: release.release_at,
       due_at: release.due_date,
+      visible: Number(release.visible) === 1,
     }))
+  ),
+  ...inserts(
+    'lms_lectures',
+    lectures.map((lecture) => ({
+      id: lecture.id,
+      course_id: lecture.course_id,
+      module_id: lecture.module_id,
+      title: lecture.title || 'Untitled',
+      position: number(lecture.position),
+    }))
+  ),
+  ...inserts(
+    'lms_test_placements',
+    [...new Map(placements.map((p) => [`${p.aid}:${p.course_id}`, p])).values()].map((p) => ({
+      test_id: p.aid,
+      course_id: p.course_id,
+      module_id: p.module_id,
+      lecture_id: p.lecture_id,
+    }))
+  ),
+  ...inserts(
+    'lms_course_sections',
+    courseSections.map((row) => ({ course_id: row.course_id, section_id: row.section_id }))
   ),
   ...inserts(
     'lms_section_students',
