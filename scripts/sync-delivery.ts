@@ -22,6 +22,13 @@ if (!source?.startsWith('postgres')) {
 
 /** The tracker's program codes as Vertex names them. */
 const PROGRAM: Record<string, string> = { 'BTECH-CS': 'B.Tech', BCA: 'BCA', MCA: 'MCA' };
+/**
+ * Batches the tracker files under another campus or program than the LMS: Rathinam's B.Tech
+ * batches are under RGIB in the tracker, but their students are RITB's BE in the LMS.
+ */
+const MOVED: Record<string, { campus: string; program: string }> = {
+  'RGIB:B.Tech': { campus: 'RITB', program: 'BE' },
+};
 const yearOf = (name: string | null) => {
   const match = name?.match(/(20\d\d)/);
   return match ? Number(match[1]) : null;
@@ -69,6 +76,19 @@ await tracker.query('rollback');
 await tracker.end();
 
 const program = (code: string) => PROGRAM[code] ?? code;
+/** Vertex's campus and program for a tracker row. */
+const place = (row: { campus_code: string; program: string }) =>
+  MOVED[`${row.campus_code}:${program(row.program)}`] ?? {
+    campus: row.campus_code,
+    program: program(row.program),
+  };
+// A moved batch keeps its curriculum, so its topics are listed under the new program too.
+const topicRows = topics.flatMap((row) => [
+  { ...row, program: program(row.program) },
+  ...Object.entries(MOVED)
+    .filter(([key]) => key.endsWith(`:${program(row.program)}`))
+    .map(([, moved]) => ({ ...row, program: moved.program })),
+]);
 const sql = neon(target);
 await sql.transaction([
   sql`delete from dlv_classes`,
@@ -80,8 +100,8 @@ await sql.transaction([
     classes.map((row) => ({
       id: row.id,
       class_date: row.class_date,
-      campus_code: row.campus_code,
-      program: program(row.program),
+      campus_code: place(row).campus,
+      program: place(row).program,
       batch_year: yearOf(row.batch),
       section: row.section,
       trainer: row.trainer,
@@ -99,8 +119,8 @@ await sql.transaction([
     sql,
     'dlv_targets',
     targets.map((row) => ({
-      campus_code: row.campus_code,
-      program: program(row.program),
+      campus_code: place(row).campus,
+      program: place(row).program,
       batch_year: yearOf(row.batch),
       section: row.section,
       students: row.students,
@@ -111,9 +131,9 @@ await sql.transaction([
   ...batchInserts(
     sql,
     'dlv_topics',
-    topics.map((row) => ({
+    topicRows.map((row) => ({
       curriculum: row.curriculum,
-      program: program(row.program),
+      program: row.program,
       batch_years: `{${yearsOf(row.curriculum).join(',')}}`,
       topic: row.topic.trim(),
       topic_order: row.topic_order,

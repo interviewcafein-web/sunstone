@@ -561,15 +561,31 @@ async function delivery(campusId: number, batch: string | null) {
      order by batch_year desc, program, section`,
     params
   );
-  const trainers = await db().query(
-    `select trainer as name, round(sum(minutes) / 60.0)::int as hours, count(*)::int as classes,
-            round(100.0 * sum(present) / nullif(sum(total) filter (where present is not null), 0))::int as attendance,
-            max(class_date)::text as last_class
-     from dlv_classes where campus_code = $1 and ${DLV_FILTER} and status = 'VERIFIED' and ${DLV_VALID}
-       and trainer is not null
+  const tracked = await db().query(
+    `select trainer as name,
+            round(coalesce(sum(minutes) filter (where status = 'VERIFIED'), 0) / 60.0)::int as hours,
+            round(coalesce(sum(minutes) filter (where status = 'PENDING VERIFICATION'), 0) / 60.0)::int as pending_hours,
+            count(*) filter (where status = 'VERIFIED')::int as classes,
+            round(100.0 * sum(present) filter (where status = 'VERIFIED') /
+                  nullif(sum(total) filter (where status = 'VERIFIED' and present is not null), 0))::int as attendance,
+            max(class_date) filter (where status = 'VERIFIED')::text as last_class
+     from dlv_classes where campus_code = $1 and ${DLV_FILTER} and ${DLV_VALID}
+       and status in ('VERIFIED', 'PENDING VERIFICATION') and trainer is not null
      group by trainer order by hours desc`,
     params
   );
+  // The same trainers' PRIME coding classes in the LMS time table, since the tracker's first
+  // class here, for the batch of each session's students.
+  const lms = await db().query(
+    `select min(a.faculty) as name, count(*)::int as classes, round(sum(a.minutes) / 60.0)::int as hours
+     from att_sessions a join students s on s.lms_user_id = a.first_student
+     where a.campus_id = $3 and (${PRIME_CODING}) and a.minutes between 1 and 600 and a.faculty is not null
+       and a.lecture_date >= (select min(class_date) from dlv_classes where campus_code = $1)
+       and ${COHORT.replace(/admission_year|program/g, (column) => `s.${column}`)}
+     group by a.faculty_id`,
+    [code, batch, campusId]
+  );
+  const trainers = compareTrainers(tracked as TrackedTrainer[], lms as LmsTrainer[]);
   const weeks = await db().query(
     `select date_trunc('week', class_date)::date::text as week, round(sum(minutes) / 60.0)::int as hours
      from dlv_classes where campus_code = $1 and ${DLV_FILTER} and status = 'VERIFIED' and ${DLV_VALID}
@@ -603,6 +619,90 @@ async function delivery(campusId: number, batch: string | null) {
 // PRIME subjects in attendance (named by hand in the LMS: "Prime Domain Coding", "Prime
 // Aptitude", "Competitive Coding (Sunstone Prime Tech Domain)"...).
 const PRIME_SUBJECT = `subject ~* '(^|[^a-z])prime([^a-z]|$)|competitive coding'`;
+// The PRIME coding domain only ("Prime Domain Coding", "Priem Domain Coding", "Prime Tech
+// Domain"…), not PRIME aptitude or communication.
+const PRIME_CODING = `(subject ~* '(^|[^a-z])pri[mne]{2}([^a-z]|$)' and subject ~* 'domain|coding|tech'
+  and subject !~* 'apti|comm') or subject ~* 'competitive coding'`;
+
+interface TrackedTrainer {
+  name: string;
+  hours: number;
+  pending_hours: number;
+  classes: number;
+  attendance: number | null;
+  last_class: string | null;
+}
+interface LmsTrainer {
+  name: string;
+  hours: number;
+  classes: number;
+}
+const nameTokens = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z ]/g, ' ')
+    .split(/\s+/)
+    .filter((token, index, all) => token && token !== all[index - 1]);
+const titleCase = (name: string) =>
+  name.trim().replace(/\S+/g, (word) => word[0].toUpperCase() + word.slice(1).toLowerCase());
+
+/**
+ * Tracker trainers with their hours in the LMS. Each system has its own spelling of a name, so
+ * they match by full name, then by one name within the other ("Hansraj" / "Hansraj Athole"),
+ * then by a first name only one trainer on each side has ("Ravi Panjiyar" / "Ravi Kumar").
+ * LMS instructors with PRIME coding classes but nothing in the tracker are listed too.
+ */
+function compareTrainers(tracked: TrackedTrainer[], lms: LmsTrainer[]) {
+  const pool = lms.map((row) => ({ ...row, tokens: nameTokens(String(row.name)), used: false }));
+  const rows = tracked.map((row) => ({
+    ...row,
+    tokens: nameTokens(String(row.name)),
+    match: null as (typeof pool)[number] | null,
+  }));
+  const rules: ((a: string[], b: string[]) => boolean)[] = [
+    (a, b) => a.join(' ') === b.join(' '),
+    (a, b) => a.every((token) => b.includes(token)) || b.every((token) => a.includes(token)),
+    (a, b) =>
+      a[0] === b[0] && rows.filter((row) => !row.match && row.tokens[0] === a[0]).length === 1,
+  ];
+  for (const rule of rules) {
+    for (const row of rows) {
+      if (row.match) continue;
+      const candidates = pool.filter((entry) => !entry.used && rule(row.tokens, entry.tokens));
+      if (candidates.length !== 1) continue;
+      row.match = candidates[0];
+      candidates[0].used = true;
+    }
+  }
+  const lmsName = (entry: (typeof pool)[number]) => titleCase(String(entry.name));
+  return [
+    ...rows.map(({ tokens, match, ...row }) => ({
+      ...row,
+      in_tracker: true,
+      lms_name: match && match.tokens.join(' ') !== tokens.join(' ') ? lmsName(match) : null,
+      lms_hours: match ? Number(match.hours) : null,
+      lms_classes: match ? Number(match.classes) : null,
+    })),
+    ...pool
+      .filter((entry) => !entry.used && Number(entry.classes) >= 3)
+      .map((entry) => ({
+        name: lmsName(entry),
+        hours: 0,
+        pending_hours: 0,
+        classes: 0,
+        attendance: null as number | null,
+        last_class: null as string | null,
+        in_tracker: false,
+        lms_name: null,
+        lms_hours: Number(entry.hours),
+        lms_classes: Number(entry.classes),
+      })),
+  ].sort(
+    (a, b) =>
+      Math.max(b.hours + b.pending_hours, b.lms_hours ?? 0) -
+      Math.max(a.hours + a.pending_hours, a.lms_hours ?? 0)
+  );
+}
 
 /** Class attendance for one campus (and batch): overall, PRIME, weekly, per subject and instructor. */
 async function attendance(campusId: number, batch: string | null) {

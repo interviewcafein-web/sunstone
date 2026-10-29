@@ -52,12 +52,16 @@ const sessions = await redash<{
   marked: number;
   present: number;
   campus_id: number | null;
+  minutes: number | null;
+  first_student: number | null;
 }>(`
   select s.*, trim(pu.name) faculty
   from (
     select tt.id, tt.lecture_date, tt.lecture_start_time start_time, tt.section_id,
            ${COURSE} course_id, ${SUBJECT} subject, tt.professor_id faculty_id,
            count(*) marked, sum(ttsm.is_present = '1') present,
+           time_to_sec(timediff(tt.lecture_end_time, tt.lecture_start_time)) div 60 minutes,
+           min(ttsm.student_id) first_student,
            (select u.campus_id from users u where u.id = min(ttsm.student_id)) campus_id
     ${BASE}
     group by tt.id
@@ -142,6 +146,8 @@ await sql.transaction([
       faculty_id: session.faculty_id,
       faculty: session.faculty,
       campus_id: session.campus_id,
+      minutes: session.minutes == null ? null : Number(session.minutes),
+      first_student: session.first_student,
       marked: Number(session.marked),
       present: Number(session.present),
     }))

@@ -37,6 +37,84 @@ function Bar({ value, pending = 0, color }: { value: number; pending?: number; c
   );
 }
 
+type Trainer = CampusDelivery['trainers'][number];
+
+/**
+ * How a trainer's tracker hours compare with the LMS: in step within 10% (or 5 h), otherwise
+ * which side has more, or that one side has nothing.
+ */
+function trainerGap(trainer: Trainer) {
+  const logged = trainer.hours + trainer.pending_hours;
+  if (!trainer.in_tracker) return { tone: 'warn', label: 'Not in tracker' } as const;
+  if (trainer.lms_hours === null) return { tone: 'warn', label: 'Not in LMS' } as const;
+  const gap = trainer.lms_hours - logged;
+  if (Math.abs(gap) <= Math.max(5, 0.1 * Math.max(logged, trainer.lms_hours))) {
+    return { tone: 'ok', label: 'In step' } as const;
+  }
+  return {
+    tone: 'warn',
+    label: gap > 0 ? `LMS +${gap} h` : `Tracker +${-gap} h`,
+  } as const;
+}
+
+function TrainerRow({ trainer, peak }: { trainer: Trainer; peak: number }) {
+  const gap = trainerGap(trainer);
+  const logged = trainer.hours + trainer.pending_hours;
+  return (
+    <li className="py-2.5 text-sm">
+      <div className="flex items-start justify-between gap-3">
+        <span className="min-w-0">
+          <span className="block truncate font-medium">{trainer.name}</span>
+          <span className="text-xs text-slate-500">
+            {trainer.in_tracker
+              ? `${trainer.classes} classes · last ${lmsDate(trainer.last_class)}`
+              : `${trainer.lms_classes} LMS classes`}
+            {trainer.attendance !== null && ` · ${trainer.attendance}% attendance`}
+            {trainer.lms_name && ` · LMS: ${trainer.lms_name}`}
+          </span>
+        </span>
+        <span
+          className={cn(
+            'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold',
+            gap.tone === 'ok'
+              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+              : 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
+          )}
+        >
+          {gap.label}
+        </span>
+      </div>
+      <div className="mt-1.5 grid grid-cols-[3.25rem_1fr_8.75rem] items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
+        <span>Tracker</span>
+        <span className="flex h-1.5 overflow-hidden rounded-full bg-slate-100">
+          <span
+            className="bar-fill bg-brand-500 h-full"
+            style={{ width: `${(trainer.hours / peak) * 100}%` }}
+          />
+          <span
+            className="bg-brand-500 h-full opacity-40"
+            style={{ width: `${(trainer.pending_hours / peak) * 100}%` }}
+          />
+        </span>
+        <span className="text-right tabular-nums">
+          <b className="text-slate-800">{logged} h</b>
+          {trainer.pending_hours > 0 && ` (${trainer.pending_hours} awaiting)`}
+        </span>
+        <span>LMS</span>
+        <span className="flex h-1.5 overflow-hidden rounded-full bg-slate-100">
+          <span
+            className="bar-fill h-full bg-violet-500"
+            style={{ width: `${((trainer.lms_hours ?? 0) / peak) * 100}%` }}
+          />
+        </span>
+        <span className="text-right tabular-nums">
+          <b className="text-slate-800">{trainer.lms_hours ?? 0} h</b>
+        </span>
+      </div>
+    </li>
+  );
+}
+
 /**
  * PRIME coding domain delivery for a campus: verified hours taught against the hours
  * allocated, by batch and section, by trainer, week by week, and topic by topic through the
@@ -173,25 +251,24 @@ export function DeliverySection({ data }: { data: CampusDelivery | null }) {
           <div>
             <h3 className="flex items-center gap-1.5 text-sm font-bold">
               <Users className="size-4 text-slate-400" aria-hidden />
-              By trainer
+              By trainer: tracker vs LMS
             </h3>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Hours logged in the tracker (verified and awaiting) beside PRIME coding classes in the
+              LMS time table over the same dates.
+            </p>
             <ul className="mt-2 divide-y divide-slate-100">
               {data.trainers.map((trainer) => (
-                <li
+                <TrainerRow
                   key={trainer.name}
-                  className="flex items-center justify-between gap-3 py-2 text-sm"
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate font-medium">{trainer.name}</span>
-                    <span className="text-xs text-slate-500">
-                      {trainer.classes} classes · last {lmsDate(trainer.last_class)}
-                      {trainer.attendance !== null && ` · ${trainer.attendance}% attendance`}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-base font-bold tabular-nums">
-                    {trainer.hours} h
-                  </span>
-                </li>
+                  trainer={trainer}
+                  peak={Math.max(
+                    1,
+                    ...data.trainers.map((row) =>
+                      Math.max(row.hours + row.pending_hours, row.lms_hours ?? 0)
+                    )
+                  )}
+                />
               ))}
             </ul>
           </div>
