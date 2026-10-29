@@ -216,8 +216,8 @@ export default function AssessmentsPage() {
           Every campus at a glance
         </h1>
         <p className="text-brand-100 mt-2 max-w-2xl text-sm">
-          PRIME tests, attendance, exams and AMCAT for each campus, from the Sunstone LMS. Open a
-          campus for its full journey.{syncedAt && ` Updated ${lmsDate(syncedAt, true)}.`}
+          PRIME Mock Tests, attendance, exams and AMCAT for each campus, from the Sunstone LMS. Open
+          a campus for its full journey.{syncedAt && ` Updated ${lmsDate(syncedAt, true)}.`}
         </p>
         <dl className="relative mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
           <HeroStat
@@ -1525,7 +1525,7 @@ function StudentsTab({
                 ))}
                 <th className={cn(head, group, 'text-right')}>Attendance</th>
                 <th className={cn(head, 'text-right')}>Exams avg</th>
-                <th className={cn(head, 'text-right')}>All PRIME tests</th>
+                <th className={cn(head, 'text-right')}>All PRIME Mock Tests</th>
                 <th className={cn(head, 'pr-5')}>Last submission</th>
               </tr>
             </thead>

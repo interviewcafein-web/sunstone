@@ -82,8 +82,8 @@ for (const [campusId, tests] of byCampus) {
   const names = tests.map((test) => String(test.name));
   const title =
     tests.length === 1
-      ? `New PRIME test at ${campus}: ${names[0]}`
-      : `${tests.length} new PRIME tests at ${campus}`;
+      ? `New PRIME Mock Test at ${campus}: ${names[0]}`
+      : `${tests.length} new PRIME Mock Tests at ${campus}`;
   const body = tests
     .map(
       (test) =>
@@ -100,7 +100,9 @@ for (const [campusId, tests] of byCampus) {
   const html = frame({
     kicker: 'New tests',
     title:
-      tests.length === 1 ? 'A new PRIME test is live' : `${tests.length} new PRIME tests are live`,
+      tests.length === 1
+        ? 'A new PRIME Mock Test is live'
+        : `${tests.length} new PRIME Mock Tests are live`,
     subtitle: campus,
     logo: tests[0].logo as string | null,
     preheader: `${names.slice(0, 3).join(', ')} released to ${campus} students.`,

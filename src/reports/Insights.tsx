@@ -96,7 +96,7 @@ export function InsightsPage({
         <View style={{ flexGrow: 1, flexBasis: 0, paddingRight: 16 }}>
           <Text style={{ fontSize: 16, fontWeight: 800 }}>360° summary · {title}</Text>
           <Text style={{ fontSize: 8.5, color: MUTED, marginTop: 3 }}>
-            Coding, attendance, PRIME tests, AMCAT and internal exams side by side for{' '}
+            Coding, attendance, PRIME Mock Tests, AMCAT and internal exams side by side for{' '}
             {formatNumber(scope.students)} students. Students with no data on a front are left out
             of it; coverage is the share with data.
           </Text>
@@ -288,7 +288,7 @@ function PainPointItem({ point }: { point: PainPoint }) {
 const COLUMN_LABELS: Record<DimensionId, string> = {
   coding: 'SOLVED',
   attendance: 'ATTEND.',
-  tests: 'TESTS',
+  tests: 'MOCKS',
   amcat: 'AMCAT',
   exams: 'EXAMS',
 };

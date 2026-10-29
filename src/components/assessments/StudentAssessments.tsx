@@ -208,7 +208,7 @@ export function StudentAssessments({
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           <Kpi
             icon={BookOpenCheck}
-            label="PRIME tests released"
+            label="PRIME Mock Tests released"
             value={String(released.length)}
             hint={upcoming.length ? `${upcoming.length} live or upcoming` : 'Prime Domain Coding'}
           />

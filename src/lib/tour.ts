@@ -41,7 +41,7 @@ const TOURS: Record<TourId, Step[]> = {
     {
       target: 'table',
       title: 'One row per student',
-      text: 'Coding on LeetCode, GFG and GitHub, then attendance, the latest AMCAT score and PRIME test average, each with its trend. Click a column to sort; click a name to open the full profile.',
+      text: 'Coding on LeetCode, GFG and GitHub, then attendance, the latest AMCAT score and PRIME Mock Test average, each with its trend. Click a column to sort; click a name to open the full profile.',
       side: 'top',
     },
     {
@@ -93,7 +93,7 @@ const TOURS: Record<TourId, Step[]> = {
     {
       target: 'student-sections',
       title: 'Everything about this student',
-      text: 'Coding profiles, Assessments (PRIME tests, AMCAT, internal exams) and Attendance, each in its own section.',
+      text: 'Coding profiles, Assessments (PRIME Mock Tests, AMCAT, internal exams) and Attendance, each in its own section.',
       side: 'bottom',
     },
   ],

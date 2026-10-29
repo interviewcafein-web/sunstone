@@ -145,7 +145,7 @@ export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
               divided
             />
             <SortHeader
-              label="PRIME tests"
+              label="PRIME Mock Tests"
               icon={<ClipboardCheck className="text-brand-600 size-3.5" aria-hidden />}
               hint="average, taken"
               sortKey="tests"

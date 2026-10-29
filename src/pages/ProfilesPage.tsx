@@ -56,7 +56,7 @@ const CATEGORIES: { id: Category; label: string; hint: string; icon: typeof Layo
   {
     id: 'assessments',
     label: 'Assessments',
-    hint: 'PRIME tests, internal exams, AMCAT',
+    hint: 'PRIME Mock Tests, internal exams, AMCAT',
     icon: ClipboardList,
   },
   {
@@ -68,7 +68,7 @@ const CATEGORIES: { id: Category; label: string; hint: string; icon: typeof Layo
 ];
 
 const ASSESSMENT_TABS: { id: StudentSection; label: string; icon: typeof LayoutGrid }[] = [
-  { id: 'tests', label: 'PRIME tests', icon: ClipboardCheck },
+  { id: 'tests', label: 'PRIME Mock Tests', icon: ClipboardCheck },
   { id: 'amcat', label: 'AMCAT', icon: Award },
   { id: 'exams', label: 'Exams', icon: NotebookPen },
 ];

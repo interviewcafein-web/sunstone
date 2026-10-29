@@ -130,7 +130,7 @@ export function CampusReport({ data }: { data: CampusReportData }) {
     <Document
       title={`Sunstone PRIME Vertex – Progress Report – ${label}`}
       author="Sunstone PRIME"
-      subject="Coding practice, attendance, PRIME tests, AMCAT and internal exams"
+      subject="Coding practice, attendance, PRIME Mock Tests, AMCAT and internal exams"
     >
       {children}
     </Document>
@@ -615,7 +615,7 @@ function TableHeader({ origin }: { origin: string }) {
         }}
       >
         <Text style={[headerCell, { width: COLUMNS.front, textAlign: 'right' }]}>ATTEND.</Text>
-        <Text style={[headerCell, { width: COLUMNS.front, textAlign: 'right' }]}>TESTS</Text>
+        <Text style={[headerCell, { width: COLUMNS.front, textAlign: 'right' }]}>MOCKS</Text>
         <Text style={[headerCell, { width: COLUMNS.front, textAlign: 'right' }]}>AMCAT</Text>
         <Text style={[headerCell, { width: COLUMNS.exams, textAlign: 'right' }]}>EXAMS</Text>
       </View>

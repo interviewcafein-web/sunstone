@@ -52,8 +52,8 @@ export const DIMENSIONS: Dimension[] = [
   },
   {
     id: 'tests',
-    label: 'PRIME tests',
-    short: 'Tests',
+    label: 'PRIME Mock Tests',
+    short: 'Mock Tests',
     measure: 'Average score on submitted PRIME domain tests',
     good: 70,
     risk: 50,
@@ -384,7 +384,7 @@ export function findPainPoints(
     points.push({
       severity: scope.participation < 50 ? 'high' : 'medium',
       dimension: 'tests',
-      title: `Only ${scope.participation}% of PRIME tests are attempted`,
+      title: `Only ${scope.participation}% of PRIME Mock Tests are attempted`,
       detail: 'Average share of released tests each student submitted.',
       weight: (100 - scope.participation) * 0.9,
     });

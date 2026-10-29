@@ -79,7 +79,7 @@ export function AssessmentSections({
         Assessments and attendance
       </Text>
       <Text style={{ fontSize: 8.5, color: MUTED, marginTop: 3 }}>
-        PRIME tests, AMCAT, internal exams and class attendance from the LMS
+        PRIME Mock Tests, AMCAT, internal exams and class attendance from the LMS
         {syncedAt ? `, as of ${lmsDate(syncedAt, true)}` : ''}.
       </Text>
       <TestsSection tests={assessments.tests} />
@@ -213,12 +213,12 @@ function TestsSection({ tests }: { tests: StudentTest[] }) {
   return (
     <>
       <SectionTitle
-        title="PRIME tests"
+        title="PRIME Mock Tests"
         aside="Prime Domain Coding tests and assignments"
         color={color}
       />
       {released.length === 0 ? (
-        <Empty>No PRIME tests have been released to this student yet.</Empty>
+        <Empty>No PRIME Mock Tests have been released to this student yet.</Empty>
       ) : (
         <>
           <View style={{ flexDirection: 'row', gap: 8 }}>

@@ -472,7 +472,7 @@ export function InsightsPanel({ students }: { students: CampusStudentRow[] }) {
     <section className={cn(panel, 'p-5')}>
       <h2 className="text-lg font-bold">Attendance vs. scores</h2>
       <p className="text-sm text-slate-500">
-        Each dot is a student: class attendance across, PRIME test average up. Lines at{' '}
+        Each dot is a student: class attendance across, PRIME Mock Test average up. Lines at{' '}
         {ATTENDANCE_OK}% attendance and {SCORE_OK}% score. Click a group to list its students.
       </p>
       <div className="mt-4 grid gap-5 lg:grid-cols-5">

@@ -119,7 +119,7 @@ export default function InsightsPage() {
             </p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">{scopeName}</h1>
             <p className="text-brand-100 mt-2 max-w-2xl text-sm">
-              Coding, attendance, PRIME tests, AMCAT and internal exams side by side for{' '}
+              Coding, attendance, PRIME Mock Tests, AMCAT and internal exams side by side for{' '}
               {scope.students.toLocaleString('en-IN')} students, with what needs attention first.
             </p>
           </div>
@@ -736,7 +736,7 @@ function EngagementScatter({ rows }: { rows: StudentInsight[] }) {
     <section className={cn(panel, 'p-5')}>
       <h2 className="text-lg font-bold">Engagement map</h2>
       <p className="text-sm text-slate-500">
-        Each dot is a student: attendance across, PRIME test average up, colour by coding zone.
+        Each dot is a student: attendance across, PRIME Mock Test average up, colour by coding zone.
         Lines at 75% attendance and 50% score.
       </p>
       <div className="mt-4 grid gap-5 lg:grid-cols-4">
@@ -755,7 +755,7 @@ function EngagementScatter({ rows }: { rows: StudentInsight[] }) {
               <YAxis
                 type="number"
                 dataKey="y"
-                name="Tests"
+                name="Mock Tests"
                 domain={[0, 100]}
                 unit="%"
                 tick={{ fontSize: 11, fill: colors.tick }}

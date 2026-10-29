@@ -162,7 +162,7 @@ Sunstone PRIME Vertex`;
   <tr><td style="padding:32px 32px 8px">
     <div style="font-size:18px;font-weight:bold;color:#0f172a">${hello}</div>
     <p style="margin:10px 0 0;font-size:15px;line-height:24px;color:#334155">
-      Welcome aboard! You now have access to <b>Sunstone PRIME Vertex</b>, where every PRIME student&rsquo;s coding practice, attendance, PRIME tests, AMCAT and exams come together in one place, so you can see who is thriving and who needs a hand.
+      Welcome aboard! You now have access to <b>Sunstone PRIME Vertex</b>, where every PRIME student&rsquo;s coding practice, attendance, PRIME Mock Tests, AMCAT and exams come together in one place, so you can see who is thriving and who needs a hand.
     </p>
   </td></tr>
 
@@ -201,7 +201,7 @@ Sunstone PRIME Vertex`;
   <tr><td style="padding:24px 32px 4px">
     <div style="font-size:16px;font-weight:bold;color:#0f172a;margin-bottom:12px">What you&rsquo;ll find inside</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-      ${feature('🏆', 'Students', 'Every student ranked, with LeetCode, GFG and GitHub alongside attendance, AMCAT and PRIME tests, each with its trend.', '#fef3c7')}
+      ${feature('🏆', 'Students', 'Every student ranked, with LeetCode, GFG and GitHub alongside attendance, AMCAT and PRIME Mock Tests, each with its trend.', '#fef3c7')}
       ${feature('🏫', 'Campuses', 'Each campus&rsquo;s PRIME journey: Prime Mock Tests and leaderboards, Practice Tests and MCQs, AMCAT, exams, and attendance by subject and instructor.', '#dbeafe')}
       ${feature('🎯', '360° view', 'Campuses and batches compared on every front, with the pain points and students who need attention first.', '#fce7f3')}
     </table>
