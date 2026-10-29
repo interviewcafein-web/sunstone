@@ -46,7 +46,19 @@ function newCode(): string {
 
 const codeHash = (email: string, code: string) => digest(`otp:${email}:${code}`);
 
+/**
+ * App-store reviewers sign in with a fixed code: REVIEW_EMAIL and REVIEW_LOGIN_CODE (6 digits)
+ * are set only in Vercel. No email is sent to that address, and the account still has to be
+ * active staff (its access is whatever the Team page gives it).
+ */
+const reviewLogin = (email: string) => {
+  const reviewEmail = process.env.REVIEW_EMAIL?.trim().toLowerCase();
+  const code = process.env.REVIEW_LOGIN_CODE?.trim();
+  return reviewEmail && code && /^\d{6}$/.test(code) && email === reviewEmail ? code : null;
+};
+
 async function send(email: string): Promise<Response> {
+  if (reviewLogin(email)) return json(200, SENT);
   if (!(await isStaff(email))) {
     // Same answer and roughly the same time as a real send.
     await new Promise((resolve) => setTimeout(resolve, 400 + Math.random() * 300));
@@ -83,6 +95,14 @@ async function verify(
   app = false
 ): Promise<Response> {
   const wrong = () => json(401, { error: 'That code is wrong or has expired.' });
+  const reviewCode = reviewLogin(email);
+  if (reviewCode) {
+    if (!sameText(code, reviewCode) || !(await isStaff(email))) return wrong();
+    const token = await createSession(email, 'otp');
+    return json(200, app ? { user: email, token } : { user: email }, {
+      'Set-Cookie': sessionCookie(request, token, SESSION_DAYS * 86_400),
+    });
+  }
   if (!/^\d{6}$/.test(code)) return wrong();
 
   const [latest] = await db()`
