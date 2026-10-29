@@ -1,6 +1,7 @@
 import { Link, Outlet, createRootRoute, useRouterState } from '@tanstack/react-router';
 import { Building2, Library, LogIn, Radar, Users } from 'lucide-react';
 
+import { AppBanner } from '@/components/common/AppBanner';
 import { BrandLockup } from '@/components/common/BrandLockup';
 import { NotificationBell } from '@/components/common/NotificationBell';
 import { ProfileMenu } from '@/components/common/ProfileMenu';
@@ -35,6 +36,7 @@ function RootComponent() {
 
   return (
     <div className="flex min-h-dvh flex-col">
+      {!onLoginPage && <AppBanner />}
       <header className="sticky top-0 z-30 bg-surface/85 backdrop-blur-md">
         {/* Navy-to-gold accent: the Sunstone PRIME and Vertex colours. */}
         <div
@@ -113,6 +115,9 @@ function RootComponent() {
             <span>
               Stats from LeetCode, GeeksforGeeks, HackerRank, Codeforces, CodeChef and GitHub
             </span>
+            <Link to="/app" className="font-medium hover:text-slate-700 hover:underline">
+              Android app
+            </Link>
             <Link to="/privacy" className="font-medium hover:text-slate-700 hover:underline">
               Privacy policy
             </Link>

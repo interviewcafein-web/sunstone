@@ -11,6 +11,7 @@ import {
   LockKeyhole,
   Mail,
   ShieldCheck,
+  Smartphone,
   TrendingUp,
 } from 'lucide-react';
 
@@ -118,6 +119,13 @@ export default function LoginPage() {
             <ShieldCheck className="size-3.5 text-emerald-600" aria-hidden />
             For the Sunstone PRIME team. No access? Ask HQ to add your email.
           </p>
+          <a
+            href="/app"
+            className="text-brand-700 dark:text-brand-300 mt-2 inline-flex items-center gap-1.5 text-xs font-semibold hover:underline"
+          >
+            <Smartphone className="size-3.5" aria-hidden />
+            Get the Android app
+          </a>
         </div>
       </div>
     </div>

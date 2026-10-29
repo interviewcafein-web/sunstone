@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   UserRound,
   Users,
+  Smartphone,
 } from 'lucide-react';
 
 import { Avatar } from '@/components/common/Avatar';
@@ -158,6 +159,10 @@ export function ProfileMenu({ user, onLogOut }: { user: SessionInfo; onLogOut: (
               <Compass className="size-4 text-slate-500" aria-hidden />
               Take the tour
             </button>
+            <Link to="/app" role="menuitem" className={item} onClick={() => setOpen(false)}>
+              <Smartphone className="size-4 text-slate-500" aria-hidden />
+              Get the Android app
+            </Link>
             <div className="my-1 border-t border-slate-100" />
             <button
               type="button"
