@@ -10,6 +10,11 @@
       ],
       "destination": "https://vertex.sunstone.in/$1",
       "permanent": true
+    },
+    {
+      "source": "/app/vertex.apk",
+      "destination": "https://github.com/interviewcafein-web/sunstone/releases/latest/download/vertex.apk",
+      "permanent": false
     }
   ],
   "rewrites": [

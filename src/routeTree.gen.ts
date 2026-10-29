@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
+import { Route as AppRouteImport } from './routes/app'
 import { Route as AssessmentsRouteImport } from './routes/assessments'
 import { Route as CampusesRouteImport } from './routes/campuses'
 import { Route as InsightsRouteImport } from './routes/insights'
@@ -32,6 +33,11 @@ const AccountRoute = AccountRouteImport.update({
   path: '/account',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/account.lazy').then((d) => d.Route))
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AssessmentsRoute = AssessmentsRouteImport.update({
   id: '/assessments',
   path: '/assessments',
@@ -86,6 +92,7 @@ const SSlugCardRoute = SSlugCardRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/app': typeof AppRoute
   '/assessments': typeof AssessmentsRoute
   '/campuses': typeof CampusesRoute
   '/insights': typeof InsightsRoute
@@ -100,6 +107,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/app': typeof AppRoute
   '/assessments': typeof AssessmentsRoute
   '/campuses': typeof CampusesRoute
   '/insights': typeof InsightsRoute
@@ -115,6 +123,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/app': typeof AppRoute
   '/assessments': typeof AssessmentsRoute
   '/campuses': typeof CampusesRoute
   '/insights': typeof InsightsRoute
@@ -131,6 +140,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/account'
+    | '/app'
     | '/assessments'
     | '/campuses'
     | '/insights'
@@ -145,6 +155,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/account'
+    | '/app'
     | '/assessments'
     | '/campuses'
     | '/insights'
@@ -159,6 +170,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/account'
+    | '/app'
     | '/assessments'
     | '/campuses'
     | '/insights'
@@ -174,6 +186,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
+  AppRoute: typeof AppRoute
   AssessmentsRoute: typeof AssessmentsRoute
   CampusesRoute: typeof CampusesRoute
   InsightsRoute: typeof InsightsRoute
@@ -200,6 +213,13 @@ declare module '@tanstack/react-router' {
       path: '/account'
       fullPath: '/account'
       preLoaderRoute: typeof AccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/assessments': {
@@ -278,6 +298,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
+  AppRoute: AppRoute,
   AssessmentsRoute: AssessmentsRoute,
   CampusesRoute: CampusesRoute,
   InsightsRoute: InsightsRoute,
