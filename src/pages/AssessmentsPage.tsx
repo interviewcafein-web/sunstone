@@ -43,7 +43,7 @@ import {
 import { ExamsTab } from '@/components/assessments/ExamsSection';
 import { Avatar } from '@/components/common/Avatar';
 import { AnimatedRing } from '@/components/common/AnimatedRing';
-import { cohortLabel, parseBatch } from '@/lib/cohorts';
+import { cohortLabel, cohortYears, parseBatch } from '@/lib/cohorts';
 import { PeriodFilter, inPeriod, type PeriodChoice } from '@/components/assessments/PeriodFilter';
 import { CampusLogo } from '@/components/common/CampusLogo';
 import { PainPoints } from '@/components/insights/PainPoints';
@@ -721,7 +721,7 @@ const pillClass = (on: boolean) =>
 
 /**
  * Batches in two steps: the programs first (All batches, B.Tech, BCA…), then that program's
- * cohorts (All B.Tech, BTECH25-29…) once one is picked. Values: "B.Tech:" or "B.Tech:2025".
+ * years (All years, 2025–29…) once one is picked. Values: "B.Tech:" or "B.Tech:2025".
  */
 function BatchPicker({
   batches,
@@ -769,7 +769,7 @@ function BatchPicker({
             onClick={() => onChange(`${program}:`)}
             className={pillClass(value === `${program}:`)}
           >
-            All {program}
+            All years
           </button>
           {cohorts.map((batch) => (
             <button
@@ -779,7 +779,7 @@ function BatchPicker({
               onClick={() => onChange(batch.key)}
               className={pillClass(value === batch.key)}
             >
-              {cohortLabel(batch.program, batch.year)}
+              {cohortYears(batch.program, batch.year)}
             </button>
           ))}
         </div>

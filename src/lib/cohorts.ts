@@ -17,6 +17,17 @@ export function cohortLabel(
   return length ? `${code}${yy(start)}-${yy(start + length)}` : `${code}${yy(start)}`;
 }
 
+/** "B.Tech", 2025 → "2025–29": the years alone, where the program is already shown. */
+export function cohortYears(
+  program: string | null | undefined,
+  year: number | string | null | undefined
+) {
+  const start = Number(year);
+  const length = program ? LENGTH[program] : undefined;
+  if (!Number.isFinite(start) || !start) return String(year ?? '');
+  return length ? `${start}–${String((start + length) % 100).padStart(2, '0')}` : String(start);
+}
+
 /**
  * A batch filter value: "2025" (everyone admitted that year), "B.Tech:" (the whole program) or
  * "B.Tech:2025" (a cohort).
