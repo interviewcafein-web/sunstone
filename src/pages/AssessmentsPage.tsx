@@ -517,33 +517,11 @@ function CampusView({
         </p>
 
         {batches.length > 1 && (
-          <div
-            className="mt-4 flex flex-wrap gap-1.5"
-            role="group"
-            aria-label="Batch"
-            data-tour="campus-batches"
-          >
-            {[undefined, ...batches].map((batch) => (
-              <button
-                key={batch?.key ?? 'all'}
-                type="button"
-                title={
-                  batch
-                    ? `${batch.program} admitted ${batch.year} · ${batch.students} students`
-                    : undefined
-                }
-                onClick={() => set({ batch: batch?.key, test: undefined })}
-                className={cn(
-                  'rounded-full px-3 py-1 text-xs font-semibold transition',
-                  search.batch === batch?.key
-                    ? 'text-brand-800 bg-white'
-                    : 'bg-white/10 text-white hover:bg-white/20'
-                )}
-              >
-                {batch ? cohortLabel(batch.program, batch.year) : 'All batches'}
-              </button>
-            ))}
-          </div>
+          <BatchPicker
+            batches={batches}
+            value={search.batch}
+            onChange={(batch) => set({ batch, test: undefined })}
+          />
         )}
 
         <dl
@@ -732,6 +710,81 @@ function CampusPainPoints({
         </Link>
       }
     />
+  );
+}
+
+const pillClass = (on: boolean) =>
+  cn(
+    'rounded-full px-3 py-1 text-xs font-semibold transition',
+    on ? 'text-brand-800 bg-white' : 'bg-white/10 text-white hover:bg-white/20'
+  );
+
+/**
+ * Batches in two steps: the programs first (All batches, B.Tech, BCA…), then that program's
+ * cohorts (All B.Tech, BTECH25-29…) once one is picked. Values: "B.Tech:" or "B.Tech:2025".
+ */
+function BatchPicker({
+  batches,
+  value,
+  onChange,
+}: {
+  batches: CampusDetail['batches'];
+  value?: string;
+  onChange: (batch: string | undefined) => void;
+}) {
+  const { program } = parseBatch(value);
+  const programs = [...new Set(batches.map((batch) => batch.program))].map((name) => ({
+    name,
+    students: batches
+      .filter((batch) => batch.program === name)
+      .reduce((sum, batch) => sum + batch.students, 0),
+  }));
+  const cohorts = batches.filter((batch) => batch.program === program);
+  return (
+    <div className="mt-4 space-y-2" data-tour="campus-batches">
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Program">
+        <button type="button" onClick={() => onChange(undefined)} className={pillClass(!value)}>
+          All batches
+        </button>
+        {programs.map(({ name, students }) => (
+          <button
+            key={name}
+            type="button"
+            title={`${students} students`}
+            onClick={() => onChange(`${name}:`)}
+            className={pillClass(program === name)}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+      {program && cohorts.length > 1 && (
+        <div
+          className="animate-rise flex flex-wrap items-center gap-1.5 border-l-2 border-white/25 pl-3"
+          role="group"
+          aria-label={`${program} batches`}
+        >
+          <button
+            type="button"
+            onClick={() => onChange(`${program}:`)}
+            className={pillClass(value === `${program}:`)}
+          >
+            All {program}
+          </button>
+          {cohorts.map((batch) => (
+            <button
+              key={batch.key}
+              type="button"
+              title={`${batch.program} admitted ${batch.year} · ${batch.students} students`}
+              onClick={() => onChange(batch.key)}
+              className={pillClass(value === batch.key)}
+            >
+              {cohortLabel(batch.program, batch.year)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

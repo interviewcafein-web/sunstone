@@ -21,10 +21,12 @@ export const config = { runtime: 'edge' };
 
 const int = (value: string | null) => (value && /^\d+$/.test(value) ? Number(value) : null);
 const NOW = `(now() at time zone 'Asia/Kolkata')`;
+const BATCH_FILTER = /^(\d{4}|[A-Za-z. ]{2,20}:(\d{4})?)$/;
 
-// A batch filter ($2): an admission year ("2025") or a cohort, program and admission year
-// ("BCA:2025", shown as BCA25-28), or null for everyone.
-const COHORT = `($2::text is null or admission_year::text = $2 or program || ':' || admission_year = $2)`;
+// A batch filter ($2): an admission year ("2025"), a whole program ("BCA:"), a cohort, program
+// and admission year ("BCA:2025", shown as BCA25-28), or null for everyone.
+const COHORT = `($2::text is null or admission_year::text = $2 or program || ':' = $2
+  or program || ':' || admission_year = $2)`;
 
 // One campus (and optionally one batch): its students, their PRIME sections, the subjects
 // those sections take, visible releases, the ones already out ("done"), who was given each
@@ -901,9 +903,9 @@ export default async function handler(request: Request): Promise<Response> {
     if (!seesCampus(viewer, campusId)) {
       return json(403, { error: 'You do not have access to this campus' });
     }
-    // "2025" or a cohort like "BCA:2025" (program names hold letters, dots and spaces).
+    // "2025", a program "BCA:" or a cohort "BCA:2025" (program names: letters, dots, spaces).
     const rawBatch = params.get('batch');
-    const batch = rawBatch && /^([A-Za-z. ]{2,20}:)?\d{4}$/.test(rawBatch) ? rawBatch : null;
+    const batch = rawBatch && BATCH_FILTER.test(rawBatch) ? rawBatch : null;
 
     if (view === 'campus') return json(200, await campus(campusId, batch));
     if (view === 'test') {

@@ -17,15 +17,19 @@ export function cohortLabel(
   return length ? `${code}${yy(start)}-${yy(start + length)}` : `${code}${yy(start)}`;
 }
 
-/** A batch filter value: "2025" (everyone admitted that year) or "B.Tech:2025" (a cohort). */
+/**
+ * A batch filter value: "2025" (everyone admitted that year), "B.Tech:" (the whole program) or
+ * "B.Tech:2025" (a cohort).
+ */
 export function parseBatch(batch: string | undefined): { year?: string; program?: string } {
   if (!batch) return {};
   const [program, year] = batch.includes(':') ? batch.split(':') : [undefined, batch];
-  return { year, program };
+  return { year: year || undefined, program };
 }
 
 /** How a batch filter value reads on screen. */
 export const batchLabel = (batch: string) => {
   const { year, program } = parseBatch(batch);
+  if (program && !year) return `All ${program}`;
   return program ? cohortLabel(program, year) : `Batch ${year}`;
 };

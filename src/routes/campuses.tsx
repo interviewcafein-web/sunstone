@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router';
 export interface AssessmentsSearch {
   /** LMS campus id. */
   campus?: number;
-  /** Admission year ("2025") or cohort ("BCA:2025"). */
+  /** Admission year ("2025"), program ("BCA:") or cohort ("BCA:2025"). */
   batch?: string;
   /** The open test: its id, or its section copies' ids ("123,456"). */
   test?: string;
@@ -28,7 +28,7 @@ export const Route = createFileRoute('/campuses')({
     campus: positive(search.campus),
     batch:
       typeof search.batch === 'number' || typeof search.batch === 'string'
-        ? /^([A-Za-z. ]{2,20}:)?\d{4}$/.test(String(search.batch))
+        ? /^(\d{4}|[A-Za-z. ]{2,20}:(\d{4})?)$/.test(String(search.batch))
           ? String(search.batch)
           : undefined
         : undefined,
