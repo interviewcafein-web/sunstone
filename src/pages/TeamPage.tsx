@@ -67,7 +67,7 @@ async function call<T>(init?: RequestInit): Promise<T> {
 }
 
 const post = (body: object) =>
-  call<{ ok: true }>({
+  call<{ ok: true; welcomed?: boolean }>({
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -122,11 +122,13 @@ export default function TeamPage() {
         role: value.role,
         campusIds: value.role === 'campus' ? value.campusIds : [],
       }),
-    onSuccess: (_, value) => {
+    onSuccess: (result, value) => {
       setNotice(
         value.existing
           ? `Updated ${value.email}. Changes apply within a minute.`
-          : `Added ${value.email}. They can now sign in with Google or an emailed code.`
+          : result.welcomed
+            ? `Added ${value.email} and sent them a welcome email with how to sign in.`
+            : `Added ${value.email}. They can sign in with Google or an emailed code (the welcome email could not be sent).`
       );
       setDraft(null);
       refresh();

@@ -20,6 +20,8 @@ import {
   sessionViewer,
 } from './_auth';
 import { db } from './_db';
+import { sendEmail, welcomeEmail } from './_email';
+import { ROLE_LABELS } from '../src/lib/roles';
 
 export const config = { runtime: 'edge' };
 
@@ -122,6 +124,10 @@ async function save(viewer: Viewer, body: Record<string, unknown>): Promise<Resp
     if (!campusIds.length) return json(400, { error: 'Choose at least one campus.' });
   }
 
+  // Someone new (or coming back after removal) gets the welcome email.
+  const [before] = await db()`select active from staff where email = ${email}`;
+  const isNew = !before?.active;
+
   await db()`
     insert into staff (email, name, role, campus_ids, added_by, active, designation, mobile)
     values (${email}, ${name}, ${role}, ${campusIds}::int[], ${normalizeEmail(viewer.user)}, true,
@@ -136,7 +142,25 @@ async function save(viewer: Viewer, body: Record<string, unknown>): Promise<Resp
       added_by = case when staff.active then staff.added_by else excluded.added_by end,
       updated_at = now()`;
   forgetStaff(email);
-  return json(200, { ok: true });
+
+  let welcomed = false;
+  if (isNew) {
+    const names = new Map((await campuses()).map((campus) => [campus.id, campus.name]));
+    const [row] = await db()`select name from staff where email = ${email}`;
+    await sendEmail({
+      to: email,
+      ...welcomeEmail({
+        name: (row?.name as string | null) ?? name,
+        email,
+        roleLabel: ROLE_LABELS[role],
+        campuses: campusIds.map((id) => names.get(id) ?? `Campus ${id}`),
+        addedBy: viewer.name ?? normalizeEmail(viewer.user),
+      }),
+    })
+      .then(() => (welcomed = true))
+      .catch((error) => console.error('[team] welcome email', error));
+  }
+  return json(200, { ok: true, welcomed });
 }
 
 async function remove(viewer: Viewer, body: Record<string, unknown>): Promise<Response> {

@@ -77,6 +77,8 @@ export interface WelcomeDetails {
   roleLabel: string;
   /** Campus names for campus staff; empty means every campus. */
   campuses: string[];
+  /** Who gave them access, when added on the Team page. */
+  addedBy?: string | null;
 }
 
 /**
@@ -84,7 +86,7 @@ export interface WelcomeDetails {
  * with tables and inline styles so it renders in Gmail, Outlook and phone mail apps; the
  * images are on the live site, with alt text for clients that block them.
  */
-export function welcomeEmail({ name, email, roleLabel, campuses }: WelcomeDetails) {
+export function welcomeEmail({ name, email, roleLabel, campuses, addedBy }: WelcomeDetails) {
   const first = name?.trim().split(/\s+/)[0];
   const hello = first ? `Hi ${escape(first)},` : 'Hi there,';
   const scope = campuses.length
@@ -98,8 +100,9 @@ export function welcomeEmail({ name, email, roleLabel, campuses }: WelcomeDetail
 
 You now have access to Sunstone PRIME Vertex, where every PRIME student's coding practice, attendance, tests, AMCAT and exams come together in one place.
 
-Your access: ${roleLabel} · ${scope}
+Your access: ${roleLabel} · ${scope}${addedBy ? `\nAdded by ${addedBy}` : ''}
 Sign in: ${SITE}/login
+Android app: ${SITE}/app
 
 How to sign in (no password needed):
 1. Continue with Google using ${email}, or
@@ -170,6 +173,7 @@ Sunstone PRIME Vertex`;
         <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#b45309;font-weight:bold">Your access</div>
         <div style="margin-top:6px;font-size:16px;font-weight:bold;color:#0f172a">${escape(roleLabel)}</div>
         <div style="margin-top:2px;font-size:14px;line-height:20px;color:#475569">${escape(scope)}</div>
+        ${addedBy ? `<div style="margin-top:8px;font-size:12px;color:#92400e">Added by ${escape(addedBy)}</div>` : ''}
       </td></tr>
     </table>
   </td></tr>
@@ -200,6 +204,27 @@ Sunstone PRIME Vertex`;
       ${feature('🏆', 'Students', 'Every student ranked, with LeetCode, GFG and GitHub alongside attendance, AMCAT and PRIME tests, each with its trend.', '#fef3c7')}
       ${feature('🏫', 'Campuses', 'Each campus&rsquo;s PRIME journey: Prime Mock Tests and leaderboards, Practice Tests and MCQs, AMCAT, exams, and attendance by subject and instructor.', '#dbeafe')}
       ${feature('🎯', '360° view', 'Campuses and batches compared on every front, with the pain points and students who need attention first.', '#fce7f3')}
+    </table>
+  </td></tr>
+
+  <!-- App -->
+  <tr><td style="padding:10px 32px 6px">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#102646;background-image:linear-gradient(135deg,#1f4a85,#102646);border-radius:16px">
+      <tr>
+        <td style="padding:18px 20px">
+          <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#f7c873;font-weight:bold">New &middot; Mobile app</div>
+          <div style="margin-top:6px;font-size:17px;font-weight:bold;color:#ffffff">Vertex on your Android phone</div>
+          <div style="margin-top:4px;font-size:13px;line-height:19px;color:#cbd9ef">Students, campuses, the 360&deg; view and instant notifications, wherever you are.</div>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:14px"><tr>
+            <td bgcolor="#e8a33d" style="border-radius:10px;background:#e8a33d">
+              <a href="${SITE}/app" style="display:inline-block;padding:10px 18px;font-size:14px;font-weight:bold;color:#1a1206;text-decoration:none">Download the app &rarr;</a>
+            </td>
+          </tr></table>
+        </td>
+        <td width="84" valign="middle" align="center" style="padding-right:18px">
+          <div style="width:64px;height:64px;border-radius:16px;background:#ffffff;line-height:64px;text-align:center"><img src="${SITE}/vertex-mark.png" width="44" height="44" alt="" style="vertical-align:middle;border:0"></div>
+        </td>
+      </tr>
     </table>
   </td></tr>
 
