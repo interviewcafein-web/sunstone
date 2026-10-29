@@ -18,7 +18,8 @@
     "staff": "tsx --env-file=.env.local scripts/staff.ts",
     "db:sync-assessments": "tsx --env-file=.env.local scripts/sync-assessments.ts",
     "db:sync-attendance": "tsx --env-file=.env.local scripts/sync-attendance.ts",
-    "db:sync-exams": "tsx --env-file=.env.local scripts/sync-exams.ts"
+    "db:sync-exams": "tsx --env-file=.env.local scripts/sync-exams.ts",
+    "db:sync-delivery": "tsx --env-file=.env.local scripts/sync-delivery.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
@@ -32,6 +33,7 @@
     "clsx": "^2.1.1",
     "driver.js": "^1.10.2",
     "lucide-react": "^0.487.0",
+    "pg": "^8.23.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-icons": "^5.7.0",
@@ -44,6 +46,7 @@
     "@tanstack/eslint-plugin-query": "^5.71.5",
     "@tanstack/router-plugin": "^1.130.12",
     "@types/node": "^22.14.1",
+    "@types/pg": "^8.23.1",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.7.0",

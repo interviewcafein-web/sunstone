@@ -40,6 +40,7 @@ import {
   InsightsPanel,
   attendanceTone,
 } from '@/components/assessments/CampusInsights';
+import { DeliverySection } from '@/components/assessments/DeliverySection';
 import { ExamsTab } from '@/components/assessments/ExamsSection';
 import { Avatar } from '@/components/common/Avatar';
 import { AnimatedRing } from '@/components/common/AnimatedRing';
@@ -1059,48 +1060,8 @@ function OverviewTab({
         ))}
       </section>
 
-      <SyllabusVsDelivery />
+      <DeliverySection data={data.delivery} />
     </div>
-  );
-}
-
-/** Planned syllabus against what has actually been taught: waiting on the delivery data. */
-function SyllabusVsDelivery() {
-  return (
-    <section className={cn(panel, 'relative overflow-hidden border-dashed p-5 lg:col-span-3')}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span className="bg-brand-500/10 text-brand-700 dark:text-brand-300 flex size-10 items-center justify-center rounded-xl">
-            <BookOpenCheck className="size-5" aria-hidden />
-          </span>
-          <div>
-            <h2 className="flex items-center gap-2 text-lg font-bold">
-              Syllabus vs Delivery
-              <span className="rounded-full bg-[#f59e0b]/15 px-2 py-0.5 text-[10px] font-bold tracking-wide text-[#b45309] uppercase">
-                Coming soon
-              </span>
-            </h2>
-            <p className="mt-0.5 max-w-2xl text-sm text-slate-500">
-              Each module&rsquo;s planned sessions against the sessions actually delivered, so you
-              can see which campuses and batches are ahead, on track or falling behind the syllabus.
-            </p>
-          </div>
-        </div>
-      </div>
-      <div aria-hidden className="mt-4 grid gap-2 opacity-60 sm:grid-cols-3">
-        {[72, 48, 90].map((width, index) => (
-          <div key={index} className="rounded-xl border border-slate-200 p-3">
-            <div className="skeleton h-3 w-2/3 rounded" />
-            <div className="mt-3 flex items-center gap-2">
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                <div className="bg-brand-300 h-full rounded-full" style={{ width: `${width}%` }} />
-              </div>
-              <div className="skeleton h-2.5 w-10 rounded" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
   );
 }
 

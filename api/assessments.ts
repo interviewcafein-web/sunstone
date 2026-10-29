@@ -501,10 +501,103 @@ export async function campus(campusId: number, batch: string | null) {
     attendance: await attendance(campusId, batch),
     amcat: await amcatRounds(campusId, batch),
     exams: await internalExams(campusId, batch),
+    delivery: await delivery(campusId, batch).catch((error) => {
+      console.error('[assessments] delivery', error);
+      return null;
+    }),
     batches,
     now,
     syncedAt: await lastSync(),
   };
+}
+
+// PRIME coding domain delivery (scripts/sync-delivery.ts), for one campus and batch filter.
+// Only verified classes count as delivered; durations under 1 minute or over 10 hours are
+// left out as data errors and counted separately.
+const DLV_FILTER = `($2::text is null or batch_year::text = $2 or program || ':' = $2
+  or program || ':' || batch_year = $2)`;
+const DLV_VALID = `minutes between 1 and 600`;
+
+async function delivery(campusId: number, batch: string | null) {
+  const [campus] = await db()`select code from campuses where id = ${campusId}`;
+  const code = campus?.code ? String(campus.code).trim() : null;
+  if (!code) return null;
+  const params = [code, batch];
+  const [summary] = await db().query(
+    `select
+       (select coalesce(sum(allocated_hours), 0)::int from dlv_targets where campus_code = $1 and ${DLV_FILTER}) as allocated,
+       (select coalesce(sum(planned_hours), 0)::int from dlv_targets where campus_code = $1 and ${DLV_FILTER}) as planned,
+       round(coalesce(sum(minutes) filter (where status = 'VERIFIED' and ${DLV_VALID}), 0) / 60.0)::int as delivered,
+       round(coalesce(sum(minutes) filter (where status = 'PENDING VERIFICATION' and ${DLV_VALID}), 0) / 60.0)::int as pending,
+       count(*) filter (where status = 'VERIFIED' and ${DLV_VALID})::int as classes,
+       count(*) filter (where status = 'REJECTED')::int as rejected,
+       count(*) filter (where status = 'VERIFIED' and not (${DLV_VALID}))::int as invalid,
+       count(distinct trainer) filter (where status = 'VERIFIED')::int as trainer_count,
+       round(100.0 * sum(present) filter (where status = 'VERIFIED') /
+             nullif(sum(total) filter (where status = 'VERIFIED' and present is not null), 0))::int as attendance,
+       max(class_date) filter (where status = 'VERIFIED')::text as last_class
+     from dlv_classes where campus_code = $1 and ${DLV_FILTER}`,
+    params
+  );
+  if (!summary.allocated && !summary.classes && !summary.pending) return null;
+  const sections = await db().query(
+    `with t as (
+       select program, batch_year, coalesce(section, '') as section, sum(allocated_hours)::int as allocated,
+              sum(planned_hours)::int as planned, sum(students)::int as students
+       from dlv_targets where campus_code = $1 and ${DLV_FILTER} group by 1, 2, 3),
+     d as (
+       select program, batch_year, coalesce(section, '') as section,
+              round(sum(minutes) filter (where status = 'VERIFIED' and ${DLV_VALID}) / 60.0)::int as delivered,
+              round(sum(minutes) filter (where status = 'PENDING VERIFICATION' and ${DLV_VALID}) / 60.0)::int as pending,
+              count(*) filter (where status = 'VERIFIED')::int as classes,
+              max(class_date) filter (where status = 'VERIFIED')::text as last_class
+       from dlv_classes where campus_code = $1 and ${DLV_FILTER} group by 1, 2, 3)
+     select coalesce(t.program, d.program) as program, coalesce(t.batch_year, d.batch_year) as batch_year,
+            nullif(coalesce(t.section, d.section), '') as section, t.students,
+            coalesce(t.allocated, 0) as allocated, coalesce(t.planned, 0) as planned,
+            coalesce(d.delivered, 0) as delivered, coalesce(d.pending, 0) as pending,
+            coalesce(d.classes, 0) as classes, d.last_class
+     from t full join d using (program, batch_year, section)
+     order by batch_year desc, program, section`,
+    params
+  );
+  const trainers = await db().query(
+    `select trainer as name, round(sum(minutes) / 60.0)::int as hours, count(*)::int as classes,
+            round(100.0 * sum(present) / nullif(sum(total) filter (where present is not null), 0))::int as attendance,
+            max(class_date)::text as last_class
+     from dlv_classes where campus_code = $1 and ${DLV_FILTER} and status = 'VERIFIED' and ${DLV_VALID}
+       and trainer is not null
+     group by trainer order by hours desc`,
+    params
+  );
+  const weeks = await db().query(
+    `select date_trunc('week', class_date)::date::text as week, round(sum(minutes) / 60.0)::int as hours
+     from dlv_classes where campus_code = $1 and ${DLV_FILTER} and status = 'VERIFIED' and ${DLV_VALID}
+       and class_date < date_trunc('week', current_date)
+     group by 1 order by 1`,
+    params
+  );
+  // The syllabus of the curricula these batches follow, with hours taught on each topic.
+  const topics = await db().query(
+    `with cur as (
+       select distinct t.curriculum from dlv_topics t
+       where exists (select 1 from dlv_targets g where g.campus_code = $1 and ${DLV_FILTER.replace(/batch_year/g, 'g.batch_year').replace(/program/g, 'g.program')}
+                     and g.program = t.program and g.batch_year = any(t.batch_years))),
+     taught as (
+       select curriculum, topic, round(sum(minutes) / 60.0, 1)::float8 as hours, count(*)::int as classes,
+              min(class_date)::text as first_class, max(class_date)::text as last_class
+       from dlv_classes where campus_code = $1 and ${DLV_FILTER} and status = 'VERIFIED' and ${DLV_VALID}
+       group by 1, 2)
+     select t.curriculum, t.topic, t.topic_order, t.subtopics, coalesce(x.hours, 0) as hours,
+            coalesce(x.classes, 0) as classes, x.first_class, x.last_class
+     from dlv_topics t join cur using (curriculum)
+     left join taught x on x.curriculum = t.curriculum and x.topic = t.topic
+     order by t.curriculum, t.topic_order`,
+    params
+  );
+  const [{ synced }] = await db()`
+    select (select ran_at::text from sync_state where name = 'delivery') as synced`;
+  return { ...summary, sections, trainers, weeks, topics, syncedAt: synced };
 }
 
 // PRIME subjects in attendance (named by hand in the LMS: "Prime Domain Coding", "Prime

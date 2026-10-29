@@ -25,6 +25,8 @@ jobs:
       # For the new-test emails; without them the notices still go to the bell.
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      # The PRIME delivery tracker (Supabase Postgres); the step is skipped until it is set.
+      DELIVERY_DATABASE_URL: ${{ secrets.DELIVERY_DATABASE_URL }}
     steps:
       - name: Check secrets
         id: secrets
@@ -60,6 +62,9 @@ jobs:
       - name: Internal exams
         if: steps.secrets.outputs.ready == 'true'
         run: npx tsx scripts/sync-exams.ts
+      - name: PRIME delivery (classes taught against allocated hours)
+        if: steps.secrets.outputs.ready == 'true' && env.DELIVERY_DATABASE_URL != ''
+        run: npx tsx scripts/sync-delivery.ts
       - name: Tell campuses about new tests (bell + email, HQ copied)
         if: steps.secrets.outputs.ready == 'true'
         run: npx tsx scripts/notify-new-tests.ts

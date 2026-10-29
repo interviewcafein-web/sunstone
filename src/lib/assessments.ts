@@ -269,6 +269,54 @@ export interface CampusAmcat {
   sections: { name: string; avg: number | null; takers: number }[];
 }
 
+/** PRIME coding domain delivery against allocated hours (from the delivery tracker). */
+export interface CampusDelivery {
+  allocated: number;
+  planned: number;
+  /** Verified hours. */
+  delivered: number;
+  /** Hours awaiting verification. */
+  pending: number;
+  classes: number;
+  rejected: number;
+  /** Verified classes left out for impossible durations. */
+  invalid: number;
+  trainer_count: number;
+  attendance: number | null;
+  last_class: string | null;
+  sections: {
+    program: string;
+    batch_year: number | null;
+    section: string | null;
+    students: number | null;
+    allocated: number;
+    planned: number;
+    delivered: number;
+    pending: number;
+    classes: number;
+    last_class: string | null;
+  }[];
+  trainers: {
+    name: string;
+    hours: number;
+    classes: number;
+    attendance: number | null;
+    last_class: string;
+  }[];
+  weeks: { week: string; hours: number }[];
+  topics: {
+    curriculum: string;
+    topic: string;
+    topic_order: number;
+    subtopics: number;
+    hours: number;
+    classes: number;
+    first_class: string | null;
+    last_class: string | null;
+  }[];
+  syncedAt: string | null;
+}
+
 export interface CampusDetail {
   summary: {
     students: number;
@@ -298,6 +346,8 @@ export interface CampusDetail {
   batches: { key: string; program: string; year: number; students: number }[];
   now: string;
   syncedAt: string | null;
+  /** Null when the campus has no PRIME delivery records. */
+  delivery: CampusDelivery | null;
 }
 
 export interface TestStudent {
