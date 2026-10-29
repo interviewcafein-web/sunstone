@@ -24,7 +24,7 @@ const NOW = `(now() at time zone 'Asia/Kolkata')`;
 const BATCH_FILTER = /^(\d{4}|[A-Za-z. ]{2,20}:(\d{4})?)$/;
 
 // A batch filter ($2): an admission year ("2025"), a whole program ("BCA:"), a cohort, program
-// and admission year ("BCA:2025", shown as BCA25-28), or null for everyone.
+// and admission year ("BCA:2025", shown as BCA 2025–28), or null for everyone.
 const COHORT = `($2::text is null or admission_year::text = $2 or program || ':' = $2
   or program || ':' || admission_year = $2)`;
 
