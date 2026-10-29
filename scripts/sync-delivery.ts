@@ -1,7 +1,8 @@
 // Copies PRIME coding domain delivery from the delivery tracker (a separate Supabase Postgres)
 // into Vertex: classes taught (date, campus, batch, section, trainer, topic, hours, status),
 // allocated hours per campus/batch/section, and each curriculum's topics in order. Read-only
-// on the tracker; replaces the previous copy in one transaction.
+// on the tracker; replaces the previous copy in one transaction. Classes submitted more than
+// once are flagged `duplicate` (all but the first), as the tracker's own totals count them once.
 //
 //   npm run db:sync-delivery        (DATABASE_URL and DELIVERY_DATABASE_URL from .env.local)
 //
@@ -45,7 +46,12 @@ const { rows: classes } = await tracker.query(`
          b.name as batch, r.section, pr.full_name as trainer, cu.name as curriculum,
          t.name as topic, t.order_index as topic_order, st.name as subtopic,
          r.duration_minutes as minutes, r.total_present as present,
-         r.student_count_snapshot as total, r.verification_status::text as status
+         r.student_count_snapshot as total, r.verification_status::text as status,
+         -- A class submitted more than once: every copy after the first.
+         row_number() over (
+           partition by r.trainer_id, r.class_date, r.batch_id, r.section, r.start_time, r.end_time,
+                        r.subtopic_id, r.verification_status
+           order by r.created_at) > 1 as duplicate
   from class_records r
   join campuses c on c.id = r.campus_id
   join programs p on p.id = r.program_id
@@ -75,6 +81,7 @@ const { rows: topics } = await tracker.query(`
 await tracker.query('rollback');
 await tracker.end();
 
+const duplicates = classes.filter((row) => row.duplicate).length;
 const program = (code: string) => PROGRAM[code] ?? code;
 /** Vertex's campus and program for a tracker row. */
 const place = (row: { campus_code: string; program: string }) =>
@@ -113,6 +120,7 @@ await sql.transaction([
       present: row.present,
       total: row.total,
       status: row.status,
+      duplicate: row.duplicate,
     }))
   ),
   ...batchInserts(
@@ -140,9 +148,9 @@ await sql.transaction([
       subtopics: row.subtopics,
     }))
   ),
-  sql`insert into sync_state (name, ran_at, detail) values ('delivery', now(), ${JSON.stringify({ classes: classes.length })}::jsonb)
+  sql`insert into sync_state (name, ran_at, detail) values ('delivery', now(), ${JSON.stringify({ classes: classes.length, duplicates })}::jsonb)
       on conflict (name) do update set ran_at = now(), detail = excluded.detail`,
 ]);
 console.log(
-  `Delivery: ${classes.length} classes, ${targets.length} allocations, ${topics.length} topics.`
+  `Delivery: ${classes.length} classes (${duplicates} repeat submissions flagged), ${targets.length} allocations, ${topics.length} topics.`
 );

@@ -52,9 +52,16 @@ export const scoreFill = (pct: number | null | undefined) =>
 /** "2026-10-27 19:14:00" (LMS time, India) → "27 Oct 2026". */
 export function lmsDate(value: string | null | undefined, withTime = false) {
   if (!value) return '—';
-  const date = new Date(value.replace(' ', 'T').slice(0, 19));
+  // Database timestamps carry their zone ("…18:36:48.12+00"); dates and LMS times without one
+  // are India time. Shown in India time either way.
+  let text = value.trim().replace(' ', 'T').replace(/\.\d+/, '');
+  if (!text.includes('T')) text = `${text.slice(0, 10)}T00:00:00`;
+  text = text.replace(/([+-]\d\d)$/, '$1:00');
+  if (!/(Z|[+-]\d\d:\d\d)$/.test(text)) text += '+05:30';
+  const date = new Date(text);
   if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -281,6 +288,8 @@ export interface CampusDelivery {
   rejected: number;
   /** Verified classes left out for impossible durations. */
   invalid: number;
+  /** Repeat submissions of a class (the same class logged again, seconds apart), left out. */
+  duplicates: number;
   trainer_count: number;
   attendance: number | null;
   last_class: string | null;

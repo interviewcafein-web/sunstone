@@ -513,7 +513,8 @@ export async function campus(campusId: number, batch: string | null) {
 
 // PRIME coding domain delivery (scripts/sync-delivery.ts), for one campus and batch filter.
 // Only verified classes count as delivered; durations under 1 minute or over 10 hours are
-// left out as data errors and counted separately.
+// left out as data errors and counted separately, and so are repeat submissions of a class
+// (dlv_classes_counted leaves them out).
 const DLV_FILTER = `($2::text is null or batch_year::text = $2 or program || ':' = $2
   or program || ':' || batch_year = $2)`;
 const DLV_VALID = `minutes between 1 and 600`;
@@ -535,8 +536,10 @@ async function delivery(campusId: number, batch: string | null) {
        count(distinct trainer) filter (where status = 'VERIFIED')::int as trainer_count,
        round(100.0 * sum(present) filter (where status = 'VERIFIED') /
              nullif(sum(total) filter (where status = 'VERIFIED' and present is not null), 0))::int as attendance,
-       max(class_date) filter (where status = 'VERIFIED')::text as last_class
-     from dlv_classes where campus_code = $1 and ${DLV_FILTER}`,
+       max(class_date) filter (where status = 'VERIFIED')::text as last_class,
+       (select count(*) from dlv_classes where campus_code = $1 and ${DLV_FILTER}
+          and duplicate and status = 'VERIFIED')::int as duplicates
+     from dlv_classes_counted where campus_code = $1 and ${DLV_FILTER}`,
     params
   );
   if (!summary.allocated && !summary.classes && !summary.pending) return null;
@@ -551,7 +554,7 @@ async function delivery(campusId: number, batch: string | null) {
               round(sum(minutes) filter (where status = 'PENDING VERIFICATION' and ${DLV_VALID}) / 60.0)::int as pending,
               count(*) filter (where status = 'VERIFIED')::int as classes,
               max(class_date) filter (where status = 'VERIFIED')::text as last_class
-       from dlv_classes where campus_code = $1 and ${DLV_FILTER} group by 1, 2, 3)
+       from dlv_classes_counted where campus_code = $1 and ${DLV_FILTER} group by 1, 2, 3)
      select coalesce(t.program, d.program) as program, coalesce(t.batch_year, d.batch_year) as batch_year,
             nullif(coalesce(t.section, d.section), '') as section, t.students,
             coalesce(t.allocated, 0) as allocated, coalesce(t.planned, 0) as planned,
@@ -569,7 +572,7 @@ async function delivery(campusId: number, batch: string | null) {
             round(100.0 * sum(present) filter (where status = 'VERIFIED') /
                   nullif(sum(total) filter (where status = 'VERIFIED' and present is not null), 0))::int as attendance,
             max(class_date) filter (where status = 'VERIFIED')::text as last_class
-     from dlv_classes where campus_code = $1 and ${DLV_FILTER} and ${DLV_VALID}
+     from dlv_classes_counted where campus_code = $1 and ${DLV_FILTER} and ${DLV_VALID}
        and status in ('VERIFIED', 'PENDING VERIFICATION') and trainer is not null
      group by trainer order by hours desc`,
     params
@@ -588,7 +591,7 @@ async function delivery(campusId: number, batch: string | null) {
   const trainers = compareTrainers(tracked as TrackedTrainer[], lms as LmsTrainer[]);
   const weeks = await db().query(
     `select date_trunc('week', class_date)::date::text as week, round(sum(minutes) / 60.0)::int as hours
-     from dlv_classes where campus_code = $1 and ${DLV_FILTER} and status = 'VERIFIED' and ${DLV_VALID}
+     from dlv_classes_counted where campus_code = $1 and ${DLV_FILTER} and status = 'VERIFIED' and ${DLV_VALID}
        and class_date < date_trunc('week', current_date)
      group by 1 order by 1`,
     params
@@ -596,17 +599,17 @@ async function delivery(campusId: number, batch: string | null) {
   // The syllabus of the curricula these batches follow, with hours taught on each topic.
   const topics = await db().query(
     `with cur as (
-       select distinct t.curriculum from dlv_topics t
+       select distinct t.curriculum, t.program from dlv_topics t
        where exists (select 1 from dlv_targets g where g.campus_code = $1 and ${DLV_FILTER.replace(/batch_year/g, 'g.batch_year').replace(/program/g, 'g.program')}
                      and g.program = t.program and g.batch_year = any(t.batch_years))),
      taught as (
        select curriculum, topic, round(sum(minutes) / 60.0, 1)::float8 as hours, count(*)::int as classes,
               min(class_date)::text as first_class, max(class_date)::text as last_class
-       from dlv_classes where campus_code = $1 and ${DLV_FILTER} and status = 'VERIFIED' and ${DLV_VALID}
+       from dlv_classes_counted where campus_code = $1 and ${DLV_FILTER} and status = 'VERIFIED' and ${DLV_VALID}
        group by 1, 2)
      select t.curriculum, t.topic, t.topic_order, t.subtopics, coalesce(x.hours, 0) as hours,
             coalesce(x.classes, 0) as classes, x.first_class, x.last_class
-     from dlv_topics t join cur using (curriculum)
+     from dlv_topics t join cur using (curriculum, program)
      left join taught x on x.curriculum = t.curriculum and x.topic = t.topic
      order by t.curriculum, t.topic_order`,
     params

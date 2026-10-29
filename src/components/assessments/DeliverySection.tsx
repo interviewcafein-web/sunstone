@@ -202,6 +202,11 @@ export function DeliverySection({ data }: { data: CampusDelivery | null }) {
           {pending > 0 && <span>{pending}% awaiting verification</span>}
           {data.rejected > 0 && <span>{data.rejected} classes rejected</span>}
           {data.invalid > 0 && <span>{data.invalid} left out (impossible duration)</span>}
+          {data.duplicates > 0 && (
+            <span>
+              {data.duplicates} repeat submission{data.duplicates === 1 ? '' : 's'} counted once
+            </span>
+          )}
         </div>
       </div>
 
