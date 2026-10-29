@@ -12,6 +12,7 @@
 import { type Viewer, json, managesTeam, normalizeEmail, sessionViewer } from './_auth';
 import { db } from './_db';
 import { notificationEmail, sendEmails } from './_email';
+import { pushTo } from './_push';
 
 export const config = { runtime: 'edge' };
 
@@ -110,6 +111,17 @@ async function send(viewer: Viewer, body: Record<string, unknown>) {
     returning id::int as id`;
   // The sender has read their own notification.
   await db()`insert into notification_reads (notification_id, email) values (${created.id}, ${me})`;
+
+  // A push to every phone of everyone who sees it in the bell (HQ sees everything).
+  const viewers = await db()`
+    select email from staff
+    where active and email <> ${me} and (
+      role in ('hq', 'super_admin') or ${audience} = 'all'
+      or (${audience} = 'campus' and campus_ids && ${campusIds}::int[]))`;
+  await pushTo(
+    viewers.map((row) => String(row.email)),
+    { title, body: text || title, link }
+  ).catch((error) => console.error('[push]', error));
 
   let emailed = 0;
   if (body.email === true) {

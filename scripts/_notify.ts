@@ -5,6 +5,7 @@
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 
 import type { Email } from '../api/_email';
+import { pushTo } from '../api/_push';
 
 /** Shown as the sender in the bell. */
 export const SYSTEM_SENDER = 'Vertex';
@@ -57,6 +58,12 @@ export async function addNotice(
             ${notice.campusId === null ? [] : [notice.campusId]}::int[], ${SYSTEM_SENDER})
     returning id`;
   const campusStaff = notice.campusId === null ? [] : (directory.campus.get(notice.campusId) ?? []);
+  // Phones of everyone who sees it in the bell: the campus's staff and HQ.
+  await pushTo([...new Set([...campusStaff, ...directory.hq])], {
+    title: notice.title,
+    body: notice.body,
+    link: notice.link,
+  }).catch((error) => console.error('[push]', error));
   const to = campusStaff.length ? campusStaff : directory.hq;
   if (!to.length) return null;
   const cc = campusStaff.length ? directory.hq.filter((email) => !campusStaff.includes(email)) : [];
