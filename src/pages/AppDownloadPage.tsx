@@ -24,7 +24,7 @@ const FEATURES: { icon: LucideIcon; title: string; text: string }[] = [
 const STEPS = [
   'Open this page on your Android phone and tap Download.',
   'Open the downloaded file. If asked, allow “Install unknown apps” for your browser.',
-  'If Play Protect warns you, tap “Install anyway”: Vertex is our internal app, not on the Play Store.',
+  'When Play Protect asks, tap “Scan app” (not “Install without scanning”): Vertex is our internal app, not on the Play Store, so Google checks it first. If it then warns you, tap “Install anyway”.',
   'Open Vertex, sign in with your work email (or Google), and allow notifications.',
 ];
 
