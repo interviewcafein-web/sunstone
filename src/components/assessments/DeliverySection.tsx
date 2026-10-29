@@ -4,8 +4,10 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock,
+  Code2,
   GraduationCap,
   Hourglass,
+  NotebookPen,
   Users,
 } from 'lucide-react';
 
@@ -19,6 +21,8 @@ const panel = 'shadow-card bg-surface rounded-2xl border border-slate-200';
 const share = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
 /** Delivered against allocated: green from 75%, amber from 40%. */
 const paceColor = (pct: number) => (pct >= 75 ? '#10b981' : pct >= 40 ? '#f59e0b' : '#ef4444');
+/** Hours awaiting verification. */
+const PENDING = '#f59e0b';
 
 function Bar({ value, pending = 0, color }: { value: number; pending?: number; color: string }) {
   return (
@@ -29,8 +33,11 @@ function Bar({ value, pending = 0, color }: { value: number; pending?: number; c
       />
       {pending > 0 && (
         <div
-          className="h-full opacity-40"
-          style={{ width: `${Math.min(100 - Math.min(100, value), pending)}%`, background: color }}
+          className="h-full opacity-60"
+          style={{
+            width: `${Math.min(100 - Math.min(100, value), pending)}%`,
+            background: PENDING,
+          }}
         />
       )}
     </div>
@@ -39,79 +46,79 @@ function Bar({ value, pending = 0, color }: { value: number; pending?: number; c
 
 type Trainer = CampusDelivery['trainers'][number];
 
-/**
- * How a trainer's tracker hours compare with the LMS: in step within 10% (or 5 h), otherwise
- * which side has more, or that one side has nothing.
- */
-function trainerGap(trainer: Trainer) {
-  const logged = trainer.hours + trainer.pending_hours;
-  if (!trainer.in_tracker) return { tone: 'warn', label: 'Not in tracker' } as const;
-  if (trainer.lms_hours === null) return { tone: 'warn', label: 'Not in LMS' } as const;
-  const gap = trainer.lms_hours - logged;
-  if (Math.abs(gap) <= Math.max(5, 0.1 * Math.max(logged, trainer.lms_hours))) {
-    return { tone: 'ok', label: 'In step' } as const;
-  }
-  return {
-    tone: 'warn',
-    label: gap > 0 ? `LMS +${gap} h` : `Tracker +${-gap} h`,
-  } as const;
-}
-
+/** One trainer: verified and awaiting hours, classes, problems solved, attendance. */
 function TrainerRow({ trainer, peak }: { trainer: Trainer; peak: number }) {
-  const gap = trainerGap(trainer);
-  const logged = trainer.hours + trainer.pending_hours;
   return (
     <li className="py-2.5 text-sm">
       <div className="flex items-start justify-between gap-3">
         <span className="min-w-0">
           <span className="block truncate font-medium">{trainer.name}</span>
           <span className="text-xs text-slate-500">
-            {trainer.in_tracker
-              ? `${trainer.classes} classes · last ${lmsDate(trainer.last_class)}`
-              : `${trainer.lms_classes} LMS classes`}
+            {trainer.classes} classes · {trainer.problems.toLocaleString('en-IN')} problems
             {trainer.attendance !== null && ` · ${trainer.attendance}% attendance`}
-            {trainer.lms_name && ` · LMS: ${trainer.lms_name}`}
+            {` · last logged ${lmsDate(trainer.last_logged)}`}
           </span>
         </span>
-        <span
-          className={cn(
-            'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold',
-            gap.tone === 'ok'
-              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
-              : 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
+        <span className="shrink-0 text-right tabular-nums">
+          <b className="text-base">{trainer.hours} h</b>
+          {trainer.pending_hours > 0 && (
+            <span className="block text-[11px] font-semibold text-amber-600">
+              +{trainer.pending_hours} h awaiting
+            </span>
           )}
-        >
-          {gap.label}
         </span>
       </div>
-      <div className="mt-1.5 grid grid-cols-[3.25rem_1fr_8.75rem] items-center gap-x-2 gap-y-1 text-[11px] text-slate-500">
-        <span>Tracker</span>
-        <span className="flex h-1.5 overflow-hidden rounded-full bg-slate-100">
-          <span
-            className="bar-fill bg-brand-500 h-full"
-            style={{ width: `${(trainer.hours / peak) * 100}%` }}
-          />
-          <span
-            className="bg-brand-500 h-full opacity-40"
-            style={{ width: `${(trainer.pending_hours / peak) * 100}%` }}
-          />
-        </span>
-        <span className="text-right tabular-nums">
-          <b className="text-slate-800">{logged} h</b>
-          {trainer.pending_hours > 0 && ` (${trainer.pending_hours} awaiting)`}
-        </span>
-        <span>LMS</span>
-        <span className="flex h-1.5 overflow-hidden rounded-full bg-slate-100">
-          <span
-            className="bar-fill h-full bg-violet-500"
-            style={{ width: `${((trainer.lms_hours ?? 0) / peak) * 100}%` }}
-          />
-        </span>
-        <span className="text-right tabular-nums">
-          <b className="text-slate-800">{trainer.lms_hours ?? 0} h</b>
-        </span>
+      <div className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-slate-100">
+        <span
+          className="bar-fill bg-brand-500 h-full"
+          style={{ width: `${(trainer.hours / peak) * 100}%` }}
+        />
+        <span
+          className="h-full opacity-60"
+          style={{ width: `${(trainer.pending_hours / peak) * 100}%`, background: PENDING }}
+        />
       </div>
+      {trainer.rejected > 0 && (
+        <p className="mt-1 text-[11px] text-red-600">
+          {trainer.rejected} entr{trainer.rejected === 1 ? 'y' : 'ies'} rejected at verification
+        </p>
+      )}
     </li>
+  );
+}
+
+/** LMS PRIME coding classes on days the trainer logged nothing in the tracker. */
+function NotLogged({ data }: { data: NonNullable<CampusDelivery['unlogged']> }) {
+  const range = `${lmsDate(data.from)} – ${lmsDate(data.to)}`;
+  if (!data.classes) {
+    return (
+      <p className="mt-3 flex items-start gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
+        <CheckCircle2 className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+        Every PRIME coding class in the LMS time table ({range}) has a tracker entry that day.
+      </p>
+    );
+  }
+  return (
+    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2.5 dark:border-amber-500/30 dark:bg-amber-500/10">
+      <p className="flex items-center gap-1.5 text-sm font-semibold text-amber-800 dark:text-amber-300">
+        <NotebookPen className="size-4" aria-hidden />
+        {data.classes} class{data.classes === 1 ? '' : 'es'} not logged yet
+      </p>
+      <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
+        Of {data.checked} PRIME coding classes in the LMS time table ({range}), these were on days
+        the trainer logged nothing in the tracker.
+      </p>
+      <ul className="mt-2 space-y-1 text-xs">
+        {data.trainers.map((trainer) => (
+          <li key={trainer.name} className="flex justify-between gap-2">
+            <span className="font-medium">{trainer.name}</span>
+            <span className="text-slate-500 tabular-nums">
+              <b className="text-slate-800">{trainer.classes}</b> · latest {lmsDate(trainer.last)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -135,6 +142,7 @@ export function DeliverySection({ data }: { data: CampusDelivery | null }) {
 
   const done = share(data.delivered, data.allocated);
   const pending = share(data.pending, data.allocated);
+  const remaining = Math.max(0, data.allocated - data.delivered - data.pending);
   const curricula = [...new Set(data.topics.map((topic) => topic.curriculum))];
   const covered = data.topics.filter((topic) => topic.hours > 0).length;
 
@@ -147,8 +155,8 @@ export function DeliverySection({ data }: { data: CampusDelivery | null }) {
             Syllabus vs Delivery
           </h2>
           <p className="text-sm text-slate-500">
-            PRIME coding domain hours taught against the hours allocated. Only verified classes
-            count as delivered.
+            PRIME coding domain hours from the delivery tracker: allocated hours, and how many are
+            verified, awaiting verification and still to go.
             {data.syncedAt && ` Updated ${lmsDate(data.syncedAt, true)}.`}
           </p>
         </div>
@@ -166,7 +174,7 @@ export function DeliverySection({ data }: { data: CampusDelivery | null }) {
                 / {data.allocated.toLocaleString('en-IN')} h
               </span>
             </p>
-            <p className="text-xs text-slate-500">delivered of allocated</p>
+            <p className="text-xs text-slate-500">verified of allocated</p>
             {data.pending > 0 && (
               <p className="mt-1 text-xs font-semibold text-amber-600">
                 +{data.pending} h awaiting verification
@@ -177,7 +185,7 @@ export function DeliverySection({ data }: { data: CampusDelivery | null }) {
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
             { icon: CheckCircle2, label: 'Classes', value: data.classes.toLocaleString('en-IN') },
-            { icon: Users, label: 'Trainers', value: String(data.trainer_count) },
+            { icon: Code2, label: 'Problems solved', value: data.problems.toLocaleString('en-IN') },
             {
               icon: GraduationCap,
               label: 'Class attendance',
@@ -197,10 +205,29 @@ export function DeliverySection({ data }: { data: CampusDelivery | null }) {
       </div>
       <div className="px-5">
         <Bar value={done} pending={pending} color={paceColor(done)} />
-        <div className="mt-1 flex flex-wrap gap-x-4 text-[11px] text-slate-500">
-          <span>{done}% delivered</span>
-          {pending > 0 && <span>{pending}% awaiting verification</span>}
-          {data.rejected > 0 && <span>{data.rejected} classes rejected</span>}
+        <dl className="mt-3 grid gap-2 sm:grid-cols-3">
+          {[
+            { label: 'Verified', hours: data.delivered, color: paceColor(done) },
+            { label: 'Awaiting verification', hours: data.pending, color: PENDING },
+            { label: 'Still to go', hours: remaining, color: '#cbd5e1' },
+          ].map((part) => (
+            <div
+              key={part.label}
+              className="flex items-center gap-2.5 rounded-xl bg-slate-50 px-3 py-2"
+            >
+              <span className="size-2.5 shrink-0 rounded-full" style={{ background: part.color }} />
+              <dt className="flex-1 text-xs text-slate-500">{part.label}</dt>
+              <dd className="text-sm tabular-nums">
+                <b>{part.hours.toLocaleString('en-IN')} h</b>
+                <span className="ml-1 text-xs text-slate-500">
+                  {share(part.hours, data.allocated)}%
+                </span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+        <div className="mt-2 flex flex-wrap gap-x-4 text-[11px] text-slate-500">
+          {data.rejected > 0 && <span>{data.rejected} entries rejected</span>}
           {data.invalid > 0 && <span>{data.invalid} left out (impossible duration)</span>}
           {data.duplicates > 0 && (
             <span>
@@ -256,26 +283,21 @@ export function DeliverySection({ data }: { data: CampusDelivery | null }) {
           <div>
             <h3 className="flex items-center gap-1.5 text-sm font-bold">
               <Users className="size-4 text-slate-400" aria-hidden />
-              By trainer: tracker vs LMS
+              By trainer
             </h3>
             <p className="mt-0.5 text-xs text-slate-500">
-              Hours logged in the tracker (verified and awaiting) beside PRIME coding classes in the
-              LMS time table over the same dates.
+              Verified hours, and hours awaiting verification, as logged in the tracker.
             </p>
             <ul className="mt-2 divide-y divide-slate-100">
               {data.trainers.map((trainer) => (
                 <TrainerRow
                   key={trainer.name}
                   trainer={trainer}
-                  peak={Math.max(
-                    1,
-                    ...data.trainers.map((row) =>
-                      Math.max(row.hours + row.pending_hours, row.lms_hours ?? 0)
-                    )
-                  )}
+                  peak={Math.max(1, ...data.trainers.map((row) => row.hours + row.pending_hours))}
                 />
               ))}
             </ul>
+            {data.unlogged && <NotLogged data={data.unlogged} />}
           </div>
           {data.weeks.length > 1 && (
             <div>

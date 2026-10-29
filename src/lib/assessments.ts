@@ -290,6 +290,8 @@ export interface CampusDelivery {
   invalid: number;
   /** Repeat submissions of a class (the same class logged again, seconds apart), left out. */
   duplicates: number;
+  /** Problems solved in verified classes, as logged. */
+  problems: number;
   trainer_count: number;
   attendance: number | null;
   last_class: string | null;
@@ -305,24 +307,35 @@ export interface CampusDelivery {
     classes: number;
     last_class: string | null;
   }[];
-  /** Per trainer: tracker hours beside the PRIME coding hours in the LMS time table. */
+  /** Per trainer, from the tracker. */
   trainers: {
     name: string;
-    /** Verified tracker hours. */
+    /** Verified hours. */
     hours: number;
-    /** Tracker hours awaiting verification. */
+    /** Hours awaiting verification. */
     pending_hours: number;
+    /** Verified classes. */
     classes: number;
+    /** Entries rejected at verification. */
+    rejected: number;
+    /** Problems solved in verified classes, as logged. */
+    problems: number;
     attendance: number | null;
-    last_class: string | null;
-    /** False for an LMS instructor with PRIME coding classes but nothing in the tracker. */
-    in_tracker: boolean;
-    /** The LMS spelling, when it differs from the tracker's. */
-    lms_name: string | null;
-    /** Null when the trainer has no PRIME coding classes in the LMS. */
-    lms_hours: number | null;
-    lms_classes: number | null;
+    /** Latest class logged (verified or awaiting). */
+    last_logged: string | null;
   }[];
+  /**
+   * A check against the LMS time table: its PRIME coding classes on days the trainer logged
+   * nothing in the tracker. Null when the LMS has no PRIME coding classes for this selection.
+   */
+  unlogged: {
+    classes: number;
+    /** LMS PRIME coding classes looked at, from `from` to `to`. */
+    checked: number;
+    from: string;
+    to: string;
+    trainers: { name: string; classes: number; last: string }[];
+  } | null;
   weeks: { week: string; hours: number }[];
   topics: {
     curriculum: string;

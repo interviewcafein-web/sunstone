@@ -1,7 +1,7 @@
 // Copies PRIME coding domain delivery from the delivery tracker (a separate Supabase Postgres)
-// into Vertex: classes taught (date, campus, batch, section, trainer, topic, hours, status),
-// allocated hours per campus/batch/section, and each curriculum's topics in order. Read-only
-// on the tracker; replaces the previous copy in one transaction. Classes submitted more than
+// into Vertex: classes taught (date, campus, batch, section, trainer, topic, hours, problems
+// solved, status), allocated hours per campus/batch/section, and each curriculum's topics in
+// order. Read-only on the tracker; replaces the previous copy in one transaction. Classes submitted more than
 // once are flagged `duplicate` (all but the first), as the tracker's own totals count them once.
 //
 //   npm run db:sync-delivery        (DATABASE_URL and DELIVERY_DATABASE_URL from .env.local)
@@ -47,6 +47,7 @@ const { rows: classes } = await tracker.query(`
          t.name as topic, t.order_index as topic_order, st.name as subtopic,
          r.duration_minutes as minutes, r.total_present as present,
          r.student_count_snapshot as total, r.verification_status::text as status,
+         r.problems_solved as problems,
          -- A class submitted more than once: every copy after the first.
          row_number() over (
            partition by r.trainer_id, r.class_date, r.batch_id, r.section, r.start_time, r.end_time,
@@ -121,6 +122,7 @@ await sql.transaction([
       total: row.total,
       status: row.status,
       duplicate: row.duplicate,
+      problems: row.problems,
     }))
   ),
   ...batchInserts(

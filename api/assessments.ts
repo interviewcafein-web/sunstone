@@ -537,6 +537,7 @@ async function delivery(campusId: number, batch: string | null) {
        round(100.0 * sum(present) filter (where status = 'VERIFIED') /
              nullif(sum(total) filter (where status = 'VERIFIED' and present is not null), 0))::int as attendance,
        max(class_date) filter (where status = 'VERIFIED')::text as last_class,
+       coalesce(sum(problems) filter (where status = 'VERIFIED' and ${DLV_VALID}), 0)::int as problems,
        (select count(*) from dlv_classes where campus_code = $1 and ${DLV_FILTER}
           and duplicate and status = 'VERIFIED')::int as duplicates
      from dlv_classes_counted where campus_code = $1 and ${DLV_FILTER}`,
@@ -564,31 +565,41 @@ async function delivery(campusId: number, batch: string | null) {
      order by batch_year desc, program, section`,
     params
   );
-  const tracked = await db().query(
+  const trainers = await db().query(
     `select trainer as name,
-            round(coalesce(sum(minutes) filter (where status = 'VERIFIED'), 0) / 60.0)::int as hours,
-            round(coalesce(sum(minutes) filter (where status = 'PENDING VERIFICATION'), 0) / 60.0)::int as pending_hours,
-            count(*) filter (where status = 'VERIFIED')::int as classes,
+            round(coalesce(sum(minutes) filter (where status = 'VERIFIED' and ${DLV_VALID}), 0) / 60.0)::int as hours,
+            round(coalesce(sum(minutes) filter (where status = 'PENDING VERIFICATION' and ${DLV_VALID}), 0) / 60.0)::int as pending_hours,
+            count(*) filter (where status = 'VERIFIED' and ${DLV_VALID})::int as classes,
+            count(*) filter (where status = 'REJECTED')::int as rejected,
+            coalesce(sum(problems) filter (where status = 'VERIFIED' and ${DLV_VALID}), 0)::int as problems,
             round(100.0 * sum(present) filter (where status = 'VERIFIED') /
                   nullif(sum(total) filter (where status = 'VERIFIED' and present is not null), 0))::int as attendance,
-            max(class_date) filter (where status = 'VERIFIED')::text as last_class
-     from dlv_classes_counted where campus_code = $1 and ${DLV_FILTER} and ${DLV_VALID}
-       and status in ('VERIFIED', 'PENDING VERIFICATION') and trainer is not null
-     group by trainer order by hours desc`,
+            max(class_date) filter (where status <> 'REJECTED')::text as last_logged
+     from dlv_classes_counted where campus_code = $1 and ${DLV_FILTER} and trainer is not null
+     group by trainer
+     having count(*) filter (where status <> 'REJECTED') > 0
+     order by hours desc, pending_hours desc`,
     params
   );
-  // The same trainers' PRIME coding classes in the LMS time table, since the tracker's first
-  // class here, for the batch of each session's students.
-  const lms = await db().query(
-    `select min(a.faculty) as name, count(*)::int as classes, round(sum(a.minutes) / 60.0)::int as hours
+  // A check against the LMS time table: PRIME coding classes there, from the tracker's first
+  // class here up to yesterday, with no tracker entry by the same trainer on that day.
+  const lmsDays = await db().query(
+    `select min(a.faculty) as name, a.lecture_date::text as day, count(*)::int as classes
      from att_sessions a join students s on s.lms_user_id = a.first_student
-     where a.campus_id = $3 and (${PRIME_CODING}) and a.minutes between 1 and 600 and a.faculty is not null
+     where a.campus_id = $3 and (${PRIME_CODING}) and a.faculty is not null
        and a.lecture_date >= (select min(class_date) from dlv_classes where campus_code = $1)
+       and a.lecture_date < ${NOW}::date
        and ${COHORT.replace(/admission_year|program/g, (column) => `s.${column}`)}
-     group by a.faculty_id`,
+     group by a.faculty_id, a.lecture_date`,
     [code, batch, campusId]
   );
-  const trainers = compareTrainers(tracked as TrackedTrainer[], lms as LmsTrainer[]);
+  const trackerDays = await db().query(
+    `select trainer as name, class_date::text as day, count(*)::int as classes
+     from dlv_classes_counted where campus_code = $1 and ${DLV_FILTER} and trainer is not null
+     group by 1, 2`,
+    params
+  );
+  const unlogged = notLogged(lmsDays as LmsDay[], trackerDays as LmsDay[]);
   const weeks = await db().query(
     `select date_trunc('week', class_date)::date::text as week, round(sum(minutes) / 60.0)::int as hours
      from dlv_classes_counted where campus_code = $1 and ${DLV_FILTER} and status = 'VERIFIED' and ${DLV_VALID}
@@ -616,7 +627,7 @@ async function delivery(campusId: number, batch: string | null) {
   );
   const [{ synced }] = await db()`
     select (select ran_at::text from sync_state where name = 'delivery') as synced`;
-  return { ...summary, sections, trainers, weeks, topics, syncedAt: synced };
+  return { ...summary, sections, trainers, unlogged, weeks, topics, syncedAt: synced };
 }
 
 // PRIME subjects in attendance (named by hand in the LMS: "Prime Domain Coding", "Prime
@@ -627,19 +638,12 @@ const PRIME_SUBJECT = `subject ~* '(^|[^a-z])prime([^a-z]|$)|competitive coding'
 const PRIME_CODING = `(subject ~* '(^|[^a-z])pri[mne]{2}([^a-z]|$)' and subject ~* 'domain|coding|tech'
   and subject !~* 'apti|comm') or subject ~* 'competitive coding'`;
 
-interface TrackedTrainer {
+interface LmsDay {
   name: string;
-  hours: number;
-  pending_hours: number;
-  classes: number;
-  attendance: number | null;
-  last_class: string | null;
-}
-interface LmsTrainer {
-  name: string;
-  hours: number;
+  day: string;
   classes: number;
 }
+
 const nameTokens = (name: string) =>
   name
     .toLowerCase()
@@ -650,61 +654,66 @@ const titleCase = (name: string) =>
   name.trim().replace(/\S+/g, (word) => word[0].toUpperCase() + word.slice(1).toLowerCase());
 
 /**
- * Tracker trainers with their hours in the LMS. Each system has its own spelling of a name, so
- * they match by full name, then by one name within the other ("Hansraj" / "Hansraj Athole"),
- * then by a first name only one trainer on each side has ("Ravi Panjiyar" / "Ravi Kumar").
- * LMS instructors with PRIME coding classes but nothing in the tracker are listed too.
+ * LMS instructor names to tracker trainer names. Each system has its own spelling, so they
+ * match by full name, then by one name within the other ("Hansraj" / "Hansraj Athole"), then by
+ * a first name only one trainer on each side has ("Ravi Panjiyar" / "Ravi Kumar").
  */
-function compareTrainers(tracked: TrackedTrainer[], lms: LmsTrainer[]) {
-  const pool = lms.map((row) => ({ ...row, tokens: nameTokens(String(row.name)), used: false }));
-  const rows = tracked.map((row) => ({
-    ...row,
-    tokens: nameTokens(String(row.name)),
-    match: null as (typeof pool)[number] | null,
-  }));
+function matchNames(tracker: string[], lms: string[]) {
+  const left = tracker.map((name) => ({ name, tokens: nameTokens(name), used: false }));
+  const matched = new Map<string, string>();
+  const pending = () => lms.filter((name) => !matched.has(name));
   const rules: ((a: string[], b: string[]) => boolean)[] = [
     (a, b) => a.join(' ') === b.join(' '),
     (a, b) => a.every((token) => b.includes(token)) || b.every((token) => a.includes(token)),
     (a, b) =>
-      a[0] === b[0] && rows.filter((row) => !row.match && row.tokens[0] === a[0]).length === 1,
+      a[0] === b[0] && pending().filter((name) => nameTokens(name)[0] === a[0]).length === 1,
   ];
   for (const rule of rules) {
-    for (const row of rows) {
-      if (row.match) continue;
-      const candidates = pool.filter((entry) => !entry.used && rule(row.tokens, entry.tokens));
+    for (const name of pending()) {
+      const tokens = nameTokens(name);
+      const candidates = left.filter((entry) => !entry.used && rule(tokens, entry.tokens));
       if (candidates.length !== 1) continue;
-      row.match = candidates[0];
+      matched.set(name, candidates[0].name);
       candidates[0].used = true;
     }
   }
-  const lmsName = (entry: (typeof pool)[number]) => titleCase(String(entry.name));
-  return [
-    ...rows.map(({ tokens, match, ...row }) => ({
-      ...row,
-      in_tracker: true,
-      lms_name: match && match.tokens.join(' ') !== tokens.join(' ') ? lmsName(match) : null,
-      lms_hours: match ? Number(match.hours) : null,
-      lms_classes: match ? Number(match.classes) : null,
-    })),
-    ...pool
-      .filter((entry) => !entry.used && Number(entry.classes) >= 3)
-      .map((entry) => ({
-        name: lmsName(entry),
-        hours: 0,
-        pending_hours: 0,
-        classes: 0,
-        attendance: null as number | null,
-        last_class: null as string | null,
-        in_tracker: false,
-        lms_name: null,
-        lms_hours: Number(entry.hours),
-        lms_classes: Number(entry.classes),
-      })),
-  ].sort(
-    (a, b) =>
-      Math.max(b.hours + b.pending_hours, b.lms_hours ?? 0) -
-      Math.max(a.hours + a.pending_hours, a.lms_hours ?? 0)
+  return matched;
+}
+
+/**
+ * LMS classes on days the trainer logged nothing in the tracker. Whole days, not class counts:
+ * the LMS may split a class into hour slots, or list a combined class once, so counts on a day
+ * the trainer did log do not line up. Null when the LMS has no PRIME coding classes here.
+ */
+function notLogged(lms: LmsDay[], tracker: LmsDay[]) {
+  if (!lms.length) return null;
+  const names = matchNames(
+    [...new Set(tracker.map((row) => row.name))],
+    [...new Set(lms.map((row) => row.name))]
   );
+  const logged = new Set(tracker.map((row) => `${row.name}|${row.day}`));
+  const byTrainer = new Map<string, { name: string; classes: number; last: string }>();
+  let classes = 0;
+  for (const row of lms) {
+    const name = names.get(row.name);
+    const missing = name && logged.has(`${name}|${row.day}`) ? 0 : row.classes;
+    if (!missing) continue;
+    classes += missing;
+    const shown = name ?? titleCase(row.name);
+    const entry = byTrainer.get(shown) ?? { name: shown, classes: 0, last: row.day };
+    entry.classes += missing;
+    if (row.day > entry.last) entry.last = row.day;
+    byTrainer.set(shown, entry);
+  }
+  const days = lms.map((row) => row.day).sort();
+  return {
+    classes,
+    /** LMS PRIME coding classes looked at, from `from` to `to`. */
+    checked: lms.reduce((sum, row) => sum + row.classes, 0),
+    from: days[0],
+    to: days[days.length - 1],
+    trainers: [...byTrainer.values()].sort((a, b) => b.classes - a.classes),
+  };
 }
 
 /** Class attendance for one campus (and batch): overall, PRIME, weekly, per subject and instructor. */
