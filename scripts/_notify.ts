@@ -1,6 +1,7 @@
 // Automatic notifications from the scripts (new tests, weekly reports): a row in the bell,
 // and an email to the people it is for. Campus notifications go to that campus's staff with
-// every HQ member and super admin copied in; HQ notifications go to HQ.
+// HQ and super admins copied in, except the founders, who get only the HQ-wide ones (the
+// all-campus weekly report), not one per campus; HQ notifications go to all of HQ.
 
 import type { NeonQueryFunction } from '@neondatabase/serverless';
 
@@ -10,8 +11,17 @@ import { pushTo } from '../api/_push';
 /** Shown as the sender in the bell. */
 export const SYSTEM_SENDER = 'Vertex';
 
+/**
+ * The founders: they get HQ-wide notices (one all-campus weekly report), not the copy of
+ * every campus's, which would be a score of emails each Monday.
+ */
+const HQ_WIDE_ONLY = new Set(['ankur@sunstone.in', 'ashish@sunstone.in', 'piyush@sunstone.in']);
+
 export interface Directory {
+  /** Every HQ member and super admin: HQ-wide notices. */
   hq: string[];
+  /** HQ copied on each campus's notices (everyone in `hq` but the founders). */
+  hqCopied: string[];
   campus: Map<number, string[]>;
 }
 
@@ -32,7 +42,7 @@ export async function staffDirectory(sql: NeonQueryFunction<false, false>): Prom
       hq.push(email);
     }
   }
-  return { hq, campus };
+  return { hq, hqCopied: hq.filter((email) => !HQ_WIDE_ONLY.has(email)), campus };
 }
 
 export interface Notice {
@@ -58,15 +68,17 @@ export async function addNotice(
             ${notice.campusId === null ? [] : [notice.campusId]}::int[], ${SYSTEM_SENDER})
     returning id`;
   const campusStaff = notice.campusId === null ? [] : (directory.campus.get(notice.campusId) ?? []);
-  // Phones of everyone who sees it in the bell: the campus's staff and HQ.
-  await pushTo([...new Set([...campusStaff, ...directory.hq])], {
+  // HQ on this notice: all of HQ for an HQ-wide one, HQ but the founders for a campus's.
+  const hq = notice.campusId === null ? directory.hq : directory.hqCopied;
+  // Phones of the people it is for: the campus's staff and HQ.
+  await pushTo([...new Set([...campusStaff, ...hq])], {
     title: notice.title,
     body: notice.body,
     link: notice.link,
   }).catch((error) => console.error('[push]', error));
-  const to = campusStaff.length ? campusStaff : directory.hq;
+  const to = campusStaff.length ? campusStaff : hq;
   if (!to.length) return null;
-  const cc = campusStaff.length ? directory.hq.filter((email) => !campusStaff.includes(email)) : [];
+  const cc = campusStaff.length ? hq.filter((email) => !campusStaff.includes(email)) : [];
   await sql`update notifications set emailed = ${to.length + cc.length} where id = ${row.id}`;
   return { to, cc, ...notice.email };
 }
