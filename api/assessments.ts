@@ -15,6 +15,7 @@
 
 import { type Viewer, json, seesCampus, sessionViewer } from './_auth';
 import { db, together } from './_db';
+import { snapshot, type WaitUntil } from './_snapshot';
 import { integrityOf } from '../src/lib/integrity';
 
 export const config = { runtime: 'edge' };
@@ -1161,7 +1162,33 @@ export async function metrics(viewer: Viewer) {
   };
 }
 
-export default async function handler(request: Request): Promise<Response> {
+/** Everyone's view: answers saved once (api/_snapshot.ts), narrowed to each person's campuses. */
+export const EVERYONE: Viewer = {
+  user: 'snapshot',
+  name: null,
+  picture: null,
+  role: 'hq',
+  campusIds: null,
+};
+
+/** Every student's metrics, grouped by campus id ("none" for no campus), for narrowing. */
+export async function metricsByCampus() {
+  const [{ students }, rows] = await Promise.all([
+    metrics(EVERYONE),
+    db()`select username, campus_id from students where on_platform`,
+  ]);
+  const byCampus: Record<string, Record<string, unknown>> = {};
+  for (const row of rows) {
+    const found = students[String(row.username)];
+    if (found) (byCampus[String(row.campus_id ?? 'none')] ??= {})[String(row.username)] = found;
+  }
+  return { byCampus };
+}
+
+export const campusKey = (campusId: number, batch: string | null) =>
+  `campus:${campusId}:${batch ?? ''}`;
+
+export default async function handler(request: Request, context?: WaitUntil): Promise<Response> {
   if (!process.env.DATABASE_URL) return json(404, { error: 'No database configured' });
   const viewer = await sessionViewer(request);
   if (!viewer) return json(401, { error: 'Login required' });
@@ -1169,8 +1196,31 @@ export default async function handler(request: Request): Promise<Response> {
   const params = new URL(request.url).searchParams;
   const view = params.get('view');
   try {
-    if (view === 'campuses') return json(200, await campuses(viewer));
-    if (view === 'metrics') return json(200, await metrics(viewer));
+    // The heaviest views come from saved answers, remade in the background (api/_snapshot.ts).
+    if (view === 'campuses') {
+      const all = await snapshot('campuses', () => campuses(EVERYONE), context);
+      return json(
+        200,
+        viewer.campusIds === null
+          ? all
+          : {
+              ...all,
+              campuses: (all.campuses as Record<string, unknown>[]).filter((row) =>
+                seesCampus(viewer, Number(row.id))
+              ),
+            }
+      );
+    }
+    if (view === 'metrics') {
+      const { byCampus } = await snapshot('metrics', metricsByCampus, context);
+      const students = Object.assign(
+        {},
+        ...Object.entries(byCampus)
+          .filter(([id]) => viewer.campusIds === null || viewer.campusIds.includes(Number(id)))
+          .map(([, rows]) => rows)
+      );
+      return json(200, { students });
+    }
     if (view === 'student') {
       const result = await student(viewer, params.get('s') ?? '');
       return result ? json(200, result) : json(404, { error: 'Student not found' });
@@ -1185,7 +1235,12 @@ export default async function handler(request: Request): Promise<Response> {
     const rawBatch = params.get('batch');
     const batch = rawBatch && BATCH_FILTER.test(rawBatch) ? rawBatch : null;
 
-    if (view === 'campus') return json(200, await campus(campusId, batch));
+    if (view === 'campus') {
+      return json(
+        200,
+        await snapshot(campusKey(campusId, batch), () => campus(campusId, batch), context)
+      );
+    }
     if (view === 'test') {
       // One test, or the ids of its section copies: "123,456".
       const testIds = (params.get('test') ?? '')

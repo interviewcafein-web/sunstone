@@ -65,6 +65,9 @@ jobs:
       - name: PRIME delivery (classes taught against allocated hours)
         if: steps.secrets.outputs.ready == 'true' && env.DELIVERY_DATABASE_URL != ''
         run: npx tsx scripts/sync-delivery.ts
+      - name: Ready-made pages (campus pages, campus list, 360°) so they open at once
+        if: steps.secrets.outputs.ready == 'true'
+        run: npx tsx scripts/warm-snapshots.ts
       - name: Tell campuses about new tests (bell + email, HQ copied)
         if: steps.secrets.outputs.ready == 'true'
         run: npx tsx scripts/notify-new-tests.ts

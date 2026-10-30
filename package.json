@@ -19,7 +19,8 @@
     "db:sync-assessments": "tsx --env-file=.env.local scripts/sync-assessments.ts",
     "db:sync-attendance": "tsx --env-file=.env.local scripts/sync-attendance.ts",
     "db:sync-exams": "tsx --env-file=.env.local scripts/sync-exams.ts",
-    "db:sync-delivery": "tsx --env-file=.env.local scripts/sync-delivery.ts"
+    "db:sync-delivery": "tsx --env-file=.env.local scripts/sync-delivery.ts",
+    "db:warm": "tsx --env-file=.env.local scripts/warm-snapshots.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
