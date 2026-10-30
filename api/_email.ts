@@ -6,13 +6,27 @@
 //                       (its domain must be verified with each provider)
 //   RESEND_API_KEY      Resend (free: 100 a day, 3,000 a month)
 //   BREVO_API_KEY       Brevo, backup (free: 300 a day)
+//   BREVO_FROM          optional: Brevo's own sender, until EMAIL_FROM's domain is verified
+//                       there (e.g. "Sunstone PRIME Vertex <vertex.sunstone@gmail.com>")
 //   MAILJET_API_KEY     Mailjet, second backup (free: 200 a day),
 //   MAILJET_SECRET_KEY    with its secret key
+//   MAILJET_FROM        optional: Mailjet's own sender, as BREVO_FROM
 //
 // Locally, with no provider configured, the email is printed to the dev server's terminal
 // instead, so sign-in codes can be tried without sending anything.
 
 const setting = (name: string) => process.env[name]?.trim() || undefined;
+
+/** Brevo's key, also when pasted as Brevo shows it wrapped: base64 of {"api_key": "xkeysib-…"}. */
+function brevoKey() {
+  const value = setting('BREVO_API_KEY');
+  if (!value || value.startsWith('xkeysib-')) return value;
+  try {
+    return (JSON.parse(atob(value)) as { api_key?: string }).api_key?.trim() || value;
+  } catch {
+    return value;
+  }
+}
 
 /** "Name <address>" → its parts. */
 function sender(from: string) {
@@ -26,6 +40,8 @@ const list = (to: string | string[]) => (Array.isArray(to) ? to : [to]);
 
 interface Provider {
   name: string;
+  /** The setting that overrides EMAIL_FROM for this provider. */
+  from?: string;
   ready: () => boolean;
   send: (email: Email, from: string) => Promise<Response>;
 }
@@ -53,12 +69,13 @@ const PROVIDERS: Provider[] = [
   },
   {
     name: 'Brevo',
-    ready: () => Boolean(setting('BREVO_API_KEY')),
+    from: 'BREVO_FROM',
+    ready: () => Boolean(brevoKey()),
     send: ({ to, cc, subject, text, html }, from) =>
       fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
         headers: {
-          'api-key': setting('BREVO_API_KEY')!,
+          'api-key': brevoKey()!,
           'Content-Type': 'application/json',
           Accept: 'application/json',
         },
@@ -74,6 +91,7 @@ const PROVIDERS: Provider[] = [
   },
   {
     name: 'Mailjet',
+    from: 'MAILJET_FROM',
     ready: () => Boolean(setting('MAILJET_API_KEY') && setting('MAILJET_SECRET_KEY')),
     send: ({ to, cc, subject, text, html }, from) => {
       const { name, email } = sender(from);
@@ -128,7 +146,10 @@ export async function sendEmail(email: Email): Promise<string> {
   const failures: string[] = [];
   for (const provider of providers) {
     try {
-      const response = await provider.send(email, from);
+      const response = await provider.send(
+        email,
+        (provider.from && setting(provider.from)) || from
+      );
       if (response.ok) return provider.name;
       failures.push(
         `${provider.name} ${response.status}: ${(await response.text()).slice(0, 200)}`
