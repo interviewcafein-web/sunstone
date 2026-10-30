@@ -36,7 +36,7 @@ export function AppBanner() {
         to="/app"
         className="shrink-0 rounded-full bg-[#e8a33d] px-3.5 py-1.5 text-xs font-bold text-[#1a1206]"
       >
-        Get the app
+        Get the App
       </Link>
       <button
         type="button"

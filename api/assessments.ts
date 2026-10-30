@@ -367,7 +367,7 @@ export async function campus(campusId: number, batch: string | null) {
   const boardIds = tests
     .filter((test) => !test.module_key && (test.status === 'completed' || test.status === 'live'))
     .flatMap((test) => test.ids);
-  // Each student's marks on every Prime Mock Test that is out, for the per-test columns of the
+  // Each student's marks on every PRIME Mock Test that is out, for the per-test columns of the
   // Students tab.
   const mockIds = tests
     .filter((test) => !test.module_key && (test.status === 'completed' || test.status === 'live'))

@@ -12,13 +12,13 @@ export const APK_URL = '/app/vertex.apk';
 const FEATURES: { icon: LucideIcon; title: string; text: string }[] = [
   {
     icon: Users,
-    title: 'Every student',
-    text: 'Coding, Prime Mock Tests, AMCAT, exams and attendance',
+    title: 'Every Student',
+    text: 'Coding, PRIME Mock Tests, AMCAT, exams and attendance',
   },
-  { icon: Building2, title: 'Every campus', text: 'The full PRIME journey, tab by tab' },
-  { icon: Radar, title: '360° view', text: 'Campuses and batches compared, pain points first' },
+  { icon: Building2, title: 'Every Campus', text: 'The full PRIME journey, tab by tab' },
+  { icon: Radar, title: '360° View', text: 'Campuses and batches compared, pain points first' },
   { icon: Bell, title: 'Notifications', text: 'HQ announcements, new tests and weekly reports' },
-  { icon: WifiOff, title: 'Fast, even offline', text: 'Opens at once with your last data' },
+  { icon: WifiOff, title: 'Fast, Even Offline', text: 'Opens at once with your last data' },
 ];
 
 const STEPS = [
@@ -81,7 +81,7 @@ export default function AppDownloadPage() {
       </section>
 
       <section className="shadow-card bg-surface rounded-2xl border border-slate-200 p-6">
-        <h2 className="text-lg font-bold">How to install</h2>
+        <h2 className="text-lg font-bold">How to Install</h2>
         <ol className="mt-4 space-y-3">
           {STEPS.map((step, index) => (
             <li key={step} className="flex gap-3">

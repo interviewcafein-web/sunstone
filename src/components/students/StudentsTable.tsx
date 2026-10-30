@@ -155,7 +155,7 @@ export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
               divided
             />
             <SortHeader
-              label="Total solved"
+              label="Total Solved"
               hint="all platforms"
               sortKey="total"
               sort={sort}
@@ -164,7 +164,7 @@ export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
               divided
             />
             <SortHeader
-              label="Last active"
+              label="Last Active"
               hint="any platform"
               sortKey="active"
               sort={sort}

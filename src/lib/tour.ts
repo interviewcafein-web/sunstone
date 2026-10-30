@@ -28,19 +28,19 @@ const TOURS: Record<TourId, Step[]> = {
     },
     {
       target: 'filters',
-      title: 'Filter the list',
+      title: 'Filter the List',
       text: 'Narrow down by campus, batch and course, or search a student by name.',
       side: 'bottom',
     },
     {
       target: 'zones',
-      title: 'Practice zones',
+      title: 'Practice Zones',
       text: 'Students grouped by how much they practise coding. Click a zone to list only those students, or download the campus report as a PDF.',
       side: 'top',
     },
     {
       target: 'table',
-      title: 'One row per student',
+      title: 'One Row per Student',
       text: 'Coding on LeetCode, GFG and GitHub, then attendance, the latest AMCAT score and PRIME Mock Test average, each with its trend. Click a column to sort; click a name to open the full profile.',
       side: 'top',
     },
@@ -52,7 +52,7 @@ const TOURS: Record<TourId, Step[]> = {
     },
     {
       target: 'theme',
-      title: 'Light or dark',
+      title: 'Light or Dark',
       text: 'Switch the look whenever you like.',
       side: 'bottom',
     },
@@ -64,7 +64,7 @@ const TOURS: Record<TourId, Step[]> = {
     },
     {
       target: 'account',
-      title: 'Your account',
+      title: 'Your Account',
       text: 'Your profile, the team (for HQ), sign out, and this tour again whenever you need it.',
       side: 'left',
     },
@@ -72,27 +72,27 @@ const TOURS: Record<TourId, Step[]> = {
   campus: [
     {
       target: 'campus-tiles',
-      title: 'The campus at a glance',
+      title: 'The Campus at a Glance',
       text: 'Tests held, participation, average score, attendance and Learning & Practice progress. The faint lines show the last weeks; ▲▼ is the change since last week.',
       side: 'bottom',
     },
     {
       target: 'campus-batches',
-      title: 'One batch at a time',
+      title: 'One Batch at a Time',
       text: 'Everything on this page follows the batch you pick.',
       side: 'bottom',
     },
     {
       target: 'campus-tabs',
-      title: 'The full journey',
-      text: 'Overview, Prime Mock Tests (with leaderboards), Practice Test and MCQs, AMCAT, exams, attendance, and Students, where the attendance-vs-score chart shows who to follow up with.',
+      title: 'The Full Journey',
+      text: 'Overview, PRIME Mock Tests (with leaderboards), Practice Test and MCQs, AMCAT, exams, attendance, and Students, where the attendance-vs-score chart shows who to follow up with.',
       side: 'bottom',
     },
   ],
   student: [
     {
       target: 'student-sections',
-      title: 'Everything about this student',
+      title: 'Everything About This Student',
       text: 'Coding profiles, Assessments (PRIME Mock Tests, AMCAT, internal exams) and Attendance, each in its own section.',
       side: 'bottom',
     },

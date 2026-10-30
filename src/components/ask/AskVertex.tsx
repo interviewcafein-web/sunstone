@@ -211,7 +211,7 @@ export function AskVertex() {
             {status.isPending
               ? 'Getting ready…'
               : !aiReady
-                ? 'Quick questions only (AI not set up)'
+                ? 'Quick Questions Only (AI Not Set Up)'
                 : left !== undefined
                   ? `AI on · ${left} question${left === 1 ? '' : 's'} left today`
                   : 'AI on'}
@@ -284,11 +284,11 @@ export function AskVertex() {
                 <div className="mt-0.5 flex items-center gap-1 pl-1 text-[10px] text-slate-400">
                   {message.source === 'quick' ? (
                     <>
-                      <Zap className="size-3" aria-hidden /> Quick answer · no AI
+                      <Zap className="size-3" aria-hidden /> Quick Answer · No AI
                     </>
                   ) : (
                     <>
-                      <Sparkles className="size-3" aria-hidden /> AI answer · check before acting
+                      <Sparkles className="size-3" aria-hidden /> AI Answer · Check Before Acting
                     </>
                   )}
                   <CopyButton text={message.text} />
@@ -314,7 +314,7 @@ export function AskVertex() {
             className="flex items-center gap-1.5 rounded-md py-0.5 pr-1 text-[11px] font-semibold tracking-wide whitespace-nowrap text-slate-500 uppercase hover:text-slate-700"
           >
             <Zap className="size-3.5 shrink-0 text-amber-500" aria-hidden />
-            Quick questions
+            Quick Questions
             <ChevronDown
               className={cn('size-3.5 transition-transform', showQuick && 'rotate-180')}
               aria-hidden
@@ -331,7 +331,7 @@ export function AskVertex() {
                 className="bg-surface ml-auto max-w-[9.5rem] truncate rounded-md border border-slate-200 px-1.5 py-1 text-xs"
                 aria-label="Campus"
               >
-                {campuses.length !== 1 && <option value="">All campuses</option>}
+                {campuses.length !== 1 && <option value="">All Campuses</option>}
                 {campuses.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.code ?? item.name}
@@ -345,7 +345,7 @@ export function AskVertex() {
                 className="bg-surface max-w-[8.5rem] rounded-md border border-slate-200 px-1.5 py-1 text-xs disabled:opacity-50"
                 aria-label="Batch"
               >
-                <option value="">All batches</option>
+                <option value="">All Batches</option>
                 {campus?.batches.map((item) => (
                   <option
                     key={`${item.program}:${item.year}`}

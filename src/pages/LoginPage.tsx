@@ -68,7 +68,7 @@ export default function LoginPage() {
         <div className="flex flex-col justify-center p-6 sm:p-10">
           <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
             <LockKeyhole className="text-brand-600 size-5" aria-hidden />
-            Welcome back
+            Welcome Back
           </h1>
           <p className="mt-1 text-sm text-slate-500">Sign in with your work account to continue.</p>
 
@@ -91,7 +91,7 @@ export default function LoginPage() {
                 {!passwordOnly && (
                   <button type="button" className={linkButton} onClick={() => setMode('choose')}>
                     <ArrowLeft className="size-3.5" aria-hidden />
-                    Other ways to sign in
+                    Other Ways to Sign In
                   </button>
                 )}
               </>
@@ -131,7 +131,7 @@ export default function LoginPage() {
             className="text-brand-700 dark:text-brand-300 mt-2 inline-flex items-center gap-1.5 text-xs font-semibold hover:underline"
           >
             <Smartphone className="size-3.5" aria-hidden />
-            Get the Android app
+            Get the Android App
           </a>
         </div>
       </div>
@@ -140,9 +140,9 @@ export default function LoginPage() {
 }
 
 const HIGHLIGHTS = [
-  { icon: Code2, title: 'Coding practice', text: 'LeetCode, GFG and GitHub for every student' },
-  { icon: Building2, title: 'Campus journeys', text: 'Tests, exams, attendance and AMCAT' },
-  { icon: TrendingUp, title: 'Trends that matter', text: 'Spot who is slipping, week by week' },
+  { icon: Code2, title: 'Coding Practice', text: 'LeetCode, GFG and GitHub for every student' },
+  { icon: Building2, title: 'Campus Journeys', text: 'Tests, exams, attendance and AMCAT' },
+  { icon: TrendingUp, title: 'Trends That Matter', text: 'Spot who is slipping, week by week' },
 ];
 
 /** The left half: brand, a line about Vertex and what is inside, over a slowly moving backdrop. */
@@ -335,7 +335,7 @@ function EmailCodeForm({ next }: { next?: string }) {
           }}
         >
           <ArrowLeft className="size-3.5" aria-hidden />
-          Different email
+          Different Email
         </button>
         <button
           type="button"
@@ -343,7 +343,7 @@ function EmailCodeForm({ next }: { next?: string }) {
           disabled={wait > 0 || busy}
           onClick={send}
         >
-          {wait > 0 ? `Resend in ${wait}s` : 'Resend code'}
+          {wait > 0 ? `Resend in ${wait}s` : 'Resend Code'}
         </button>
       </div>
     </form>

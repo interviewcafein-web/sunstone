@@ -59,7 +59,7 @@ export function HandleForm({ handles, onSubmit }: HandleFormProps) {
           type="submit"
           className="bg-brand-600 hover:bg-brand-700 focus-visible:outline-brand-500 rounded-lg px-4 py-2 text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2"
         >
-          Show profile
+          Show Profile
         </button>
       </div>
     </form>

@@ -76,7 +76,7 @@ export function AssessmentSections({
   return (
     <>
       <Text style={{ fontSize: first ? 16 : 12, fontWeight: 800, marginTop: first ? 0 : 18 }}>
-        Assessments and attendance
+        Assessments and Attendance
       </Text>
       <Text style={{ fontSize: 8.5, color: MUTED, marginTop: 3 }}>
         PRIME Mock Tests, AMCAT, internal exams and class attendance from the LMS
@@ -224,7 +224,7 @@ function TestsSection({ tests }: { tests: StudentTest[] }) {
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <StatTile
               width="32%"
-              label="Average score"
+              label="Average Score"
               value={average === null ? '—' : `${average}%`}
               hint={
                 gap === null
@@ -242,7 +242,7 @@ function TestsSection({ tests }: { tests: StudentTest[] }) {
             />
             <StatTile
               width="32%"
-              label="Not submitted"
+              label="Not Submitted"
               value={formatNumber(released.filter((test) => !test.submitted).length)}
               hint="released tests with no submission"
               color={color}
@@ -250,7 +250,7 @@ function TestsSection({ tests }: { tests: StudentTest[] }) {
           </View>
 
           <Text style={{ fontSize: 9, fontWeight: 700, marginTop: 12, marginBottom: 2 }}>
-            Recent tests
+            Recent Tests
             <Text style={{ fontWeight: 400, color: MUTED }}>
               {' '}
               · latest {recent.length} of {released.length}, newest first; the dark tick marks the
@@ -378,7 +378,7 @@ function ExamsSection({ exams, average }: { exams: StudentExam[]; average: numbe
   return (
     <>
       <SectionTitle
-        title="Internal exams"
+        title="Internal Exams"
         aside={
           average === null
             ? 'Midterms and end-term'
@@ -430,7 +430,7 @@ function ExamsSection({ exams, average }: { exams: StudentExam[]; average: numbe
                   paddingHorizontal: 4,
                 }}
               >
-                Mock interviews and group discussions
+                Mock Interviews and Group Discussions
               </Text>
               {mocks.map((exam) =>
                 examRow(
@@ -477,7 +477,7 @@ function AmcatSection({ sittings }: { sittings: AmcatSitting[] }) {
           >
             <StatTile
               width="24%"
-              label="Latest average"
+              label="Latest Average"
               value={averages.length ? String(averages[averages.length - 1]) : '—'}
               hint={lmsDate(ordered[ordered.length - 1].taken_at)}
               color={colorOn('amcat', averages[averages.length - 1])}
@@ -630,21 +630,21 @@ function AttendanceSection({ attendance }: { attendance: StudentAssessmentsData[
           <View wrap={false} style={{ flexDirection: 'row', gap: 8 }}>
             <StatTile
               width="24%"
-              label="All classes"
+              label="All Classes"
               value={overall === null ? '—' : `${overall}%`}
               hint={`${formatNumber(totals.present)} of ${formatNumber(totals.sessions)} classes`}
               color={colorOn('attendance', overall)}
             />
             <StatTile
               width="24%"
-              label="PRIME classes"
+              label="PRIME Classes"
               value={prime === null ? '—' : `${prime}%`}
               hint={`${formatNumber(totals.primePresent)} of ${formatNumber(totals.primeSessions)} classes`}
               color={colorOn('attendance', prime)}
             />
             <StatTile
               width="24%"
-              label="Last 4 weeks"
+              label="Last 4 Weeks"
               value={lastWeeks === null ? '—' : `${lastWeeks}%`}
               hint="recent attendance"
               color={colorOn('attendance', lastWeeks)}
@@ -664,7 +664,7 @@ function AttendanceSection({ attendance }: { attendance: StudentAssessmentsData[
               style={{ marginTop: 10, backgroundColor: SOFT, borderRadius: 8, padding: 10 }}
             >
               <Text style={{ fontSize: 8.5, fontWeight: 700, marginBottom: 6 }}>
-                Week by week
+                Week by Week
                 <Text style={{ fontWeight: 400, color: MUTED }}>
                   {' '}
                   · share of classes attended each week (week starting)
@@ -695,7 +695,7 @@ function AttendanceSection({ attendance }: { attendance: StudentAssessmentsData[
           )}
 
           <Text style={{ fontSize: 9, fontWeight: 700, marginTop: 10, marginBottom: 2 }}>
-            By subject
+            By Subject
           </Text>
           <HeadRow>
             <Text style={[head, { width: 230 }]}>SUBJECT</Text>

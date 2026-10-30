@@ -165,7 +165,7 @@ export interface CampusStudentRow {
   amcat: number;
   amcat_avg: number | null;
   exam_avg: number | null;
-  /** Marks on each Prime Mock Test that is out, by the test's ids joined ("12,34"). */
+  /** Marks on each PRIME Mock Test that is out, by the test's ids joined ("12,34"). */
   mocks: Record<string, { pct: number | null; marks: number | null; submitted: boolean }>;
   /** Score on each AMCAT round, by round name. */
   amcat_rounds: Record<string, { score: number | null; taken_on: string | null }>;

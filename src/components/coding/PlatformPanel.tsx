@@ -104,7 +104,7 @@ export function PlatformPanel({
       {platform.id === 'hackerrank' && profile.topics.length > 0 && (
         <Card>
           <Donut
-            title="Problems solved by skill"
+            title="Problems Solved by Skill"
             rows={profile.topics.map((topic, index) => ({
               ...topic,
               color: ['#10B981', '#0EA5E9', '#6366F1', '#F59E0B', '#EC4899', '#14B8A6'][index % 6],

@@ -306,7 +306,7 @@ function ComposeDialog({
 
   const audiences: { id: NotificationAudience; label: string; note: string; icon: LucideIcon }[] = [
     { id: 'all', label: 'Everyone', note: 'All staff', icon: Users },
-    { id: 'hq', label: 'HQ only', note: 'HQ and super admins', icon: Megaphone },
+    { id: 'hq', label: 'HQ Only', note: 'HQ and super admins', icon: Megaphone },
     { id: 'campus', label: 'Campuses', note: 'Staff of chosen campuses', icon: Building2 },
   ];
 
@@ -541,7 +541,7 @@ function ComposeDialog({
             ) : (
               <Send className="size-4" aria-hidden />
             )}
-            {send.isPending ? 'Sending…' : 'Send notification'}
+            {send.isPending ? 'Sending…' : 'Send Notification'}
           </button>
         </div>
       </form>

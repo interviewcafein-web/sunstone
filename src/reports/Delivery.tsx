@@ -95,7 +95,7 @@ export function DeliveryPage({ entry, label }: { entry: ReportCampusDelivery; la
       style={[base.page, { paddingTop: 28, paddingHorizontal: 32 }]}
       wrap
     >
-      <Text style={{ fontSize: 16, fontWeight: 800 }}>PRIME coding delivery · {entry.campus}</Text>
+      <Text style={{ fontSize: 16, fontWeight: 800 }}>PRIME Coding Delivery · {entry.campus}</Text>
       <Text style={{ fontSize: 8.5, color: MUTED, marginTop: 3 }}>
         Hours from the delivery tracker: allocated, verified, awaiting verification and still to go.
         {data?.syncedAt ? ` Updated ${lmsDate(data.syncedAt, true)}.` : ''}
@@ -112,7 +112,7 @@ export function DeliveryPage({ entry, label }: { entry: ReportCampusDelivery; la
       {instructors.length > 0 && (
         <View wrap={false}>
           <SectionTitle note="attendance in their PRIME coding classes, from the LMS">
-            PRIME coding instructors
+            PRIME Coding Instructors
           </SectionTitle>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
             {instructors.map((person) => (
@@ -147,9 +147,9 @@ function DeliveryBody({ data }: { data: NonNullable<ReportCampusDelivery['delive
   const pending = share(data.pending, data.allocated);
   const remaining = Math.max(0, data.allocated - data.delivered - data.pending);
   const notes = [
-    data.rejected > 0 && `${formatNumber(data.rejected)} entries rejected`,
-    data.invalid > 0 && `${formatNumber(data.invalid)} left out (impossible duration)`,
-    data.duplicates > 0 && `${formatNumber(data.duplicates)} repeat submissions counted once`,
+    data.rejected > 0 && `Rejected Entries: ${formatNumber(data.rejected)}`,
+    data.invalid > 0 && `Left Out (Impossible Duration): ${formatNumber(data.invalid)}`,
+    data.duplicates > 0 && `Repeat Submissions Counted Once: ${formatNumber(data.duplicates)}`,
   ].filter(Boolean);
   const widths = { section: 230, hours: 110, bar: 170 };
   const t = { name: 190, hours: 80, pending: 80, classes: 60, problems: 70, attendance: 70 };
@@ -173,21 +173,21 @@ function DeliveryBody({ data }: { data: NonNullable<ReportCampusDelivery['delive
         />
         <StatTile
           width="18%"
-          label="Awaiting verification"
+          label="Awaiting Verification"
           value={`${formatNumber(data.pending)} h`}
           hint={`${pending}% of allocated`}
           color={PENDING}
         />
         <StatTile
           width="18%"
-          label="Still to go"
+          label="Still to Go"
           value={`${formatNumber(remaining)} h`}
           hint={`${share(remaining, data.allocated)}% of allocated`}
           color="#94a3b8"
         />
         <StatTile
           width="24%"
-          label="Classes · problems · attendance"
+          label="Classes · Problems · Attendance"
           value={`${formatNumber(data.classes)} · ${formatNumber(data.problems)} · ${data.attendance === null ? '—' : `${data.attendance}%`}`}
           hint={`last class ${lmsDate(data.last_class)}`}
         />
@@ -200,7 +200,7 @@ function DeliveryBody({ data }: { data: NonNullable<ReportCampusDelivery['delive
       </View>
 
       <SectionTitle note="verified of allocated hours, awaiting verification in amber">
-        By batch and section
+        By Batch and Section
       </SectionTitle>
       <View
         fixed={false}
@@ -262,7 +262,7 @@ function DeliveryBody({ data }: { data: NonNullable<ReportCampusDelivery['delive
 
       {data.trainers.length > 0 && (
         <View wrap={false}>
-          <SectionTitle note="as logged in the tracker">By trainer</SectionTitle>
+          <SectionTitle note="as logged in the tracker">By Trainer</SectionTitle>
           <View
             style={{
               flexDirection: 'row',
@@ -320,7 +320,7 @@ function DeliveryBody({ data }: { data: NonNullable<ReportCampusDelivery['delive
               <Text style={{ flexGrow: 1, flexBasis: 0, color: MUTED }}>
                 {lmsDate(trainer.last_logged)}
                 {trainer.rejected ? (
-                  <Text style={{ color: '#b91c1c' }}>{` · ${trainer.rejected} rejected`}</Text>
+                  <Text style={{ color: '#b91c1c' }}>{` · Rejected: ${trainer.rejected}`}</Text>
                 ) : (
                   ''
                 )}
@@ -343,8 +343,7 @@ function DeliveryBody({ data }: { data: NonNullable<ReportCampusDelivery['delive
           }}
         >
           <Text style={{ fontSize: 9.5, fontWeight: 800, color: '#92400e' }}>
-            {formatNumber(data.unlogged.classes)} class{data.unlogged.classes === 1 ? '' : 'es'} not
-            logged yet
+            Classes Not Logged Yet: {formatNumber(data.unlogged.classes)}
           </Text>
           <Text style={{ fontSize: 7.5, color: '#475569', marginTop: 2 }}>
             Of {formatNumber(data.unlogged.checked)} PRIME coding classes in the LMS time table (
@@ -400,7 +399,7 @@ export function DeliveryComparisonPage({
       style={[base.page, { paddingTop: 28, paddingHorizontal: 32 }]}
       wrap
     >
-      <Text style={{ fontSize: 16, fontWeight: 800 }}>PRIME coding delivery by campus</Text>
+      <Text style={{ fontSize: 16, fontWeight: 800 }}>PRIME Coding Delivery by Campus</Text>
       <Text style={{ fontSize: 8.5, color: MUTED, marginTop: 3 }}>
         From the delivery tracker, furthest behind first. All campuses together:{' '}
         {formatNumber(totals.delivered)} of {formatNumber(totals.allocated)} h verified (

@@ -24,7 +24,7 @@ export interface Zone {
 export const ZONES: Zone[] = [
   {
     id: 'green',
-    label: 'Green zone',
+    label: 'Green Zone',
     min: 100,
     rule: '100+ solved',
     advice: 'Strong practice. Push them to contests and harder problems.',
@@ -33,7 +33,7 @@ export const ZONES: Zone[] = [
   },
   {
     id: 'yellow',
-    label: 'Yellow zone',
+    label: 'Yellow Zone',
     min: 50,
     rule: '50–99 solved',
     advice: 'On track. Next milestone: 100 problems.',
@@ -42,7 +42,7 @@ export const ZONES: Zone[] = [
   },
   {
     id: 'orange',
-    label: 'Orange zone',
+    label: 'Orange Zone',
     min: 25,
     rule: '25–49 solved',
     advice: 'Needs a push. Set weekly targets and check in regularly.',
@@ -51,7 +51,7 @@ export const ZONES: Zone[] = [
   },
   {
     id: 'red',
-    label: 'Red zone',
+    label: 'Red Zone',
     min: 0,
     rule: 'Under 25 solved',
     advice: 'Focus list. Needs mentoring and a fixed daily practice slot.',
@@ -60,7 +60,7 @@ export const ZONES: Zone[] = [
   },
   {
     id: 'none',
-    label: 'Not linked',
+    label: 'Not Linked',
     rule: 'No LeetCode / GFG / Codeforces / CodeChef',
     advice: 'No usable DSA profile. Ask them to fix their entry in the form.',
     color: '#64748b',

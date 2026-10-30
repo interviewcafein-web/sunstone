@@ -38,7 +38,7 @@ export function CodingOverview({ profiles }: { profiles: CodingProfile[] }) {
 
   const distributions = [
     {
-      title: 'DSA · by difficulty',
+      title: 'DSA · By Difficulty',
       aside: 'LeetCode + GeeksforGeeks',
       rows: ['Easy', 'Medium', 'Hard'].map((label) => ({
         label,
@@ -47,8 +47,8 @@ export function CodingOverview({ profiles }: { profiles: CodingProfile[] }) {
       })),
     },
     {
-      title: 'Competitive programming',
-      aside: 'by platform',
+      title: 'Competitive Programming',
+      aside: 'By Platform',
       rows: (['codeforces', 'codechef'] as PlatformId[]).map((id) => ({
         label: platformOf(id).name,
         count: map[id]?.solved ?? 0,
@@ -89,19 +89,19 @@ export function CodingOverview({ profiles }: { profiles: CodingProfile[] }) {
           <OverviewTile
             icon={Target}
             tone="bg-brand-100 dark:bg-brand-900/60 text-brand-700 dark:text-brand-300"
-            label="Total solved"
+            label="Total Solved"
             value={formatNumber(solved)}
           />
           <OverviewTile
             icon={Flame}
             tone="bg-orange-100 text-orange-600"
-            label="Current streak"
+            label="Current Streak"
             value={`${streaks.current}d`}
           />
           <OverviewTile
             icon={Trophy}
             tone="bg-amber-100 text-amber-600"
-            label="Best streak"
+            label="Best Streak"
             value={`${streaks.best}d`}
           />
           <OverviewTile
@@ -124,7 +124,7 @@ export function CodingOverview({ profiles }: { profiles: CodingProfile[] }) {
         <div className="space-y-4">
           {distributions.length > 0 && (
             <Card>
-              <CardHeader title="Question distribution" />
+              <CardHeader title="Question Distribution" />
               <div className="space-y-6">
                 {distributions.map((group) => (
                   <Donut
@@ -153,7 +153,7 @@ export function CodingOverview({ profiles }: { profiles: CodingProfile[] }) {
           {awards.length > 0 && (
             <Card>
               <CardHeader
-                title="Badges & awards"
+                title="Badges & Awards"
                 aside={`${awards.length} earned${certificates ? ` · ${certificates} certificate${certificates === 1 ? '' : 's'}` : ''}`}
               />
               <BadgeWall badges={awards.slice(0, 12)} compact />
@@ -218,7 +218,7 @@ function ContestsCard({ profiles }: { profiles: CodingProfile[] }) {
   const attended = profiles.reduce((sum, profile) => sum + profile.rating!.contests, 0);
   return (
     <Card>
-      <CardHeader title="Contests & ratings" aside={`${attended} attended`} />
+      <CardHeader title="Contests & Ratings" aside={`${attended} attended`} />
       <ul className="divide-y divide-slate-100">
         {profiles.map((profile) => {
           const platform = platformOf(profile.platform);
@@ -258,7 +258,7 @@ function RatingHistoryCard({ profiles }: { profiles: CodingProfile[] }) {
   return (
     <Card>
       <CardHeader
-        title="Rating history"
+        title="Rating History"
         aside={
           withHistory.length > 1 && (
             <Segmented

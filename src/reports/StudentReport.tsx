@@ -156,13 +156,13 @@ export function StudentReport({ data }: { data: StudentReportData }) {
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
                 <StatTile
                   width="32%"
-                  label="Problems solved"
+                  label="Problems Solved"
                   value={formatNumber(solved)}
                   hint="all platforms"
                 />
                 <StatTile
                   width="32%"
-                  label="Active days"
+                  label="Active Days"
                   value={formatNumber(streaks.activeDays)}
                 />
                 <StatTile
@@ -174,13 +174,13 @@ export function StudentReport({ data }: { data: StudentReportData }) {
                 <StatTile width="32%" label="Contests" value={formatNumber(contests)} />
                 <StatTile
                   width="32%"
-                  label="Top contest rating"
+                  label="Top Contest Rating"
                   value={rated[0] ? formatNumber(rated[0].rating!.current!) : '—'}
                   hint={rated[0] ? platformOf(rated[0].platform).name : 'no rated contests'}
                 />
                 <StatTile
                   width="32%"
-                  label="Last 30 days"
+                  label="Last 30 Days"
                   value={formatNumber(windows[2].value)}
                   hint={`submissions · ${formatNumber(windows[1].value)} in the last 7 days`}
                 />
@@ -189,7 +189,7 @@ export function StudentReport({ data }: { data: StudentReportData }) {
               {/* Activity heatmap */}
               <View style={{ marginTop: 16, backgroundColor: SOFT, borderRadius: 8, padding: 12 }}>
                 <Text style={{ fontSize: 10, fontWeight: 700, marginBottom: 8 }}>
-                  Activity in the last year, all platforms
+                  Activity in the Last Year, All Platforms
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 1.6 }}>
                   {weeks.map((week, index) => (

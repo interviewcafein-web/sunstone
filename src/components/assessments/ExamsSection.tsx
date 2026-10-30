@@ -197,7 +197,7 @@ export function ExamsTab({ data }: { data: CampusExams }) {
 
       {mocks.length > 0 && (
         <section className={cn(panel, 'p-5')}>
-          <h2 className="text-lg font-bold">Mock interviews and group discussions</h2>
+          <h2 className="text-lg font-bold">Mock Interviews and Group Discussions</h2>
           <p className="text-sm text-slate-500">Scored by the panel on five criteria each.</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             {(['mock_pi', 'mock_gd'] as const).map((kind) => {

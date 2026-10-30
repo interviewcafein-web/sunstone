@@ -111,27 +111,27 @@ export function AttendanceTab({ data }: { data: CampusAttendance }) {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat
           icon={CalendarCheck}
-          label="Attendance, all classes"
+          label="Attendance, All Classes"
           value={`${data.pct ?? '—'}%`}
           tone={attendanceTone(data.pct)}
         />
         <Stat
           icon={GraduationCap}
-          label="Attendance, PRIME classes"
+          label="Attendance, PRIME Classes"
           value={data.prime_pct === null ? '—' : `${data.prime_pct}%`}
           tone={attendanceTone(data.prime_pct)}
         />
-        <Stat icon={Users} label="Students tracked" value={data.students.toLocaleString('en-IN')} />
+        <Stat icon={Users} label="Students Tracked" value={data.students.toLocaleString('en-IN')} />
         <Stat
           icon={School}
-          label="Attendance marks"
+          label="Attendance Marks"
           value={data.marks.toLocaleString('en-IN')}
           hint={data.syncedAt ? `Since 1 Jul · updated ${lmsDate(data.syncedAt)}` : undefined}
         />
       </div>
 
       <section className={cn(panel, 'p-5')}>
-        <h2 className="text-lg font-bold">Week by week</h2>
+        <h2 className="text-lg font-bold">Week by Week</h2>
         <p className="text-sm text-slate-500">
           Share of classes attended each week (75% line for reference).
         </p>
@@ -172,7 +172,7 @@ export function AttendanceTab({ data }: { data: CampusAttendance }) {
 
       <div className="grid gap-5 lg:grid-cols-2">
         <section className={cn(panel, 'self-start p-5')}>
-          <h2 className="text-lg font-bold">By subject</h2>
+          <h2 className="text-lg font-bold">By Subject</h2>
           <ul className="mt-3 space-y-3">
             {subjects.map((subject) => (
               <li key={subject.subject}>
@@ -206,14 +206,14 @@ export function AttendanceTab({ data }: { data: CampusAttendance }) {
               onClick={() => setAllSubjects(!allSubjects)}
               className="text-brand-700 dark:text-brand-300 mt-3 text-sm font-semibold hover:underline"
             >
-              {allSubjects ? 'Show fewer' : `Show all ${data.subjects.length} subjects`}
+              {allSubjects ? 'Show Fewer' : `Show All ${data.subjects.length} Subjects`}
             </button>
           )}
         </section>
 
         <section className={cn(panel, 'overflow-hidden')}>
           <div className="px-5 pt-5">
-            <h2 className="text-lg font-bold">By instructor</h2>
+            <h2 className="text-lg font-bold">By Instructor</h2>
             <p className="text-sm text-slate-500">
               PRIME coding domain instructors, with attendance in their PRIME coding classes.
             </p>
@@ -317,7 +317,7 @@ export function AmcatTab({
       )}
       {sections.length > 0 && (
         <section className={cn(panel, 'p-5')}>
-          <h2 className="text-lg font-bold">AMCAT section averages</h2>
+          <h2 className="text-lg font-bold">AMCAT Section Averages</h2>
           <p className="text-sm text-slate-500">
             {filtering ? 'The chosen rounds' : 'All rounds'} taken by these students, from the AMCAT
             platform (scores out of 100).
@@ -414,25 +414,25 @@ type Group = 'absent_low' | 'present_low' | 'absent_good' | 'on_track';
 
 const GROUPS: Record<Group, { title: string; who: string; color: string; icon: typeof Users }> = {
   absent_low: {
-    title: 'Not attending, scoring low',
+    title: 'Not Attending, Scoring Low',
     who: 'Follow up with the campus: students are missing classes.',
     color: '#ef4444',
     icon: UserX,
   },
   present_low: {
-    title: 'Attending, scoring low',
+    title: 'Attending, Scoring Low',
     who: 'Review teaching with the instructor: students come but do not score.',
     color: '#f59e0b',
     icon: TrendingDown,
   },
   absent_good: {
-    title: 'Scoring well, low attendance',
+    title: 'Scoring Well, Low Attendance',
     who: 'Doing well despite missing classes; encourage attendance.',
     color: '#0ea5e9',
     icon: Target,
   },
   on_track: {
-    title: 'On track',
+    title: 'On Track',
     who: 'Attending and scoring well.',
     color: '#10b981',
     icon: UserCheck,
@@ -463,7 +463,7 @@ export function InsightsPanel({ students }: { students: CampusStudentRow[] }) {
 
   return (
     <section className={cn(panel, 'p-5')}>
-      <h2 className="text-lg font-bold">Attendance vs. scores</h2>
+      <h2 className="text-lg font-bold">Attendance vs. Scores</h2>
       <p className="text-sm text-slate-500">
         Each dot is a student: class attendance across, PRIME Mock Test average up. Lines at{' '}
         {ATTENDANCE_OK}% attendance and {SCORE_OK}% score. Click a group to list its students.

@@ -133,12 +133,12 @@ export function ProfileMenu({ user, onLogOut }: { user: SessionInfo; onLogOut: (
           <div className="p-1.5">
             <Link to="/account" role="menuitem" className={item} onClick={() => setOpen(false)}>
               <UserRound className="size-4 text-slate-500" aria-hidden />
-              My profile
+              My Profile
             </Link>
             {user.managesTeam && (
               <Link to="/team" role="menuitem" className={item} onClick={() => setOpen(false)}>
                 <Users className="size-4 text-slate-500" aria-hidden />
-                Manage team
+                Manage Team
               </Link>
             )}
             <button
@@ -161,7 +161,7 @@ export function ProfileMenu({ user, onLogOut }: { user: SessionInfo; onLogOut: (
             </button>
             <Link to="/app" role="menuitem" className={item} onClick={() => setOpen(false)}>
               <Smartphone className="size-4 text-slate-500" aria-hidden />
-              Get the Android app
+              Get the Android App
             </Link>
             <div className="my-1 border-t border-slate-100" />
             <button
@@ -174,7 +174,7 @@ export function ProfileMenu({ user, onLogOut }: { user: SessionInfo; onLogOut: (
               )}
             >
               <LogOut className="size-4" aria-hidden />
-              Log out
+              Log Out
             </button>
           </div>
         </div>

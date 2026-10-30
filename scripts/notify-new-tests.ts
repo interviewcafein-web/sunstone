@@ -128,7 +128,7 @@ for (const [campusId, tests] of byCampus) {
       ),
       'Remind students to attempt it before it closes. Scores appear in Vertex after the nightly sync.'
     ),
-    cta: { label: 'See the campus journey', href: `${SITE}${link}` },
+    cta: { label: 'See the Campus Journey', href: `${SITE}${link}` },
     footer: `Sent automatically by Vertex to ${escape(campus)} staff, with HQ copied.`,
   });
   const email = await addNotice(sql, directory, {

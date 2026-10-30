@@ -176,7 +176,7 @@ function headline(scope: GroupStats, testsThisWeek: number) {
     </td>`;
   return `<tr><td style="padding:22px 24px 0">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-      ${tile('Overall health', scope.overall === null ? '—' : String(scope.overall), overallColor(scope.overall), `${scope.students.toLocaleString('en-IN')} students`)}
+      ${tile('Overall Health', scope.overall === null ? '—' : String(scope.overall), overallColor(scope.overall), `${scope.students.toLocaleString('en-IN')} students`)}
       ${tile('At risk on 3+ fronts', atRisk.toLocaleString('en-IN'), atRisk ? BAND.risk : BAND.good, 'start here')}
       ${tile('Attendance last week', weeks.length ? `${weeks[weeks.length - 1]}%` : '—', BAND[bandOf(DIMENSIONS[1], weeks.at(-1) ?? null)], change === null ? 'no trend yet' : `${change >= 0 ? '▲ +' : '▼ '}${Math.abs(change)} vs week before`)}
       ${tile('New tests this week', String(testsThisWeek), '#274f87', active === null ? 'released' : `${active}% coded last week`)}
@@ -211,7 +211,7 @@ function fronts(scope: GroupStats, benchmark?: GroupStats) {
     ];
   });
   return section(
-    'The five fronts',
+    'The Five Fronts',
     table([{ label: 'Front' }, { label: 'Average', align: 'center' }, { label: 'Students' }], rows),
     'Coding is the best solved count on one platform (100+ is full marks).'
   );
@@ -222,12 +222,12 @@ const SEVERITY = { high: BAND.risk, medium: BAND.ok, low: BAND.none } as const;
 function pains(points: PainPoint[]) {
   if (!points.length) {
     return section(
-      'Pain points',
+      'Pain Points',
       `<div style="font-size:14px;color:${BAND.good}">Nothing stands out this week. 🎉</div>`
     );
   }
   return section(
-    'Pain points',
+    'Pain Points',
     points
       .slice(0, 6)
       .map(
@@ -298,7 +298,7 @@ function people(rows: StudentInsight[], showCampus: boolean) {
   return (
     (coders.length
       ? section(
-          '🏆 Top coders',
+          '🏆 Top Coders',
           table(
             [{ label: 'Student' }, { label: 'Solved', align: 'right' }],
             coders.map((row, index) => [
@@ -311,7 +311,7 @@ function people(rows: StudentInsight[], showCampus: boolean) {
       : '') +
     (rounders.length
       ? section(
-          '⭐ All-rounders',
+          '⭐ All-Rounders',
           table(
             [{ label: 'Student' }, { label: 'Overall', align: 'right' }],
             rounders.map((row, index) => [
@@ -324,9 +324,9 @@ function people(rows: StudentInsight[], showCampus: boolean) {
       : '') +
     (flagged.length
       ? section(
-          '🚩 Students who need attention',
+          '🚩 Students Who Need Attention',
           table(
-            [{ label: 'Student' }, { label: 'At risk on' }],
+            [{ label: 'Student' }, { label: 'At Risk On' }],
             flagged
               .slice(0, 8)
               .map((row) => [
@@ -352,7 +352,7 @@ const CATEGORY_NAME: Record<string, string> = {
 function unusualScores(tests: FlaggedTest[], showCampus: boolean) {
   if (!tests.length) return '';
   return section(
-    '⚠️ Tests with unusually high scores',
+    '⚠️ Tests with Unusually High Scores',
     table(
       [{ label: 'Test' }, { label: 'Why' }, { label: 'Flag', align: 'center' }],
       tests
@@ -425,10 +425,10 @@ function deliverySection(entry: DeliveryEntry | undefined) {
       .slice(0, 5);
     if (behind.length) {
       inner +=
-        `<div style="margin-top:14px;font-size:12px;font-weight:bold;color:#475569">Sections furthest behind</div>` +
+        `<div style="margin-top:14px;font-size:12px;font-weight:bold;color:#475569">Sections Furthest Behind</div>` +
         table(
           [
-            { label: 'Batch · section' },
+            { label: 'Batch · Section' },
             { label: 'Verified', align: 'right' },
             { label: 'Done', align: 'right' },
           ],
@@ -442,14 +442,14 @@ function deliverySection(entry: DeliveryEntry | undefined) {
     const trainers = data.trainers as Record<string, unknown>[];
     if (trainers.length) {
       inner +=
-        `<div style="margin-top:14px;font-size:12px;font-weight:bold;color:#475569">By trainer</div>` +
+        `<div style="margin-top:14px;font-size:12px;font-weight:bold;color:#475569">By Trainer</div>` +
         table(
           [
             { label: 'Trainer' },
             { label: 'Verified', align: 'right' },
             { label: 'Awaiting', align: 'right' },
             { label: 'Classes', align: 'right' },
-            { label: 'Last logged', align: 'right' },
+            { label: 'Last Logged', align: 'right' },
           ],
           trainers.map((trainer) => [
             `<b>${escape(String(trainer.name))}</b>${Number(trainer.rejected) ? `<div style="font-size:11px;color:${BAND.risk}">${trainer.rejected} entries rejected</div>` : ''}`,
@@ -464,13 +464,13 @@ function deliverySection(entry: DeliveryEntry | undefined) {
     }
     if (data.unlogged && data.unlogged.classes > 0) {
       inner += `<div style="margin-top:14px;padding:10px 12px;border:1px solid #fcd34d;background:#fffbeb;border-radius:10px;font-size:13px;color:#78350f">
-  <b>${data.unlogged.classes} class${data.unlogged.classes === 1 ? '' : 'es'} not logged yet</b>: PRIME coding classes in the LMS time table on days the trainer logged nothing in the tracker (${escape(
+  <b>Classes Not Logged Yet: ${data.unlogged.classes}</b>: PRIME coding classes in the LMS time table on days the trainer logged nothing in the tracker (${escape(
     data.unlogged.trainers.map((trainer) => `${trainer.name} ${trainer.classes}`).join(', ')
   )}).</div>`;
     }
   }
   if (entry.instructors.length) {
-    inner += `<div style="margin-top:14px;font-size:13px;color:#334155"><b>PRIME coding instructors</b> (attendance in their classes): ${entry.instructors
+    inner += `<div style="margin-top:14px;font-size:13px;color:#334155"><b>PRIME Coding Instructors</b> (attendance in their classes): ${entry.instructors
       .map((person) => `${escape(person.name)} ${person.pct === null ? '—' : `${person.pct}%`}`)
       .join(' · ')}</div>`;
   }
@@ -481,7 +481,7 @@ function deliverySection(entry: DeliveryEntry | undefined) {
       ].filter(Boolean)
     : [];
   return section(
-    '📚 PRIME coding delivery',
+    '📚 PRIME Coding Delivery',
     inner,
     `From the delivery tracker: allocated hours, verified, awaiting verification and still to go.${notes.length ? ` ${notes.join('; ')}.` : ''}`
   );
@@ -506,14 +506,14 @@ function deliveryComparison(entries: DeliveryEntry[]) {
     { allocated: 0, delivered: 0 }
   );
   return section(
-    '📚 PRIME coding delivery by campus',
+    '📚 PRIME Coding Delivery by Campus',
     table(
       [
         { label: 'Campus' },
         { label: 'Verified', align: 'right' },
         { label: 'Done', align: 'right' },
         { label: 'Awaiting', align: 'right' },
-        { label: 'Not logged', align: 'right' },
+        { label: 'Not Logged', align: 'right' },
       ],
       rows.map(({ entry, data, pct }) => [
         `<b>${escape(entry.campus)}</b>`,
@@ -549,7 +549,7 @@ function reportEmail(
   const link = options.campus
     ? `/insights?campus=${encodeURIComponent(options.campus)}`
     : '/insights';
-  const title = options.campus ?? 'All campuses';
+  const title = options.campus ?? 'All Campuses';
   const subject = `Weekly report · ${title} · ${week}`;
   const html = frame({
     kicker: 'Weekly report',
@@ -567,7 +567,7 @@ function reportEmail(
         : deliverySection(options.delivery)) +
       unusualScores(options.flagged, !options.campus) +
       people(rows, !options.campus),
-    cta: { label: 'Open the 360° view', href: `${SITE}${link}` },
+    cta: { label: 'Open the 360° View', href: `${SITE}${link}` },
     footer: options.campus
       ? `Sent every Monday to ${escape(options.campus)} staff, with HQ copied.`
       : 'Sent every Monday to HQ.',
@@ -575,7 +575,7 @@ function reportEmail(
   const text = [
     subject,
     '',
-    `Overall health: ${scope.overall ?? '—'} · ${scope.students} students · ${scope.critical} at risk on 3+ fronts`,
+    `Overall Health: ${scope.overall ?? '—'} · ${scope.students} students · ${scope.critical} at risk on 3+ fronts`,
     '',
     'Pain points:',
     ...points.slice(0, 6).map((point) => `- ${point.title}: ${point.detail}`),
@@ -598,7 +598,7 @@ function reportEmail(
 
 // --- Build every report --------------------------------------------------------------------
 
-const all = groupStats('All campuses', insights);
+const all = groupStats('All Campuses', insights);
 const campusGroups = groupBy(insights, (row) => row.student.campus).filter(
   (group) => group.students >= 5
 );

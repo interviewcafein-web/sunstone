@@ -80,8 +80,8 @@ export default function InsightsPage() {
     ? inCampus.filter((row) => row.student.batch === search.batch)
     : inCampus;
 
-  const overallStats = useMemo(() => groupStats('All campuses', all), [all]);
-  const scopeName = [search.campus ?? 'All campuses', search.batch && `Batch ${search.batch}`]
+  const overallStats = useMemo(() => groupStats('All Campuses', all), [all]);
+  const scopeName = [search.campus ?? 'All Campuses', search.batch && `Batch ${search.batch}`]
     .filter(Boolean)
     .join(' · ');
   const scope = useMemo(() => groupStats(scopeName, scoped), [scopeName, scoped]);
@@ -128,14 +128,14 @@ export default function InsightsPage() {
               label="Campus"
               value={search.campus ?? ''}
               options={campuses}
-              all="All campuses"
+              all="All Campuses"
               onChange={(campus) => setScope({ campus: campus || undefined })}
             />
             <ScopeSelect
               label="Batch"
               value={search.batch ?? ''}
               options={batches}
-              all="All batches"
+              all="All Batches"
               onChange={(batch) => setScope({ campus: search.campus, batch: batch || undefined })}
             />
           </div>
@@ -272,7 +272,7 @@ function OverallBadge({
         suffix=""
       />
       <div>
-        <p className="text-sm font-semibold">Overall health</p>
+        <p className="text-sm font-semibold">Overall Health</p>
         <p className="text-brand-100 text-xs">Average across all five fronts</p>
         <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#ef4444]/25 px-2 py-0.5 text-xs font-semibold text-[#fee2e2] ring-1 ring-[#fca5a5]/40">
           <AlertOctagon className="size-3.5" aria-hidden />
@@ -391,9 +391,9 @@ function DimensionCard({
 function BandBar({ good, ok, risk }: { good: number; ok: number; risk: number }) {
   const total = good + ok + risk || 1;
   const parts = [
-    { label: 'Doing well', value: good, color: BAND_COLORS.good },
+    { label: 'Doing Well', value: good, color: BAND_COLORS.good },
     { label: 'Average', value: ok, color: BAND_COLORS.ok },
-    { label: 'At risk', value: risk, color: BAND_COLORS.risk },
+    { label: 'At Risk', value: risk, color: BAND_COLORS.risk },
   ];
   return (
     <div className="mt-3">
@@ -442,7 +442,7 @@ function ShapeRadar({
   }));
   return (
     <section className={cn(panel, 'p-5', className)}>
-      <h2 className="text-lg font-bold">Strengths at a glance</h2>
+      <h2 className="text-lg font-bold">Strengths at a Glance</h2>
       <p className="text-sm text-slate-500">
         The fuller the shape, the healthier.{benchmark ? ' Dashed: all campuses.' : ''}
       </p>
@@ -477,7 +477,7 @@ function ShapeRadar({
                 color: colors.text,
                 fontSize: 12,
               }}
-              formatter={(value, key) => [value, key === 'all' ? 'All campuses' : scope.key]}
+              formatter={(value, key) => [value, key === 'all' ? 'All Campuses' : scope.key]}
             />
           </RadarChart>
         </ResponsiveContainer>
@@ -734,7 +734,7 @@ function EngagementScatter({ rows }: { rows: StudentInsight[] }) {
 
   return (
     <section className={cn(panel, 'p-5')}>
-      <h2 className="text-lg font-bold">Engagement map</h2>
+      <h2 className="text-lg font-bold">Engagement Map</h2>
       <p className="text-sm text-slate-500">
         Each dot is a student: attendance across, PRIME Mock Test average up, colour by coding zone.
         Lines at 75% attendance and 50% score.
@@ -907,7 +907,7 @@ function AttentionList({ rows, className }: { rows: StudentInsight[]; className?
     <section className={cn(panel, 'p-5', className)}>
       <h2 className="flex items-center gap-2 text-lg font-bold">
         <AlertOctagon className="size-5 text-red-500" aria-hidden />
-        Students who need attention
+        Students Who Need Attention
       </h2>
       <p className="text-sm text-slate-500">
         At risk on two fronts or more, most fronts first. {flagged.length.toLocaleString('en-IN')}{' '}
@@ -940,7 +940,7 @@ function StarsList({ rows, className }: { rows: StudentInsight[]; className?: st
     <section className={cn(panel, 'p-5', className)}>
       <h2 className="flex items-center gap-2 text-lg font-bold">
         <Star className="size-5 text-amber-400" aria-hidden />
-        All-rounders
+        All-Rounders
       </h2>
       <p className="text-sm text-slate-500">Highest overall, with data on three fronts or more.</p>
       <ol className="mt-2 divide-y divide-slate-100">

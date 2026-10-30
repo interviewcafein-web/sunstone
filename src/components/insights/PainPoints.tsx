@@ -82,7 +82,7 @@ function PlanPanel({
     <div className="mt-4 rounded-xl border border-amber-300/70 bg-gradient-to-br from-amber-50/80 to-white p-4 dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent">
       <p className="flex items-center gap-1.5 text-sm font-bold">
         <Sparkles className="size-4 text-amber-500" aria-hidden />
-        AI action plan
+        AI Action Plan
         <span className="ml-auto text-[11px] font-normal text-slate-500">
           AI suggestions · check before acting
         </span>
@@ -101,7 +101,7 @@ function PlanPanel({
             onClick={onRetry}
             className="font-semibold underline-offset-2 hover:underline"
           >
-            Try again
+            Try Again
           </button>
         </p>
       )}
@@ -148,7 +148,7 @@ export function PainPoints({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-lg font-bold">
           <AlertTriangle className="size-5 text-amber-500" aria-hidden />
-          Pain points
+          Pain Points
         </h2>
         <div className="flex items-center gap-3">
           {action ?? <span className="text-xs text-slate-500">Most pressing first</span>}
@@ -164,7 +164,7 @@ export function PainPoints({
               ) : (
                 <Sparkles className="size-3.5" aria-hidden />
               )}
-              AI action plan
+              AI Action Plan
             </button>
           )}
         </div>
@@ -226,7 +226,7 @@ export function PainPoints({
           onClick={() => setShowAll(!showAll)}
           className="text-brand-700 dark:text-brand-300 mt-3 text-xs font-semibold hover:underline"
         >
-          {showAll ? 'Show fewer' : `Show all ${points.length}`}
+          {showAll ? 'Show Fewer' : `Show All ${points.length}`}
         </button>
       )}
       <div ref={planRef}>

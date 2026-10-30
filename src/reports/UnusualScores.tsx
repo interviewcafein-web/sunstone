@@ -1,4 +1,4 @@
-// "Tests with unusually high scores": tests taken in an open browser whose scores are high and
+// "Tests with Unusually High Scores": tests taken in an open browser whose scores are high and
 // uniform enough to suggest answers were shared (src/lib/integrity.ts). A sign, not proof.
 
 import { Page, Text, View } from '@react-pdf/renderer';
@@ -61,7 +61,7 @@ export function UnusualScoresPage({
       style={[base.page, { paddingTop: 28, paddingHorizontal: 32 }]}
       wrap
     >
-      <Text style={{ fontSize: 16, fontWeight: 800 }}>Tests with unusually high scores</Text>
+      <Text style={{ fontSize: 16, fontWeight: 800 }}>Tests with Unusually High Scores</Text>
       <Text style={{ fontSize: 8.5, color: MUTED, marginTop: 3 }}>
         {formatNumber(tests.length)} tests. {INTEGRITY_NOTE}
       </Text>

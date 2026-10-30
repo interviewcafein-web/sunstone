@@ -213,7 +213,7 @@ export default function AssessmentsPage() {
       <section className={heroClass}>
         <p className="text-brand-200 text-xs font-semibold tracking-[0.2em] uppercase">Campuses</p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
-          Every campus at a glance
+          Every Campus at a Glance
         </h1>
         <p className="text-brand-100 mt-2 max-w-2xl text-sm">
           PRIME Mock Tests, attendance, exams and AMCAT for each campus, from the Sunstone LMS. Open
@@ -222,13 +222,13 @@ export default function AssessmentsPage() {
         <dl className="relative mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
           <HeroStat
             icon={Building2}
-            label="Campuses with tests"
+            label="Campuses with Tests"
             value={String(active.length)}
             note={`of ${campuses.length}`}
           />
           <HeroStat
             icon={BookOpenCheck}
-            label="Tests held"
+            label="Tests Held"
             value={totals.tests.toLocaleString('en-IN')}
           />
           <HeroStat
@@ -254,9 +254,9 @@ export default function AssessmentsPage() {
 }
 
 const HEALTH = [
-  { min: 75, label: 'On track', chip: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-  { min: 50, label: 'Needs attention', chip: 'bg-amber-50 text-amber-700 ring-amber-200' },
-  { min: 0, label: 'At risk', chip: 'bg-red-50 text-red-700 ring-red-200' },
+  { min: 75, label: 'On Track', chip: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+  { min: 50, label: 'Needs Attention', chip: 'bg-amber-50 text-amber-700 ring-amber-200' },
+  { min: 0, label: 'At Risk', chip: 'bg-red-50 text-red-700 ring-red-200' },
 ];
 
 function CampusCard({ campus }: { campus: CampusOverview }) {
@@ -336,7 +336,7 @@ function CampusCard({ campus }: { campus: CampusOverview }) {
             <div className="mt-5 grid grid-cols-3 gap-2">
               {[
                 { label: 'Participation', value: participation, icon: Users },
-                { label: 'Avg score', value: campus.avg_pct, icon: Target },
+                { label: 'Avg Score', value: campus.avg_pct, icon: Target },
                 { label: 'Attendance', value: campus.attendance_pct, icon: CalendarCheck },
               ].map(({ label, value, icon: Icon }) => (
                 <div
@@ -373,8 +373,8 @@ function CampusCard({ campus }: { campus: CampusOverview }) {
         {(campus.attendance_weeks.length > 1 || campus.test_weeks.length > 1) && (
           <div className="mt-4 grid grid-cols-2 gap-2">
             {[
-              { label: 'Attendance, weekly', values: campus.attendance_weeks },
-              { label: 'Tests, weekly', values: campus.test_weeks },
+              { label: 'Attendance, Weekly', values: campus.attendance_weeks },
+              { label: 'Tests, Weekly', values: campus.test_weeks },
             ].map(({ label, values }) => (
               <div key={label} className="rounded-xl border border-slate-200/80 px-3 pt-2 pb-1">
                 <p className="flex items-center justify-between gap-1 text-[11px] text-slate-500">
@@ -399,7 +399,7 @@ const CATEGORIES: TestCategory[] = ['assignment', 'test', 'mcq', 'amcat_mock'];
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'subject', label: 'Prime Mock Test', icon: Trophy },
+  { id: 'subject', label: 'PRIME Mock Test', icon: Trophy },
   { id: 'modules', label: 'Practice Test and MCQs', icon: FolderTree },
   { id: 'amcat', label: 'AMCAT', icon: Award },
   { id: 'exams', label: 'Exams', icon: NotebookPen },
@@ -531,7 +531,7 @@ function CampusView({
         >
           <HeroStat
             icon={BookOpenCheck}
-            label="Tests held"
+            label="Tests Held"
             value={String(summary.tests)}
             note={summary.scheduled ? `+${summary.scheduled} scheduled` : undefined}
             trend={data.timeline.map((week) => week.tests)}
@@ -546,7 +546,7 @@ function CampusView({
           />
           <HeroStat
             icon={Target}
-            label="Average score"
+            label="Average Score"
             value={summary.avg_pct === null ? '—' : `${summary.avg_pct}%`}
             trend={data.timeline.map((week) => week.avg_pct)}
           />
@@ -561,7 +561,7 @@ function CampusView({
           />
           <HeroStat
             icon={CalendarDays}
-            label="Learning & Practice started"
+            label="Learning & Practice Started"
             value={`${percent(summary.modules_started, summary.modules)}%`}
             note={`${summary.modules_started}/${summary.modules} modules`}
           />
@@ -707,7 +707,7 @@ function CampusPainPoints({
           search={{ campus, batch: cohort.year }}
           className="text-brand-700 dark:text-brand-300 inline-flex items-center gap-1 text-sm font-semibold hover:underline"
         >
-          Full 360° view
+          Full 360° View
           <ChevronRight className="size-4" aria-hidden />
         </Link>
       }
@@ -746,7 +746,7 @@ function BatchPicker({
     <div className="mt-4 space-y-2" data-tour="campus-batches">
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Program">
         <button type="button" onClick={() => onChange(undefined)} className={pillClass(!value)}>
-          All batches
+          All Batches
         </button>
         {programs.map(({ name, students }) => (
           <button
@@ -771,7 +771,7 @@ function BatchPicker({
             onClick={() => onChange(`${program}:`)}
             className={pillClass(value === `${program}:`)}
           >
-            All years
+            All Years
           </button>
           {cohorts.map((batch) => (
             <button
@@ -869,7 +869,7 @@ function ModuleGrid({ modules }: { modules: SyllabusModule[] }) {
           onClick={() => setAll(!all)}
           className="text-brand-700 dark:text-brand-300 mt-3 text-sm font-semibold hover:underline"
         >
-          {all ? 'Show fewer' : `Show all ${modules.length} modules`}
+          {all ? 'Show Fewer' : `Show All ${modules.length} Modules`}
         </button>
       )}
     </>
@@ -980,7 +980,7 @@ function OverviewTab({
       </section>
 
       <section className={cn(panel, 'p-5')}>
-        <h2 className="text-lg font-bold">Up next</h2>
+        <h2 className="text-lg font-bold">Up Next</h2>
         <ul className="mt-3 space-y-2">
           {[...live, ...scheduled].slice(0, 8).map((test) => (
             <li key={test.ids.join(',')}>
@@ -1014,7 +1014,7 @@ function OverviewTab({
         </ul>
         {recent.length > 0 && (
           <>
-            <h3 className="mt-5 text-sm font-semibold text-slate-600">Recently completed</h3>
+            <h3 className="mt-5 text-sm font-semibold text-slate-600">Recently Completed</h3>
             <ul className="mt-2 space-y-1.5">
               {recent.map((test) => (
                 <li key={test.ids.join(',')}>
@@ -1095,7 +1095,7 @@ function SubjectTestsTab({
   if (!tests.length) {
     return (
       <p className={cn(panel, 'p-5 text-sm text-slate-500')}>
-        No Prime Mock Tests (such as AMCAT mocks) for this campus yet.
+        No PRIME Mock Tests (such as AMCAT mocks) for this campus yet.
       </p>
     );
   }
@@ -1392,7 +1392,7 @@ function StudentsTab({
   rounds,
 }: {
   students: CampusStudentRow[];
-  /** Prime Mock Tests, for one column each. */
+  /** PRIME Mock Tests, for one column each. */
   mocks: SubjectTest[];
   /** AMCAT rounds, for one column each. */
   rounds: AmcatRound[];
@@ -1459,7 +1459,7 @@ function StudentsTab({
           <div>
             <h2 className="text-lg font-bold">Students</h2>
             <p className="text-sm text-slate-500">
-              Every Prime Mock Test and AMCAT round, one column each, best mock average first.
+              Every PRIME Mock Test and AMCAT round, one column each, best mock average first.
               Scroll sideways for more; open a student for their full journey.
             </p>
           </div>
@@ -1486,7 +1486,7 @@ function StudentsTab({
                   colSpan={mockColumns.length + 1}
                   className={cn(group, 'text-brand-700 dark:text-brand-300 px-3 py-1.5')}
                 >
-                  Prime Mock Tests
+                  PRIME Mock Tests
                 </th>
                 <th
                   colSpan={roundColumns.length + 1}
@@ -1829,7 +1829,7 @@ function TestPanel({
               />
               <HeroStat
                 icon={Trophy}
-                label="Top score"
+                label="Top Score"
                 value={scores.length ? `${Math.max(...scores)}%` : '—'}
               />
             </dl>
@@ -1871,7 +1871,7 @@ function TestPanel({
             <div className="space-y-5">
               {scores.length > 0 && (
                 <div>
-                  <h3 className="mb-2 text-sm font-semibold">Score distribution</h3>
+                  <h3 className="mb-2 text-sm font-semibold">Score Distribution</h3>
                   <div className="h-40">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={bands} margin={{ top: 4, right: 4, bottom: 0, left: -24 }}>
@@ -1952,7 +1952,7 @@ function TestPanel({
 
               {pending.length > 0 && (
                 <div>
-                  <h3 className="mb-2 text-sm font-semibold">Not submitted · {pending.length}</h3>
+                  <h3 className="mb-2 text-sm font-semibold">Not Submitted · {pending.length}</h3>
                   <ul className="flex flex-wrap gap-1.5">
                     {pending.map((student) => (
                       <li key={student.username}>

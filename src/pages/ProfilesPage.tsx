@@ -203,7 +203,7 @@ export function ProfileView({ name, handles, student, onSubmit, view, onView }: 
                   className="text-brand-800 hover:bg-brand-50 inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold"
                 >
                   <IdCard className="size-3.5" aria-hidden />
-                  Coding card
+                  Coding Card
                 </Link>
               )}
               <button
@@ -549,7 +549,7 @@ function PlatformTab({
             onClick={() => query.refetch()}
             className="mt-3 rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium hover:bg-slate-50"
           >
-            Try again
+            Try Again
           </button>
         )}
       </Card>

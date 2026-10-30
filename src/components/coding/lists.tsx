@@ -242,7 +242,7 @@ export function CertificateCards({ certificates }: { certificates: Certificate[]
             onClick={() => setShowAll(!showAll)}
             className="text-brand-700 dark:text-brand-300 text-sm font-semibold hover:underline"
           >
-            {showAll ? 'Show fewer' : `Show all ${certificates.length}`}
+            {showAll ? 'Show Fewer' : `Show All ${certificates.length}`}
           </button>
         </div>
       )}
@@ -255,7 +255,7 @@ export function CertificateCards({ certificates }: { certificates: Certificate[]
 export function RepoCards({ repos }: { repos: Repo[] }) {
   return (
     <Card>
-      <CardHeader title="Top repositories" aside="by stars" />
+      <CardHeader title="Top Repositories" aside="by stars" />
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {repos.map((repo) => (
           <li key={repo.name}>

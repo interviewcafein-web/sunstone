@@ -80,7 +80,7 @@ function TrainerRow({ trainer, peak }: { trainer: Trainer; peak: number }) {
       </div>
       {trainer.rejected > 0 && (
         <p className="mt-1 text-[11px] text-red-600">
-          {trainer.rejected} entr{trainer.rejected === 1 ? 'y' : 'ies'} rejected at verification
+          Rejected at Verification: {trainer.rejected}
         </p>
       )}
     </li>
@@ -102,7 +102,7 @@ function NotLogged({ data }: { data: NonNullable<CampusDelivery['unlogged']> }) 
     <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2.5 dark:border-amber-500/30 dark:bg-amber-500/10">
       <p className="flex items-center gap-1.5 text-sm font-semibold text-amber-800 dark:text-amber-300">
         <NotebookPen className="size-4" aria-hidden />
-        {data.classes} class{data.classes === 1 ? '' : 'es'} not logged yet
+        Classes Not Logged Yet: {data.classes}
       </p>
       <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
         Of {data.checked} PRIME coding classes in the LMS time table ({range}), these were on days
@@ -185,13 +185,13 @@ export function DeliverySection({ data }: { data: CampusDelivery | null }) {
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
             { icon: CheckCircle2, label: 'Classes', value: data.classes.toLocaleString('en-IN') },
-            { icon: Code2, label: 'Problems solved', value: data.problems.toLocaleString('en-IN') },
+            { icon: Code2, label: 'Problems Solved', value: data.problems.toLocaleString('en-IN') },
             {
               icon: GraduationCap,
-              label: 'Class attendance',
+              label: 'Class Attendance',
               value: data.attendance === null ? '—' : `${data.attendance}%`,
             },
-            { icon: CalendarDays, label: 'Last class', value: lmsDate(data.last_class) },
+            { icon: CalendarDays, label: 'Last Class', value: lmsDate(data.last_class) },
           ].map(({ icon: Icon, label, value }) => (
             <div key={label} className="rounded-xl border border-slate-200 p-3">
               <dt className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -208,8 +208,8 @@ export function DeliverySection({ data }: { data: CampusDelivery | null }) {
         <dl className="mt-3 grid gap-2 sm:grid-cols-3">
           {[
             { label: 'Verified', hours: data.delivered, color: paceColor(done) },
-            { label: 'Awaiting verification', hours: data.pending, color: PENDING },
-            { label: 'Still to go', hours: remaining, color: '#cbd5e1' },
+            { label: 'Awaiting Verification', hours: data.pending, color: PENDING },
+            { label: 'Still to Go', hours: remaining, color: '#cbd5e1' },
           ].map((part) => (
             <div
               key={part.label}
@@ -227,13 +227,9 @@ export function DeliverySection({ data }: { data: CampusDelivery | null }) {
           ))}
         </dl>
         <div className="mt-2 flex flex-wrap gap-x-4 text-[11px] text-slate-500">
-          {data.rejected > 0 && <span>{data.rejected} entries rejected</span>}
-          {data.invalid > 0 && <span>{data.invalid} left out (impossible duration)</span>}
-          {data.duplicates > 0 && (
-            <span>
-              {data.duplicates} repeat submission{data.duplicates === 1 ? '' : 's'} counted once
-            </span>
-          )}
+          {data.rejected > 0 && <span>Rejected Entries: {data.rejected}</span>}
+          {data.invalid > 0 && <span>Left Out (Impossible Duration): {data.invalid}</span>}
+          {data.duplicates > 0 && <span>Repeat Submissions Counted Once: {data.duplicates}</span>}
         </div>
       </div>
 
@@ -242,7 +238,7 @@ export function DeliverySection({ data }: { data: CampusDelivery | null }) {
         <div>
           <h3 className="flex items-center gap-1.5 text-sm font-bold">
             <Hourglass className="size-4 text-slate-400" aria-hidden />
-            By batch and section
+            By Batch and Section
           </h3>
           <ul className="mt-2 space-y-2.5">
             {data.sections.map((row) => {
@@ -283,7 +279,7 @@ export function DeliverySection({ data }: { data: CampusDelivery | null }) {
           <div>
             <h3 className="flex items-center gap-1.5 text-sm font-bold">
               <Users className="size-4 text-slate-400" aria-hidden />
-              By trainer
+              By Trainer
             </h3>
             <p className="mt-0.5 text-xs text-slate-500">
               Verified hours, and hours awaiting verification, as logged in the tracker.
@@ -303,7 +299,7 @@ export function DeliverySection({ data }: { data: CampusDelivery | null }) {
             <div>
               <h3 className="flex items-center gap-1.5 text-sm font-bold">
                 <Clock className="size-4 text-slate-400" aria-hidden />
-                Hours taught each week
+                Hours Taught Each Week
               </h3>
               <div className="mt-2 flex items-end gap-1" style={{ height: 72 }}>
                 {data.weeks.slice(-12).map((week, index, all) => {
@@ -338,7 +334,7 @@ export function DeliverySection({ data }: { data: CampusDelivery | null }) {
       {/* The syllabus, topic by topic */}
       <div className="border-t border-slate-200 p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-sm font-bold">Syllabus coverage</h3>
+          <h3 className="text-sm font-bold">Syllabus Coverage</h3>
           <span className="text-xs text-slate-500">
             {covered} of {data.topics.length} topics taught
           </span>
@@ -394,7 +390,7 @@ export function DeliverySection({ data }: { data: CampusDelivery | null }) {
             onClick={() => setAllTopics(!allTopics)}
             className="text-brand-700 dark:text-brand-300 mt-3 text-sm font-semibold hover:underline"
           >
-            {allTopics ? 'Show fewer' : 'Show every topic'}
+            {allTopics ? 'Show Fewer' : 'Show Every Topic'}
           </button>
         )}
       </div>

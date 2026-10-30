@@ -13,7 +13,7 @@ import { cohortLabel } from '@/lib/cohorts';
 /** Gold, silver and bronze (fixed hex: the theme's colour scales flip in dark mode). */
 const PODIUM = [
   { color: '#f59e0b', soft: '#fde68a', label: 'Champion' },
-  { color: '#94a3b8', soft: '#e2e8f0', label: 'Runner-up' },
+  { color: '#94a3b8', soft: '#e2e8f0', label: 'Runner-Up' },
   { color: '#ea580c', soft: '#fed7aa', label: 'Third' },
 ];
 
@@ -37,8 +37,8 @@ export function TopPerformers({ rows }: { rows: StudentRow[] }) {
         <span className="flex size-7 items-center justify-center rounded-lg bg-[#f59e0b]/15">
           <Trophy className="size-4 text-[#f59e0b]" aria-hidden />
         </span>
-        Top performers
-        <span className="text-xs font-medium text-slate-500">· most problems solved</span>
+        Top Performers
+        <span className="text-xs font-medium text-slate-500">· Most Problems Solved</span>
       </h2>
       <ol className="grid gap-4 pt-2 md:grid-cols-3">
         {top.map((row, place) => {

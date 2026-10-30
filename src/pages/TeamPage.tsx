@@ -182,7 +182,7 @@ export default function TeamPage() {
               Team &amp; access
             </p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
-              Who can sign in, and what they see
+              Who Can Sign In, and What They See
             </h1>
             <p className="text-brand-100 mt-2 max-w-2xl text-sm">
               Everyone signs in with Google or an emailed code. HQ sees every campus; campus teams
@@ -306,7 +306,7 @@ export default function TeamPage() {
                   ) : (
                     <span className="inline-flex items-center gap-1">
                       <Globe2 className="size-3.5 text-slate-400" aria-hidden />
-                      All campuses
+                      All Campuses
                     </span>
                   )}
                 </div>
@@ -424,7 +424,7 @@ function MemberForm({
       <div className="flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-lg font-bold">
           <ShieldCheck className="text-brand-700 dark:text-brand-300 size-5" aria-hidden />
-          {draft.existing ? `Change access for ${draft.email}` : 'Add a person'}
+          {draft.existing ? `Change access for ${draft.email}` : 'Add a Person'}
         </h2>
         <button
           type="button"

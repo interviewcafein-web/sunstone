@@ -20,7 +20,7 @@ export default function PrivacyPage() {
       <header>
         <p className="text-brand-700 dark:text-brand-300 flex items-center gap-2 text-xs font-semibold tracking-[0.2em] uppercase">
           <ShieldCheck className="size-4" aria-hidden />
-          Privacy policy
+          Privacy Policy
         </p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
           Sunstone PRIME Vertex
@@ -28,7 +28,7 @@ export default function PrivacyPage() {
         <p className="mt-1 text-sm text-slate-500">Last updated {UPDATED}</p>
       </header>
 
-      <Section title="What Vertex is">
+      <Section title="What Vertex Is">
         <p>
           Sunstone PRIME Vertex is a dashboard used by the Sunstone PRIME team to follow
           students&apos; coding practice across platforms such as LeetCode, GeeksforGeeks,
@@ -37,7 +37,7 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <Section title="Information we use">
+      <Section title="Information We Use">
         <p>
           <strong>Students.</strong> Name, campus, course, batch and enrolment status from the
           Sunstone learning platform, and the coding-platform usernames students submit through the
@@ -53,7 +53,7 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <Section title="How it is used and shared">
+      <Section title="How It Is Used and Shared">
         <p>
           Information is used only to run Vertex for Sunstone PRIME: showing student progress to
           Sunstone staff and letting students share their own coding profile. Staff see only the
@@ -78,7 +78,7 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <Section title="Keeping and removing information">
+      <Section title="Keeping and Removing Information">
         <p>
           Student information is kept while the student is enrolled in Sunstone PRIME. Staff access
           can be removed at any time by a Sunstone administrator. To ask what we hold about you, or

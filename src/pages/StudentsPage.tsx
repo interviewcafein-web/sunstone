@@ -247,7 +247,7 @@ export default function StudentsPage() {
       ).catch(() => ({ flaggedTests: [], delivery: [] }));
       await downloadCampusReport({
         origin: window.location.origin,
-        title: search.campus ?? 'All campuses',
+        title: search.campus ?? 'All Campuses',
         filters: [search.batch && `Batch ${search.batch}`, search.course].filter(
           (value): value is string => Boolean(value)
         ),
@@ -286,7 +286,7 @@ export default function StudentsPage() {
           onClick={() => students.refetch()}
           className="mt-3 rounded-md border border-red-300 bg-surface px-3 py-1.5 font-medium hover:bg-red-50"
         >
-          Try again
+          Try Again
         </button>
       </div>
     );
@@ -304,7 +304,7 @@ export default function StudentsPage() {
       .join(' · ') ||
     (ownCampuses
       ? ownCampuses.map((campus) => campus.name).join(', ') || 'No campus assigned'
-      : 'All campuses');
+      : 'All Campuses');
 
   return (
     <div className="rise-stagger space-y-5">
@@ -334,7 +334,7 @@ export default function StudentsPage() {
             blocker: reportBlocker,
             note: reportNote,
             state: reportState,
-            label: search.campus ? 'Download campus report' : 'Download all-campus report',
+            label: search.campus ? 'Download Campus Report' : 'Download All-Campus Report',
             onDownload: downloadReport,
           }}
         />

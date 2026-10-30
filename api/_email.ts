@@ -110,7 +110,7 @@ How to sign in (no password needed):
 
 What you'll find:
 - Students: every student ranked, with coding, attendance, AMCAT and test trends side by side.
-- Campuses: each campus's PRIME journey, from Prime Mock Tests, Practice Tests and MCQs to AMCAT, exams and attendance.
+- Campuses: each campus's PRIME journey, from PRIME Mock Tests, Practice Tests and MCQs to AMCAT, exams and attendance.
 - 360° view: campus and batch comparisons, with the pain points that need attention first.
 
 Tip: open "Take the tour" from your profile menu for a one-minute walkthrough.
@@ -202,7 +202,7 @@ Sunstone PRIME Vertex`;
     <div style="font-size:16px;font-weight:bold;color:#0f172a;margin-bottom:12px">What you&rsquo;ll find inside</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
       ${feature('🏆', 'Students', 'Every student ranked, with LeetCode, GFG and GitHub alongside attendance, AMCAT and PRIME Mock Tests, each with its trend.', '#fef3c7')}
-      ${feature('🏫', 'Campuses', 'Each campus&rsquo;s PRIME journey: Prime Mock Tests and leaderboards, Practice Tests and MCQs, AMCAT, exams, and attendance by subject and instructor.', '#dbeafe')}
+      ${feature('🏫', 'Campuses', 'Each campus&rsquo;s PRIME journey: PRIME Mock Tests and leaderboards, Practice Tests and MCQs, AMCAT, exams, and attendance by subject and instructor.', '#dbeafe')}
       ${feature('🎯', '360° view', 'Campuses and batches compared on every front, with the pain points and students who need attention first.', '#fce7f3')}
     </table>
   </td></tr>

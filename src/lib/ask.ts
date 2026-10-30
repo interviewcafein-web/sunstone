@@ -146,7 +146,7 @@ function studentsAnswer(result: Record<string, any>, what: string) {
 export const QUICK_QUESTIONS: QuickQuestion[] = [
   {
     id: 'summary',
-    label: 'Campus summary',
+    label: 'Campus Summary',
     needsCampus: true,
     tool: 'campus_report',
     args: scopeArgs,
@@ -162,22 +162,22 @@ export const QUICK_QUESTIONS: QuickQuestion[] = [
           ? `- **AMCAT:** latest round ${safe(r.amcat_rounds[0].name)}, average ${cell(r.amcat_rounds[0].average_score)} (${r.amcat_rounds[0].students} students)`
           : '- **AMCAT:** no rounds yet',
         r.internal_exams.length
-          ? `- **Internal exams:** ${r.internal_exams[0].event}, average ${cell(r.internal_exams[0].average_pct, '%')}, pass ${cell(r.internal_exams[0].pass_pct, '%')}`
-          : '- **Internal exams:** none yet',
+          ? `- **Internal Exams:** ${r.internal_exams[0].event}, average ${cell(r.internal_exams[0].average_pct, '%')}, pass ${cell(r.internal_exams[0].pass_pct, '%')}`
+          : '- **Internal Exams:** none yet',
         typeof d === 'object' && d
-          ? `- **PRIME coding delivery:** ${d.verified_hours} of ${d.allocated_hours} h verified (${cell(d.verified_pct, '%')}), ${d.awaiting_verification_hours} h awaiting, ${d.still_to_go_hours} h to go`
-          : '- **PRIME coding delivery:** nothing recorded in the tracker',
+          ? `- **PRIME Coding Delivery:** ${d.verified_hours} of ${d.allocated_hours} h verified (${cell(d.verified_pct, '%')}), ${d.awaiting_verification_hours} h awaiting, ${d.still_to_go_hours} h to go`
+          : '- **PRIME Coding Delivery:** nothing recorded in the tracker',
       ];
       if (typeof d === 'object' && d?.classes_not_logged_yet?.classes) {
-        lines.push(`- **Classes not logged yet:** ${d.classes_not_logged_yet.classes}`);
+        lines.push(`- **Classes Not Logged Yet:** ${d.classes_not_logged_yet.classes}`);
       }
-      lines.push('', `[Open the campus page](${r.link})`);
+      lines.push('', `[Open the Campus Page](${r.link})`);
       return lines.join('\n');
     },
   },
   {
     id: 'pain',
-    label: 'Pain points',
+    label: 'Pain Points',
     tool: 'pain_points',
     args: scopeArgs,
     format: (r) => {
@@ -198,21 +198,21 @@ export const QUICK_QUESTIONS: QuickQuestion[] = [
   },
   {
     id: 'attendance',
-    label: 'Attendance below 60%',
+    label: 'Attendance Below 60%',
     tool: 'find_students',
     args: (scope) => ({ ...scopeArgs(scope), attendance_below: 60, limit: 25 }),
     format: (r) => studentsAnswer(r, 'below 60% attendance'),
   },
   {
     id: 'mock',
-    label: 'Mock Tests below 50%',
+    label: 'Mock Tests Below 50%',
     tool: 'find_students',
     args: (scope) => ({ ...scopeArgs(scope), mock_tests_below: 50, limit: 25 }),
     format: (r) => studentsAnswer(r, 'below 50% in PRIME Mock Tests'),
   },
   {
     id: 'risk',
-    label: 'At risk on 3+ fronts',
+    label: 'At Risk on 3+ Fronts',
     tool: 'find_students',
     args: (scope) => ({
       ...scopeArgs(scope),
@@ -224,13 +224,13 @@ export const QUICK_QUESTIONS: QuickQuestion[] = [
   },
   {
     id: 'delivery',
-    label: 'Delivery by campus',
+    label: 'Delivery by Campus',
     tool: 'delivery_by_campus',
     args: () => ({}),
     format: (r) =>
       r.campuses.length
         ? [
-            '**PRIME coding delivery**, furthest behind first',
+            '**PRIME Coding Delivery**, furthest behind first',
             '',
             table(
               ['Campus', 'Verified', 'Allocated', 'Done', 'Awaiting'],
@@ -247,7 +247,7 @@ export const QUICK_QUESTIONS: QuickQuestion[] = [
   },
   {
     id: 'campuses',
-    label: 'Compare campuses',
+    label: 'Compare Campuses',
     tool: 'list_campuses',
     args: () => ({}),
     format: (r) =>

@@ -57,7 +57,7 @@ export function PdfViewer({ resource, onClose }: { resource: Resource; onClose: 
             className={`${action} border border-slate-300 text-slate-700 hover:bg-slate-50`}
           >
             <ExternalLink className="size-4" aria-hidden />
-            <span className="hidden sm:inline">Open in new tab</span>
+            <span className="hidden sm:inline">Open in New Tab</span>
           </a>
           <button
             ref={closeRef}

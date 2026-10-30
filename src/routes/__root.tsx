@@ -17,7 +17,7 @@ export const Route = createRootRoute({
 const NAV = [
   { to: '/', label: 'Students', icon: Users, exact: true },
   { to: '/campuses', label: 'Campuses', icon: Building2, exact: false },
-  { to: '/insights', label: '360° view', icon: Radar, exact: false },
+  { to: '/insights', label: '360° View', icon: Radar, exact: false },
   { to: '/resources', label: 'Resources', icon: Library, exact: false },
 ] as const;
 
@@ -32,7 +32,7 @@ function RootComponent() {
   const session = useSession();
   const logOut = useLogOut();
   const user = session.data;
-  // The login page is the sign-in form itself; a "Staff login" button there only repeats it.
+  // The login page is the sign-in form itself; a "Staff Login" button there only repeats it.
   const onLoginPage = useRouterState({ select: (state) => state.location.pathname === '/login' });
 
   return (
@@ -85,7 +85,7 @@ function RootComponent() {
                   className="bg-brand-700 hover:bg-brand-800 mr-1 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold text-white"
                 >
                   <LogIn className="size-4" aria-hidden />
-                  Staff login
+                  Staff Login
                 </Link>
               )}
               <span data-tour="theme" className="inline-flex">
@@ -117,10 +117,10 @@ function RootComponent() {
               Stats from LeetCode, GeeksforGeeks, HackerRank, Codeforces, CodeChef and GitHub
             </span>
             <Link to="/app" className="font-medium hover:text-slate-700 hover:underline">
-              Android app
+              Android App
             </Link>
             <Link to="/privacy" className="font-medium hover:text-slate-700 hover:underline">
-              Privacy policy
+              Privacy Policy
             </Link>
           </span>
         </div>

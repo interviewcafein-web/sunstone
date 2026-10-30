@@ -21,8 +21,8 @@ interface StudentFiltersProps {
 }
 
 const FILTERS: { key: FilterKey; label: string; all: string; icon: LucideIcon }[] = [
-  { key: 'campus', label: 'Campus', all: 'All campuses', icon: Building2 },
-  { key: 'batch', label: 'Batch', all: 'All batches', icon: GraduationCap },
+  { key: 'campus', label: 'Campus', all: 'All Campuses', icon: Building2 },
+  { key: 'batch', label: 'Batch', all: 'All Batches', icon: GraduationCap },
   { key: 'course', label: 'Course', all: 'All courses', icon: BookOpen },
 ];
 

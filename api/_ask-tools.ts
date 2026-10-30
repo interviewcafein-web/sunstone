@@ -185,7 +185,7 @@ async function scopeOf(context: Context, args: Args, campusRequired: boolean) {
     else return { error: 'Say which campus.' };
   }
   const label = [
-    found?.name ?? 'All campuses',
+    found?.name ?? 'All Campuses',
     program && year
       ? cohortLabel(program, year)
       : program

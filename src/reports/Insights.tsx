@@ -94,7 +94,7 @@ export function InsightsPage({
         style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}
       >
         <View style={{ flexGrow: 1, flexBasis: 0, paddingRight: 16 }}>
-          <Text style={{ fontSize: 16, fontWeight: 800 }}>360° summary · {title}</Text>
+          <Text style={{ fontSize: 16, fontWeight: 800 }}>360° Summary · {title}</Text>
           <Text style={{ fontSize: 8.5, color: MUTED, marginTop: 3 }}>
             Coding, attendance, PRIME Mock Tests, AMCAT and internal exams side by side for{' '}
             {formatNumber(scope.students)} students. Students with no data on a front are left out
@@ -132,7 +132,7 @@ export function InsightsPage({
 
       <View style={{ flexDirection: 'row', gap: 14, marginTop: 14 }} wrap={false}>
         <StudentList
-          title="Students who need attention"
+          title="Students Who Need Attention"
           caption={`At risk on two fronts or more, most fronts first. ${formatNumber(attention.length)} students${attention.length > listSize ? `, first ${listSize} shown` : ''}.`}
           rows={attention.slice(0, listSize)}
           empty="No student is at risk on two fronts or more."
@@ -140,7 +140,7 @@ export function InsightsPage({
           accent="#dc2626"
         />
         <StudentList
-          title="All-rounders"
+          title="All-Rounders"
           caption="Highest overall score, with data on three fronts or more."
           rows={stars.slice(0, listSize)}
           empty="Not enough data yet."
@@ -406,7 +406,7 @@ export function HealthComparisonPage({
   insights: StudentInsight[];
   label: string;
 }) {
-  const everyone = groupStats('All campuses', insights);
+  const everyone = groupStats('All Campuses', insights);
   const campuses = groupBy(insights, (row) => row.student.campus).sort(
     (a, b) => (b.overall ?? -1) - (a.overall ?? -1) || b.students - a.students
   );
@@ -488,7 +488,7 @@ export function HealthComparisonPage({
         style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}
       >
         <View style={{ flexGrow: 1, flexBasis: 0, paddingRight: 16 }}>
-          <Text style={{ fontSize: 16, fontWeight: 800 }}>Campus comparison: 360°</Text>
+          <Text style={{ fontSize: 16, fontWeight: 800 }}>Campus Comparison: 360°</Text>
           <Text style={{ fontSize: 8.5, color: MUTED, marginTop: 3 }}>
             Average on each front, highest overall first. A small note under a cell means fewer than
             60% of the campus have data on that front.

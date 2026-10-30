@@ -394,7 +394,7 @@ export function DifficultyBreakdown({ rows }: { rows: DifficultyRow[] }) {
     <Card>
       <div className="grid gap-5 lg:grid-cols-5">
         <div className="lg:col-span-3">
-          <CardHeader title="Attempted vs solved" aside="distinct problems" />
+          <CardHeader title="Attempted vs Solved" aside="distinct problems" />
           <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data} margin={{ top: 4, right: 4, left: -16, bottom: 0 }} barGap={4}>
@@ -423,7 +423,7 @@ export function DifficultyBreakdown({ rows }: { rows: DifficultyRow[] }) {
         </div>
         <div className="lg:col-span-2">
           <Donut
-            title="Solved split"
+            title="Solved Split"
             rows={rows.map((row) => ({ label: row.label, count: row.solved, color: row.color }))}
           />
         </div>
@@ -535,7 +535,7 @@ export function RatingCard({
   return (
     <Card>
       <CardHeader
-        title="Contest rating"
+        title="Contest Rating"
         aside={
           <>
             {history.length} contests · best <b className="text-slate-900">{formatNumber(best)}</b>
@@ -574,7 +574,7 @@ export function RatingHistogram({ items }: { items: CountItem[] }) {
   return (
     <Card>
       <CardHeader
-        title="Solved by problem rating"
+        title="Solved by Problem Rating"
         aside={
           <>
             {formatNumber(solved)} rated problems · hardest{' '}

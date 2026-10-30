@@ -78,7 +78,7 @@ export function PeriodFilter({
           className={chip(!choice.year)}
           onClick={() => onChange({ ...choice, year: undefined })}
         >
-          All years
+          All Years
         </button>
         {years.map((year) => (
           <button
@@ -99,7 +99,7 @@ export function PeriodFilter({
           className={chip(!choice.term)}
           onClick={() => onChange({ ...choice, term: undefined })}
         >
-          Both terms
+          Both Terms
         </button>
         {([1, 2] as const).map((term) => (
           <button

@@ -91,7 +91,7 @@ export default function CodingCardPage() {
           </li>
           <ChevronRight className="size-3.5" aria-hidden />
           <li aria-current="page" className="font-medium text-slate-900">
-            Coding card
+            Coding Card
           </li>
         </ol>
       </nav>
@@ -127,7 +127,7 @@ export default function CodingCardPage() {
 
         <div className="md:pt-4">
           <span className="bg-brand-50 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold">
-            <IdCard className="size-3.5" aria-hidden /> Coding card
+            <IdCard className="size-3.5" aria-hidden /> Coding Card
           </span>
           <h1 className="mt-3 text-2xl font-bold tracking-tight text-balance sm:text-3xl">
             {name}'s coding card
@@ -198,7 +198,7 @@ export default function CodingCardPage() {
               params={{ slug }}
               className="text-brand-700 dark:text-brand-300 inline-block font-semibold hover:underline"
             >
-              View the full coding profile
+              View the Full Coding Profile
             </Link>
           </div>
         </div>

@@ -75,14 +75,14 @@ export function StudentsHero({
 
       <dl className="relative mt-6 grid grid-cols-2 gap-3 md:grid-cols-5">
         <HeroStat icon={Users} label="Students" value={students} note={`of ${totalStudents}`} />
-        <HeroStat icon={CheckCircle2} label="Problems solved" value={solved} />
+        <HeroStat icon={CheckCircle2} label="Problems Solved" value={solved} />
         <HeroStat
           icon={TrendingUp}
-          label="Average per student"
+          label="Average per Student"
           value={students ? Math.round(solved / students) : 0}
         />
-        <HeroStat icon={Link2} label="Profiles linked" value={linked} />
-        <HeroStat icon={Activity} label="Active this week" value={activeThisWeek} />
+        <HeroStat icon={Link2} label="Profiles Linked" value={linked} />
+        <HeroStat icon={Activity} label="Active This Week" value={activeThisWeek} />
       </dl>
 
       {loading && (

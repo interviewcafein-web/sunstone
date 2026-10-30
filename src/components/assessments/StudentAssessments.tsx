@@ -208,7 +208,7 @@ export function StudentAssessments({
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           <Kpi
             icon={BookOpenCheck}
-            label="PRIME Mock Tests released"
+            label="PRIME Mock Tests Released"
             value={String(released.length)}
             hint={upcoming.length ? `${upcoming.length} live or upcoming` : 'Prime Domain Coding'}
           />
@@ -221,7 +221,7 @@ export function StudentAssessments({
           />
           <Kpi
             icon={Target}
-            label="Average score"
+            label="Average Score"
             value={average === null ? '—' : `${average}%`}
             hint={
               gap === null
@@ -241,7 +241,7 @@ export function StudentAssessments({
           />
           <Kpi
             icon={Award}
-            label="AMCAT, latest"
+            label="AMCAT, Latest"
             value={amcatScores.length ? String(amcatScores[amcatScores.length - 1]) : '—'}
             hint={
               amcat.length
@@ -258,7 +258,7 @@ export function StudentAssessments({
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Kpi
             icon={CalendarCheck}
-            label="All classes"
+            label="All Classes"
             value={attendancePct === null ? '—' : `${attendancePct}%`}
             hint={`${attended.present} of ${attended.sessions} classes`}
             tone={attendanceTone(attendancePct)}
@@ -266,14 +266,14 @@ export function StudentAssessments({
           />
           <Kpi
             icon={GraduationCap}
-            label="PRIME classes"
+            label="PRIME Classes"
             value={primeAttendance === null ? '—' : `${primeAttendance}%`}
             hint={`${attended.primePresent} of ${attended.primeSessions} classes`}
             tone={attendanceTone(primeAttendance)}
           />
           <Kpi
             icon={CalendarDays}
-            label="Last 4 weeks"
+            label="Last 4 Weeks"
             value={lastWeeks === null ? '—' : `${lastWeeks}%`}
             hint="Recent attendance"
             tone={attendanceTone(lastWeeks)}
@@ -449,7 +449,7 @@ export function StudentAssessments({
       {section === 'tests' && upcoming.length > 0 && (
         <Card>
           <CardHeader
-            title="Live and upcoming"
+            title="Live and Upcoming"
             aside={<span className="text-xs text-slate-500">Not submitted yet</span>}
           />
           <ul className="grid gap-2 md:grid-cols-2">
@@ -481,7 +481,7 @@ export function StudentAssessments({
           <Card className="overflow-hidden p-0">
             <div className="px-5 pt-4">
               <CardHeader
-                title="Prime Mock Tests"
+                title="PRIME Mock Tests"
                 aside={
                   <span className="text-xs text-slate-500">
                     e.g. AMCAT mock tests, with rank in class
@@ -492,7 +492,7 @@ export function StudentAssessments({
             {subjectLevel.length ? (
               <ResultsTable tests={subjectLevel} showRank />
             ) : (
-              <p className="px-5 pb-5 text-sm text-slate-500">No Prime Mock Tests yet.</p>
+              <p className="px-5 pb-5 text-sm text-slate-500">No PRIME Mock Tests yet.</p>
             )}
           </Card>
 

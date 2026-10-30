@@ -241,15 +241,15 @@ function CampusPages({
 
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
             <StatTile width="19%" label="Students" value={formatNumber(rows.length)} />
-            <StatTile width="19%" label="Problems solved" value={formatNumber(solved)} />
+            <StatTile width="19%" label="Problems Solved" value={formatNumber(solved)} />
             <StatTile
               width="19%"
-              label="Average per student"
+              label="Average per Student"
               value={formatNumber(rows.length ? Math.round(solved / rows.length) : 0)}
             />
             <StatTile
               width="19%"
-              label="Active in last 7 days"
+              label="Active in Last 7 Days"
               value={formatNumber(activeWeek)}
               hint={
                 rows.length
@@ -259,7 +259,7 @@ function CampusPages({
             />
             <StatTile
               width="19%"
-              label="With a usable profile"
+              label="With a Usable Profile"
               value={formatNumber(linked.length)}
               hint={`${rows.length - linked.length} not linked`}
             />
@@ -314,10 +314,10 @@ function CampusPages({
           </View>
 
           <View style={{ flexDirection: 'row', gap: 18, marginTop: 20 }}>
-            {/* How zones are decided */}
+            {/* How Zones Are Decided */}
             <View style={{ width: '48%', backgroundColor: SOFT, borderRadius: 8, padding: 12 }}>
               <Text style={{ fontSize: 10, fontWeight: 700, marginBottom: 6 }}>
-                How zones are decided
+                How Zones Are Decided
               </Text>
               <Text style={{ fontSize: 8.5, lineHeight: 1.5, color: '#334155' }}>
                 Each student is placed by one count: their best number of problems solved on any
@@ -345,9 +345,9 @@ function CampusPages({
               </View>
             </View>
 
-            {/* Top performers */}
+            {/* Top Performers */}
             <View style={{ width: '48%' }}>
-              <Text style={{ fontSize: 10, fontWeight: 700, marginBottom: 6 }}>Top performers</Text>
+              <Text style={{ fontSize: 10, fontWeight: 700, marginBottom: 6 }}>Top Performers</Text>
               {top.map((row, index) => (
                 <View
                   key={`${row.name}-${index}`}
@@ -502,7 +502,7 @@ function ComparisonPage({
       style={[base.page, { paddingTop: 28, paddingHorizontal: 32 }]}
       wrap
     >
-      <Text style={{ fontSize: 16, fontWeight: 800 }}>Campus comparison</Text>
+      <Text style={{ fontSize: 16, fontWeight: 800 }}>Campus Comparison</Text>
       <Text style={{ fontSize: 8.5, color: MUTED, marginTop: 3, marginBottom: 10 }}>
         Every campus at a glance. Each campus has its own summary and zone lists after this page,
         largest campus first.
@@ -526,7 +526,7 @@ function ComparisonPage({
             key={zone.id}
             style={[head, { width: widths.zone, textAlign: 'right', color: zone.color }]}
           >
-            {zone.id === 'none' ? 'NOT LINKED' : zone.label.replace(' zone', '').toUpperCase()}
+            {zone.id === 'none' ? 'NOT LINKED' : zone.label.replace(/ zone$/i, '').toUpperCase()}
           </Text>
         ))}
         <Text style={[head, { width: widths.mix, paddingLeft: 14 }]}>ZONE MIX</Text>

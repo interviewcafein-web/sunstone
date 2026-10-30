@@ -32,7 +32,7 @@ export interface Dimension {
 export const DIMENSIONS: Dimension[] = [
   {
     id: 'coding',
-    label: 'Coding practice',
+    label: 'Coding Practice',
     short: 'Coding',
     measure: 'Best solved count on LeetCode, GFG, Codeforces or CodeChef (100+ is full marks)',
     good: 100,
@@ -72,7 +72,7 @@ export const DIMENSIONS: Dimension[] = [
   },
   {
     id: 'exams',
-    label: 'Internal exams',
+    label: 'Internal Exams',
     short: 'Exams',
     measure: 'Average in Midterms and End-term',
     good: 60,
@@ -290,8 +290,7 @@ const pct = (part: number, whole: number) => (whole ? Math.round((part / whole) 
  * A front's name inside a sentence: "coding practice", "internal exams", but names that are
  * written in capitals keep them ("PRIME Mock Tests", "AMCAT").
  */
-const inSentence = (label: string) =>
-  /^[A-Z]{2,}/.test(label) ? label : label[0].toLowerCase() + label.slice(1);
+const inSentence = (label: string) => (/^[A-Z]{2,}/.test(label) ? label : label.toLowerCase());
 
 /**
  * What needs attention in `scope`, most pressing first. With `groups` (campuses or batches)
@@ -331,7 +330,7 @@ export function findPainPoints(
         title:
           dimension.id === 'coding'
             ? `${100 - covered}% have no usable coding profile`
-            : `${100 - covered}% have no ${dimension.label} data`,
+            : `${100 - covered}% have no ${inSentence(dimension.label)} data`,
         detail:
           dimension.id === 'coding'
             ? `${missing.toLocaleString('en-IN')} students: no LeetCode, GFG, Codeforces or CodeChef username in the form, or one that is not a username.`

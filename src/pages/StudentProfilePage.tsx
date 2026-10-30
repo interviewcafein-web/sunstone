@@ -35,7 +35,7 @@ export default function StudentProfilePage() {
           to="/"
           className="text-brand-700 dark:text-brand-300 mt-3 inline-block text-sm font-semibold hover:underline"
         >
-          Back to all students
+          Back to All Students
         </Link>
       </Card>
     );

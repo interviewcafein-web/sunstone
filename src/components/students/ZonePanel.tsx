@@ -37,7 +37,7 @@ interface ZonePanelProps {
     /** Shown under the button without disabling it. */
     note?: string;
     state: 'idle' | 'busy' | 'failed';
-    /** Button text, e.g. "Download campus report". */
+    /** Button text, e.g. "Download Campus Report". */
     label: string;
     onDownload: () => void;
   };
@@ -58,7 +58,7 @@ export function ZonePanel({ rows, active, onZone, report }: ZonePanelProps) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-1.5 text-base font-bold">
-            Practice zones
+            Practice Zones
             <span
               title={`Placed by the best solved count on any one of: ${basisNames}. Platforms are not added together; HackerRank and GitHub are not used.`}
               className="text-slate-400"
@@ -184,7 +184,7 @@ function DistributionBar({
           counts[zone.id] ? (
             <span key={zone.id} className="inline-flex items-center gap-1 tabular-nums">
               <span className="size-2 rounded-full" style={{ background: zone.color }} />
-              {zone.label.replace(' zone', '')} {Math.round((counts[zone.id] / total) * 100)}%
+              {zone.label.replace(/ zone$/i, '')} {Math.round((counts[zone.id] / total) * 100)}%
             </span>
           ) : null
         )}

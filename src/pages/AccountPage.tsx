@@ -86,7 +86,7 @@ export default function AccountPage() {
           <ProfilePhoto user={user} className="size-20 text-xl ring-4 ring-white/25" />
           <div className="min-w-0">
             <p className="text-brand-200 text-xs font-semibold tracking-[0.2em] uppercase">
-              My profile
+              My Profile
             </p>
             <h1 className="mt-1 truncate text-2xl font-bold tracking-tight sm:text-3xl">
               {user.name ?? user.user}
@@ -122,7 +122,7 @@ export default function AccountPage() {
           ) : (
             <>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Full name" htmlFor="name">
+                <Field label="Full Name" htmlFor="name">
                   <input
                     id="name"
                     value={draft.name}
@@ -182,7 +182,7 @@ export default function AccountPage() {
                   className="bg-brand-700 hover:bg-brand-800 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
                 >
                   {state === 'saving' && <Loader2 className="size-4 animate-spin" aria-hidden />}
-                  Save profile
+                  Save Profile
                 </button>
               </div>
             </>
