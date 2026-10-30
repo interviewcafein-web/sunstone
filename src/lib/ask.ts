@@ -233,7 +233,7 @@ export const QUICK_QUESTIONS: QuickQuestion[] = [
             '**PRIME coding delivery**, furthest behind first',
             '',
             table(
-              ['Campus', 'Verified', 'Allocated', '%', 'Awaiting'],
+              ['Campus', 'Verified', 'Allocated', 'Done', 'Awaiting'],
               r.campuses.map((c: Record<string, unknown>) => [
                 `[${safe(c.campus)}](${c.link})`,
                 `${c.verified_hours} h`,
