@@ -10,6 +10,7 @@
 import { neon } from '@neondatabase/serverless';
 
 import { syncSheet } from '../api/_sheet-sync';
+import { personName } from './_names';
 import { redash } from './_redash';
 
 const DRY_RUN = process.argv.includes('--dry');
@@ -75,12 +76,6 @@ const digits = (value: string | null | undefined) => {
   const all = (value ?? '').replace(/\D/g, '');
   return all.length >= 10 ? all.slice(-10) : null;
 };
-/** LMS names are mostly well-cased; fix the ones typed all-lower or all-upper. */
-function displayName(raw: string): string {
-  const name = raw.replace(/\s+/g, ' ').trim();
-  if (name !== name.toLowerCase() && name !== name.toUpperCase()) return name;
-  return name.toLowerCase().replace(/\b\p{L}/gu, (letter) => letter.toUpperCase());
-}
 
 /** "A Akash Kumar Rao" → "akash.rao": first and last name, initials dropped. */
 function usernameBase(name: string): string {
@@ -140,7 +135,7 @@ const rows = [...lms]
   .sort((a, b) => a.id - b.id) // earlier accounts get the plain first.last
   .map((student) => {
     const kept = existing.get(student.id);
-    const name = displayName(student.name);
+    const name = personName(student.name);
     const [debarReason, debarUntil] = (student.debarred ?? '').split('|');
     return {
       lms_user_id: student.id,

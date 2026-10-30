@@ -8,7 +8,7 @@
 import { neon } from '@neondatabase/serverless';
 
 import { batchInserts } from './_insert';
-import { subjectName } from './_names';
+import { personName, subjectName } from './_names';
 import { redash } from './_redash';
 
 const FROM = process.env.ATTENDANCE_FROM ?? '2026-07-01';
@@ -144,7 +144,7 @@ await sql.transaction([
       course_id: session.course_id,
       subject: session.subject ? subjectName(session.subject) : null,
       faculty_id: session.faculty_id,
-      faculty: session.faculty,
+      faculty: session.faculty ? personName(session.faculty) : null,
       campus_id: session.campus_id,
       minutes: session.minutes == null ? null : Number(session.minutes),
       first_student: session.first_student,

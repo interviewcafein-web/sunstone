@@ -13,6 +13,7 @@ import { neon } from '@neondatabase/serverless';
 import pg from 'pg';
 
 import { batchInserts } from './_insert';
+import { personName } from './_names';
 
 const target = process.env.DATABASE_URL;
 const source = process.env.DELIVERY_DATABASE_URL ?? process.env.SUPABASE_URL;
@@ -112,7 +113,7 @@ await sql.transaction([
       program: place(row).program,
       batch_year: yearOf(row.batch),
       section: row.section,
-      trainer: row.trainer,
+      trainer: row.trainer ? personName(row.trainer) : null,
       curriculum: row.curriculum,
       topic: row.topic?.trim() ?? null,
       topic_order: row.topic_order,

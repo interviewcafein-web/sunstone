@@ -8,6 +8,7 @@
 import { neon } from '@neondatabase/serverless';
 
 import { batchInserts } from './_insert';
+import { titleText } from './_names';
 import { redash } from './_redash';
 
 /** The PRIME domain subjects for tech students, by their (hand-typed) LMS names. */
@@ -213,7 +214,7 @@ await sql.transaction([
     'lms_courses',
     courses.map((course) => ({
       id: course.id,
-      name: course.name,
+      name: titleText(course.name),
       modules: Number(course.modules),
       lectures: Number(course.lectures),
     }))
@@ -223,7 +224,7 @@ await sql.transaction([
     modules.map((module) => ({
       id: module.id,
       course_id: module.course_id,
-      name: module.name,
+      name: titleText(module.name),
       position: number(module.position),
     }))
   ),
@@ -231,7 +232,7 @@ await sql.transaction([
     'lms_tests',
     [...tests.values()].map((test) => ({
       id: test.aid,
-      name: test.name || 'Untitled',
+      name: titleText(test.name ?? '') || 'Untitled',
       category: category(test.name ?? ''),
       max_marks: number(test.maximum_marks),
       minutes: number(test.minutes),
@@ -255,7 +256,7 @@ await sql.transaction([
       id: lecture.id,
       course_id: lecture.course_id,
       module_id: lecture.module_id,
-      title: lecture.title || 'Untitled',
+      title: titleText(lecture.title ?? '') || 'Untitled',
       position: number(lecture.position),
     }))
   ),
