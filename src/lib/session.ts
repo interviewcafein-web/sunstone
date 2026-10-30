@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { forgetCache } from './queryCache';
 import type { Role } from './roles';
 
 // Who is logged in, from the session cookie that api/login.ts sets. The cookie itself is
@@ -128,11 +129,7 @@ export function useLogOut() {
   return async () => {
     await fetch('/api/logout', { method: 'POST' }).catch(() => undefined);
     queryClient.clear();
-    try {
-      localStorage.removeItem('sunstone:query-cache');
-    } catch {
-      // Storage blocked: nothing was saved there anyway.
-    }
+    await forgetCache();
     window.location.assign('/login');
   };
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { getRouteApi } from '@tanstack/react-router';
 import {
   ArrowLeft,
@@ -17,6 +18,7 @@ import {
 
 import { BrandLockup } from '@/components/common/BrandLockup';
 import { VertexLogo } from '@/components/common/VertexLogo';
+import { forgetCache } from '@/lib/queryCache';
 import { logIn, sendSignInCode, useSignInMethods, verifySignInCode } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
@@ -48,6 +50,11 @@ export default function LoginPage() {
   const { next, error: googleError } = route.useSearch();
   const methods = useSignInMethods().data;
   const [mode, setMode] = useState<'choose' | 'password'>('choose');
+  const queryClient = useQueryClient();
+  // Whoever signs in next starts clean: nothing kept from the last person on this browser.
+  useEffect(() => {
+    void forgetCache(queryClient);
+  }, [queryClient]);
 
   // With only password login set up there is nothing to choose between.
   const passwordOnly = methods && !methods.google && !methods.email;

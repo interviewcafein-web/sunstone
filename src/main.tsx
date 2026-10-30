@@ -8,11 +8,10 @@ import {
 } from '@tanstack/react-router';
 import { QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 
 import { routeTree } from './routeTree.gen';
 import { PageLoader } from '@/components/common/PageLoader';
-import { SUMMARY_QUERY_KEY } from '@/hooks/useStudentSummaries';
+import { dropOldCopy, keepQuery, persister } from '@/lib/queryCache';
 import './globals.css';
 
 const DAY = 1000 * 60 * 60 * 24;
@@ -29,21 +28,9 @@ const queryClient = new QueryClient({
   },
 });
 
-function browserStorage(): Storage | undefined {
-  try {
-    return window.localStorage;
-  } catch {
-    // Storage blocked (private mode): run without a persisted cache.
-    return undefined;
-  }
-}
-
-// The table makes a few hundred platform calls. Keeping the results in this browser means
-// a reload shows numbers at once and only refetches what has gone stale.
-const persister = createSyncStoragePersister({
-  storage: browserStorage(),
-  key: 'sunstone:query-cache',
-});
+// Pages open at once with the numbers from the last visit, then refresh in the background
+// (src/lib/queryCache.ts keeps them in IndexedDB).
+dropOldCopy();
 
 // After a deploy, a tab opened earlier asks for page files whose names have changed and no
 // longer exist. Reload once to pick up the new version instead of showing an error; the
@@ -100,11 +87,8 @@ if (!rootElement.innerHTML) {
         persistOptions={{
           persister,
           maxAge: DAY,
-          buster: 'v2',
-          dehydrateOptions: {
-            shouldDehydrateQuery: (query) =>
-              query.queryKey[0] === SUMMARY_QUERY_KEY && query.state.status === 'success',
-          },
+          buster: 'v3',
+          dehydrateOptions: { shouldDehydrateQuery: keepQuery },
         }}
       >
         <RouterProvider router={router} />
