@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -59,68 +59,53 @@ const AI_NOTES: Record<string, string> = {
   not_configured: 'The AI is not set up yet.',
 };
 
-/** AI suggestions for the pain points shown, kept while they stay the same. */
-function SuggestedActions({ scope, points }: { scope: string; points: PainPoint[] }) {
-  const ask = useMutation({
-    mutationFn: () =>
+/** AI suggestions for the pain points shown, saved and reused while they stay the same. */
+function useActionPlan() {
+  return useMutation({
+    mutationFn: ({ scope, points }: { scope: string; points: PainPoint[] }) =>
       suggestActions(
         scope,
         points.slice(0, 6).map(({ severity, title, detail }) => ({ severity, title, detail }))
       ),
   });
-  if (ask.isIdle) {
-    // Right under the heading, so it is the first thing seen with the pain points.
-    return (
-      <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-300/70 bg-gradient-to-r from-amber-50 via-amber-50/60 to-white p-3 dark:border-amber-500/30 dark:from-amber-500/15 dark:via-amber-500/5 dark:to-transparent">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-300 to-amber-500 text-white shadow-sm">
-          <Sparkles className="size-5" aria-hidden />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-slate-800">AI action plan</p>
-          <p className="text-xs text-slate-600 dark:text-slate-400">
-            Not sure where to start? Get concrete next steps for these pain points: who does what,
-            and what to do first this week.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => ask.mutate()}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-gradient-to-r from-amber-400 to-amber-500 px-4 py-2 text-sm font-bold text-slate-900 shadow-[0_6px_16px_-6px_rgb(245_158_11/0.8)] transition-transform hover:-translate-y-0.5 hover:from-amber-300 hover:to-amber-500"
-        >
-          <Sparkles className="size-4" aria-hidden />
-          Suggest actions
-        </button>
-      </div>
-    );
-  }
+}
+
+/** The action plan, under the pain points. */
+function PlanPanel({
+  plan,
+  onRetry,
+}: {
+  plan: ReturnType<typeof useActionPlan>;
+  onRetry: () => void;
+}) {
   return (
     <div className="mt-4 rounded-xl border border-amber-300/70 bg-gradient-to-br from-amber-50/80 to-white p-4 dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent">
       <p className="flex items-center gap-1.5 text-sm font-bold">
         <Sparkles className="size-4 text-amber-500" aria-hidden />
-        Suggested actions
+        AI action plan
         <span className="ml-auto text-[11px] font-normal text-slate-500">
           AI suggestions · check before acting
         </span>
       </p>
-      {ask.isPending && (
+      {plan.isPending && (
         <p className="mt-3 flex items-center gap-2 text-sm text-slate-500">
           <Loader2 className="size-4 animate-spin" aria-hidden />
           Working out what to do…
         </p>
       )}
-      {ask.isError && (
+      {plan.isError && (
         <p className="mt-3 text-sm text-amber-800 dark:text-amber-300">
-          {(ask.error instanceof AskError && AI_NOTES[ask.error.kind]) || ask.error.message}{' '}
+          {(plan.error instanceof AskError && AI_NOTES[plan.error.kind]) || plan.error.message}{' '}
           <button
             type="button"
-            onClick={() => ask.mutate()}
+            onClick={onRetry}
             className="font-semibold underline-offset-2 hover:underline"
           >
             Try again
           </button>
         </p>
       )}
-      {ask.data && <Markdown text={ask.data.answer} className="mt-3" />}
+      {plan.data && <Markdown text={plan.data.answer} className="mt-3" />}
     </div>
   );
 }
@@ -147,16 +132,43 @@ export function PainPoints({
 }) {
   const [showAll, setShowAll] = useState(false);
   const shown = showAll ? points : points.slice(0, limit);
+  const plan = useActionPlan();
+  const planRef = useRef<HTMLDivElement>(null);
+  // A plan made for another campus or batch is not shown here.
+  const planned = Boolean(scope) && !plan.isIdle && plan.variables?.scope === scope;
+  const showPlan = () => {
+    if (!scope) return;
+    if (!planned || plan.isError) plan.mutate({ scope, points });
+    requestAnimationFrame(() =>
+      planRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    );
+  };
   return (
     <section className={cn(panel, 'p-5', className)}>
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-lg font-bold">
           <AlertTriangle className="size-5 text-amber-500" aria-hidden />
           Pain points
         </h2>
-        {action ?? <span className="text-xs text-slate-500">Most pressing first</span>}
+        <div className="flex items-center gap-3">
+          {action ?? <span className="text-xs text-slate-500">Most pressing first</span>}
+          {scope && points.length > 0 && (
+            <button
+              type="button"
+              onClick={showPlan}
+              disabled={planned && plan.isPending}
+              className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 px-3 py-1.5 text-xs font-bold text-slate-900 shadow-[0_4px_12px_-4px_rgb(245_158_11/0.8)] transition-transform hover:-translate-y-0.5 disabled:opacity-70"
+            >
+              {planned && plan.isPending ? (
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+              ) : (
+                <Sparkles className="size-3.5" aria-hidden />
+              )}
+              AI action plan
+            </button>
+          )}
+        </div>
       </div>
-      {scope && points.length > 0 && <SuggestedActions key={scope} scope={scope} points={points} />}
       {points.length === 0 ? (
         <p className="mt-6 flex items-center gap-2 text-sm text-emerald-700">
           <Sparkles className="size-4" aria-hidden />
@@ -217,6 +229,11 @@ export function PainPoints({
           {showAll ? 'Show fewer' : `Show all ${points.length}`}
         </button>
       )}
+      <div ref={planRef}>
+        {planned && (
+          <PlanPanel plan={plan} onRetry={() => scope && plan.mutate({ scope, points })} />
+        )}
+      </div>
     </section>
   );
 }
