@@ -1,16 +1,32 @@
 // Campus issues: the fixed categories campus staff choose from, and the shapes /api/issues
 // sends. Shared by the website, the API and (copied) the Vertex app.
 
+export type IssueCategoryId =
+  | 'internet'
+  | 'display'
+  | 'cooling'
+  | 'power'
+  | 'tech'
+  | 'room'
+  | 'trainer'
+  | 'classes'
+  | 'lms'
+  | 'students'
+  | 'other';
+
 export interface IssueCategory {
-  id: string;
+  id: IssueCategoryId;
   label: string;
-  group: IssueGroup;
 }
 
-export type IssueGroup = 'infrastructure' | 'trainer' | 'classes' | 'lms' | 'students' | 'other';
-
-export const ISSUE_GROUPS: { id: IssueGroup; label: string }[] = [
-  { id: 'infrastructure', label: 'Classroom and Lab' },
+/** A short, common list, so picking one takes a second; anything else is Other. */
+export const ISSUE_CATEGORIES: IssueCategory[] = [
+  { id: 'internet', label: 'Wi-Fi and Internet' },
+  { id: 'display', label: 'Projector, TV or Screen' },
+  { id: 'cooling', label: 'AC or Fan' },
+  { id: 'power', label: 'Power and Electricity' },
+  { id: 'tech', label: 'Computers and Tech' },
+  { id: 'room', label: 'Classroom and Furniture' },
   { id: 'trainer', label: 'Trainer' },
   { id: 'classes', label: 'Classes and Schedule' },
   { id: 'lms', label: 'LMS and Tests' },
@@ -18,32 +34,12 @@ export const ISSUE_GROUPS: { id: IssueGroup; label: string }[] = [
   { id: 'other', label: 'Other' },
 ];
 
-export const ISSUE_CATEGORIES: IssueCategory[] = [
-  { id: 'fan_ac', label: 'Fan or AC Not Working', group: 'infrastructure' },
-  { id: 'projector', label: 'Projector or Display', group: 'infrastructure' },
-  { id: 'power', label: 'Power or Electricity', group: 'infrastructure' },
-  { id: 'lab_computers', label: 'Lab Computers', group: 'infrastructure' },
-  { id: 'internet', label: 'Internet or Wi-Fi', group: 'infrastructure' },
-  { id: 'room', label: 'Classroom or Furniture', group: 'infrastructure' },
-  { id: 'trainer_not_deployed', label: 'Trainer Not Deployed', group: 'trainer' },
-  { id: 'trainer_absent', label: 'Trainer Absent or Late', group: 'trainer' },
-  { id: 'trainer_change', label: 'Trainer Change Needed', group: 'trainer' },
-  { id: 'class_not_scheduled', label: 'Class Not Scheduled', group: 'classes' },
-  { id: 'timetable_clash', label: 'Timetable Clash', group: 'classes' },
-  { id: 'room_unavailable', label: 'Room Not Available', group: 'classes' },
-  { id: 'lms_access', label: 'LMS Access Problem', group: 'lms' },
-  { id: 'test_problem', label: 'Test or Assessment Problem', group: 'lms' },
-  { id: 'content_missing', label: 'Content Missing', group: 'lms' },
-  { id: 'attendance', label: 'Low Attendance', group: 'students' },
-  { id: 'student_concern', label: 'Student Concern', group: 'students' },
-  { id: 'other', label: 'Something Else', group: 'other' },
-];
+/** The category's id, or 'other' for one no longer on the list. */
+export const categoryOf = (id: string): IssueCategoryId =>
+  ISSUE_CATEGORIES.find((category) => category.id === id)?.id ?? 'other';
 
 export const categoryLabel = (id: string) =>
-  ISSUE_CATEGORIES.find((category) => category.id === id)?.label ?? 'Something Else';
-
-export const categoryGroup = (id: string): IssueGroup =>
-  ISSUE_CATEGORIES.find((category) => category.id === id)?.group ?? 'other';
+  ISSUE_CATEGORIES.find((category) => category.id === id)?.label ?? 'Other';
 
 export type IssuePriority = 'normal' | 'high' | 'urgent';
 export type IssueStatus = 'open' | 'in_progress' | 'resolved';

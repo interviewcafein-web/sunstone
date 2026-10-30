@@ -3,36 +3,40 @@ import { createPortal } from 'react-dom';
 import { getRouteApi } from '@tanstack/react-router';
 import {
   ArrowRightLeft,
+  Armchair,
   BookOpen,
   CalendarClock,
   CheckCircle2,
   CircleDot,
+  Fan,
   Flag,
   HelpCircle,
+  Laptop,
   Loader2,
   MapPin,
   MessageSquare,
   Plus,
+  Presentation,
   RotateCcw,
   Send,
   UserX,
   Users,
-  Wrench,
+  Wifi,
   X,
+  Zap,
   type LucideIcon,
 } from 'lucide-react';
 
 import {
   ISSUE_CATEGORIES,
-  ISSUE_GROUPS,
   PRIORITIES,
   ago,
-  categoryGroup,
   categoryLabel,
+  categoryOf,
   priorityOf,
   statusOf,
   type Issue,
-  type IssueGroup,
+  type IssueCategoryId,
   type IssuePriority,
   type IssueUpdate,
   type IssuesResponse,
@@ -51,8 +55,13 @@ import { cn } from '@/lib/utils';
 
 const route = getRouteApi('/issues');
 
-const GROUP_ICONS: Record<IssueGroup, LucideIcon> = {
-  infrastructure: Wrench,
+const CATEGORY_ICONS: Record<IssueCategoryId, LucideIcon> = {
+  internet: Wifi,
+  display: Presentation,
+  cooling: Fan,
+  power: Zap,
+  tech: Laptop,
+  room: Armchair,
   trainer: UserX,
   classes: CalendarClock,
   lms: BookOpen,
@@ -212,7 +221,7 @@ export default function IssuesPage() {
 }
 
 function IssueCard({ issue, onOpen }: { issue: Issue; onOpen: () => void }) {
-  const Icon = GROUP_ICONS[categoryGroup(issue.category)];
+  const Icon = CATEGORY_ICONS[categoryOf(issue.category)];
   const priority = priorityOf(issue.priority);
   const state = statusOf(issue.status);
   return (
@@ -389,34 +398,29 @@ function RaiseDialog({
 
         <fieldset>
           <legend className="mb-1.5 text-xs font-semibold text-slate-600">What Is It About?</legend>
-          <div className="space-y-3">
-            {ISSUE_GROUPS.map((group) => {
-              const Icon = GROUP_ICONS[group.id];
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {ISSUE_CATEGORIES.map((item) => {
+              const Icon = CATEGORY_ICONS[item.id];
+              const chosen = category === item.id;
               return (
-                <div key={group.id}>
-                  <p className="mb-1 flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-slate-500 uppercase">
-                    <Icon className="size-3.5" aria-hidden />
-                    {group.label}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {ISSUE_CATEGORIES.filter((item) => item.group === group.id).map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        aria-pressed={category === item.id}
-                        onClick={() => setCategory(item.id)}
-                        className={cn(
-                          'rounded-full border px-3 py-1.5 text-xs font-semibold transition',
-                          category === item.id
-                            ? 'border-brand-700 bg-brand-700 text-white'
-                            : 'border-slate-300 text-slate-700 hover:border-slate-400'
-                        )}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-pressed={chosen}
+                  onClick={() => setCategory(item.id)}
+                  className={cn(
+                    'flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-xs font-semibold transition',
+                    chosen
+                      ? 'border-brand-700 bg-brand-700 text-white'
+                      : 'border-slate-300 text-slate-700 hover:border-slate-400'
+                  )}
+                >
+                  <Icon
+                    className={cn('size-4 shrink-0', !chosen && 'text-brand-600')}
+                    aria-hidden
+                  />
+                  {item.label}
+                </button>
               );
             })}
           </div>
