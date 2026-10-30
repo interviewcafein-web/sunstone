@@ -12,8 +12,9 @@
 // Who may do what: campus staff see and raise issues for their campuses; HQ and super admins
 // see every campus. Replies are open to anyone who can see the issue. The status changes by
 // HQ, super admins or the assignee; the person who raised it may reopen it. Only HQ and super
-// admins reassign. Each new issue, reply and change emails (and pushes to the app) the others
-// on it: the person who raised it and the assignee.
+// admins reassign. Each new issue is emailed (and pushed to the app) to the assignee and to HQ
+// (Sarvesh and Tarun Sharma, see DEFAULT_NOTIFY); each reply and change to the others on it:
+// the person who raised it and the assignee.
 
 import {
   ISSUE_CATEGORIES,
@@ -32,6 +33,16 @@ export const config = { runtime: 'edge' };
 
 /** New issues go to the central team: Tarun Sharma, unless ISSUES_ASSIGNEE says otherwise. */
 const DEFAULT_ASSIGNEE = 'tarun.sharma@sunstone.in';
+
+/**
+ * HQ who hear of every new issue from every campus (besides the assignee): Sarvesh and Tarun
+ * Sharma, unless ISSUES_NOTIFY (comma-separated emails) says otherwise.
+ */
+const DEFAULT_NOTIFY = ['sarvesh@sunstone.in', 'tarun.sharma@sunstone.in'];
+const notifyOnNew = () =>
+  (process.env.ISSUES_NOTIFY?.trim() ? process.env.ISSUES_NOTIFY.split(',') : DEFAULT_NOTIFY)
+    .map((email) => normalizeEmail(email))
+    .filter(Boolean);
 
 const ISSUE_FIELDS = `
   i.id::int as id, i.campus_id::int as "campusId", coalesce(c.name, 'Campus ' || i.campus_id) as campus,
@@ -187,7 +198,7 @@ async function create(viewer: Viewer, body: Record<string, unknown>) {
   );
   const issue = await findIssue(viewer, row.id);
   await tell(
-    [assignedTo],
+    [assignedTo, ...notifyOnNew()],
     raisedBy,
     row.id,
     {
