@@ -5,6 +5,7 @@
 //       one person (must be active staff), e.g. to preview it
 //   npx tsx --env-file=.env.local scripts/send-welcome.ts --all            lists who would get it
 //   npx tsx --env-file=.env.local scripts/send-welcome.ts --all --yes      sends to every active staff member
+//   add --not-signed-in to --all for only those who have never signed in (a nudge to start)
 //
 // Needs DATABASE_URL, RESEND_API_KEY and EMAIL_FROM.
 
@@ -16,6 +17,7 @@ import { ROLE_LABELS, type Role } from '../src/lib/roles';
 const args = process.argv.slice(2);
 const to = args.includes('--to') ? args[args.indexOf('--to') + 1]?.toLowerCase() : undefined;
 const all = args.includes('--all');
+const notSignedIn = args.includes('--not-signed-in');
 if (!to && !all) throw new Error('Pass --to EMAIL, or --all (add --yes to actually send).');
 if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
   throw new Error('RESEND_API_KEY and EMAIL_FROM must be set.');
@@ -25,6 +27,7 @@ const sql = neon(process.env.DATABASE_URL!);
 const staff = await sql`
   select email, name, role, campus_ids from staff
   where active and (${to ?? null}::text is null or email = ${to ?? null})
+    and (${notSignedIn}::boolean is false or last_login_at is null)
   order by role, email`;
 if (!staff.length) throw new Error(to ? `${to} is not active staff.` : 'No active staff.');
 
