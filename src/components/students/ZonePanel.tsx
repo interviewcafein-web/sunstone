@@ -122,7 +122,7 @@ export function ZonePanel({ rows, active, onZone, report }: ZonePanelProps) {
           onClick={() => onZone(undefined)}
           color="#274f87"
           icon={Users}
-          label="All students"
+          label="All Students"
           count={rows.length}
           rule={pending ? `${pending.toLocaleString()} still loading` : 'every zone'}
           loading={pending > 0}

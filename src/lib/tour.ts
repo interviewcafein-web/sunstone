@@ -151,7 +151,7 @@ export function startTour(id: TourId, user: string) {
     progressText: '{{current}} of {{total}}',
     nextBtnText: 'Next',
     prevBtnText: 'Back',
-    doneBtnText: 'Got it',
+    doneBtnText: 'Got It',
     popoverClass: 'vertex-tour',
     stagePadding: 6,
     stageRadius: 14,

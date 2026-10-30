@@ -346,7 +346,7 @@ function ComposeDialog({
           <div>
             <p className="flex items-center gap-2 font-bold">
               <Megaphone className="size-4" aria-hidden />
-              Send a notification
+              Send a Notification
             </p>
             <p className="text-brand-200 text-xs">Shows in the bell, and by email if you choose.</p>
           </div>
@@ -407,7 +407,7 @@ function ComposeDialog({
           </div>
 
           <fieldset>
-            <legend className="mb-1.5 text-xs font-semibold text-slate-600">How important</legend>
+            <legend className="mb-1.5 text-xs font-semibold text-slate-600">How Important</legend>
             <div className="grid grid-cols-3 gap-2">
               {(Object.keys(LEVELS) as NotificationLevel[]).map((id) => {
                 const item = LEVELS[id];
@@ -444,7 +444,7 @@ function ComposeDialog({
           </fieldset>
 
           <fieldset>
-            <legend className="mb-1.5 text-xs font-semibold text-slate-600">Who gets it</legend>
+            <legend className="mb-1.5 text-xs font-semibold text-slate-600">Who Gets It</legend>
             <div className="grid gap-2 sm:grid-cols-3">
               {audiences.map(({ id, label, note, icon: Icon }) => {
                 const on = audience === id;

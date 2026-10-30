@@ -424,7 +424,7 @@ function MemberForm({
       <div className="flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 text-lg font-bold">
           <ShieldCheck className="text-brand-700 dark:text-brand-300 size-5" aria-hidden />
-          {draft.existing ? `Change access for ${draft.email}` : 'Add a Person'}
+          {draft.existing ? `Change Access for ${draft.email}` : 'Add a Person'}
         </h2>
         <button
           type="button"

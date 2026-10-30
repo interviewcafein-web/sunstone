@@ -1525,9 +1525,9 @@ function StudentsTab({
                   </th>
                 ))}
                 <th className={cn(head, group, 'text-right')}>Attendance</th>
-                <th className={cn(head, 'text-right')}>Exams avg</th>
+                <th className={cn(head, 'text-right')}>Exams Avg</th>
                 <th className={cn(head, 'text-right')}>All PRIME Mock Tests</th>
-                <th className={cn(head, 'pr-5')}>Last submission</th>
+                <th className={cn(head, 'pr-5')}>Last Submission</th>
               </tr>
             </thead>
             <tbody>

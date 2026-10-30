@@ -98,7 +98,7 @@ for (const [campusId, tests] of byCampus) {
   }
 
   const html = frame({
-    kicker: 'New tests',
+    kicker: 'New Tests',
     title:
       tests.length === 1
         ? 'A new PRIME Mock Test is live'

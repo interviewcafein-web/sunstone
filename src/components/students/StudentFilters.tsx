@@ -23,7 +23,7 @@ interface StudentFiltersProps {
 const FILTERS: { key: FilterKey; label: string; all: string; icon: LucideIcon }[] = [
   { key: 'campus', label: 'Campus', all: 'All Campuses', icon: Building2 },
   { key: 'batch', label: 'Batch', all: 'All Batches', icon: GraduationCap },
-  { key: 'course', label: 'Course', all: 'All courses', icon: BookOpen },
+  { key: 'course', label: 'Course', all: 'All Courses', icon: BookOpen },
 ];
 
 /** A field with its icon inside; tinted when it holds a filter. */

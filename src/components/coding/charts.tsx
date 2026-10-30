@@ -219,10 +219,10 @@ export function ActivityHeatmap({
         aside={
           <span className="flex gap-3">
             <span>
-              Active days <b className="text-slate-900">{streaks.activeDays}</b>
+              Active Days <b className="text-slate-900">{streaks.activeDays}</b>
             </span>
             <span>
-              Best streak <b className="text-slate-900">{streaks.best}</b>
+              Best Streak <b className="text-slate-900">{streaks.best}</b>
             </span>
             <span>
               Current <b className="text-slate-900">{streaks.current}</b>

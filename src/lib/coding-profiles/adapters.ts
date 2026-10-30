@@ -264,19 +264,19 @@ async function leetcode(username: string): Promise<AdapterResult> {
     solved,
     kpis: [
       {
-        label: 'Problems solved',
+        label: 'Problems Solved',
         value: solved,
         hint: available.All ? `of ${fmt(available.All)}` : undefined,
       },
       {
-        label: 'Contest rating',
+        label: 'Contest Rating',
         value: contest?.attendedContestsCount ? Math.round(contest.rating) : null,
         hint: contest?.attendedContestsCount
           ? `Top ${contest.topPercentage}%`
           : 'No rated contests yet',
       },
       {
-        label: 'Global rank',
+        label: 'Global Rank',
         value: user.profile?.ranking ?? null,
         hint: contest?.globalRanking ? `Contest #${fmt(contest.globalRanking)}` : undefined,
       },
@@ -286,7 +286,7 @@ async function leetcode(username: string): Promise<AdapterResult> {
         hint: `${fmt(totalSubmissions)} submissions`,
       },
     ],
-    difficulty: [{ title: 'Solved by difficulty', rows }],
+    difficulty: [{ title: 'Solved by Difficulty', rows }],
     rating: contest?.attendedContestsCount
       ? {
           current: Math.round(contest.rating),
@@ -400,7 +400,7 @@ async function codeforces(username: string): Promise<AdapterResult> {
     solved: solved.size,
     kpis: [
       {
-        label: 'Problems solved',
+        label: 'Problems Solved',
         value: solved.size,
         hint: `${fmt(submissions.length)} submissions · ${percent(acceptedCount, submissions.length) ?? 0}% accepted`,
       },
@@ -410,7 +410,7 @@ async function codeforces(username: string): Promise<AdapterResult> {
         hint: info.rank ? titleCase(info.rank) : 'Unrated',
       },
       {
-        label: 'Max rating',
+        label: 'Max Rating',
         value: info.maxRating ?? null,
         hint: info.maxRank ? titleCase(info.maxRank) : undefined,
       },
@@ -422,7 +422,7 @@ async function codeforces(username: string): Promise<AdapterResult> {
     ],
     difficulty: [
       {
-        title: 'Solved by problem rating',
+        title: 'Solved by Problem Rating',
         rows: bands.map(({ label, solved: count, color }) => ({ label, solved: count, color })),
       },
     ],
@@ -505,9 +505,9 @@ async function github(username: string): Promise<AdapterResult> {
         value: contributions?.total ?? null,
         hint: 'last 12 months',
       },
-      { label: 'Public repos', value: user.public_repos, hint: `${fmt(stars)} stars` },
+      { label: 'Public Repos', value: user.public_repos, hint: `${fmt(stars)} stars` },
       { label: 'Followers', value: user.followers, hint: `following ${fmt(user.following)}` },
-      { label: 'Best streak', value: `${best}d`, hint: `current ${current}d` },
+      { label: 'Best Streak', value: `${best}d`, hint: `current ${current}d` },
     ],
     difficulty: [],
     rating: null,
@@ -601,29 +601,29 @@ async function geeksforgeeks(username: string): Promise<AdapterResult> {
     solved: info.total_problems_solved ?? 0,
     kpis: [
       {
-        label: 'Problems solved',
+        label: 'Problems Solved',
         value: info.total_problems_solved ?? 0,
         hint: streakKpiHint(calendar),
       },
       {
-        label: 'Coding score',
+        label: 'Coding Score',
         value: info.score ?? null,
         hint: `Monthly ${fmt(info.monthly_score ?? 0)}`,
       },
       {
-        label: 'Institute rank',
+        label: 'Institute Rank',
         value: info.institute_rank || null,
         hint: info.institute_name ?? undefined,
       },
       {
-        label: 'POTD streak',
+        label: 'POTD Streak',
         value: info.pod_solved_longest_streak ?? null,
         hint: `current ${info.pod_solved_current_streak ?? 0}`,
       },
     ],
     difficulty: [
       { title: 'Fundamentals', rows: [row('School'), row('Basic')] },
-      { title: 'DSA problems solved', rows: [row('Easy'), row('Medium'), row('Hard')] },
+      { title: 'DSA Problems Solved', rows: [row('Easy'), row('Medium'), row('Hard')] },
     ],
     rating: null,
     ratingDistribution: [],
@@ -677,11 +677,11 @@ async function hackerrank(username: string): Promise<AdapterResult> {
     profileUrl: `https://www.hackerrank.com/profile/${encodeURIComponent(model.username)}`,
     solved,
     kpis: [
-      { label: 'Problems solved', value: solved, hint: 'across skill tracks' },
+      { label: 'Problems Solved', value: solved, hint: 'across skill tracks' },
       { label: 'Badges', value: badges.length, hint: `${stars}★ in total` },
       { label: 'Certificates', value: passed.length, hint: 'verified' },
       {
-        label: 'Active days',
+        label: 'Active Days',
         value: streaksOf(calendar).activeDays,
         hint: model.country || undefined,
       },
@@ -838,11 +838,11 @@ async function codechef(username: string): Promise<AdapterResult> {
     rankTitle: stars ? `${stars}★` : undefined,
     solved,
     kpis: [
-      { label: 'Problems solved', value: solved, hint: `${history.length} rated contests` },
+      { label: 'Problems Solved', value: solved, hint: `${history.length} rated contests` },
       { label: 'Rating', value: rating || null, hint: division },
-      { label: 'Highest rating', value: highest || null, hint: stars ? `${stars}★` : undefined },
+      { label: 'Highest Rating', value: highest || null, hint: stars ? `${stars}★` : undefined },
       {
-        label: 'Global rank',
+        label: 'Global Rank',
         value: rank('Global'),
         hint: rank('Country') ? `Country #${fmt(rank('Country')!)}` : 'Inactive in rated contests',
       },

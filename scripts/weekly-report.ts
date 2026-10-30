@@ -179,7 +179,7 @@ function headline(scope: GroupStats, testsThisWeek: number) {
       ${tile('Overall Health', scope.overall === null ? '—' : String(scope.overall), overallColor(scope.overall), `${scope.students.toLocaleString('en-IN')} students`)}
       ${tile('At risk on 3+ fronts', atRisk.toLocaleString('en-IN'), atRisk ? BAND.risk : BAND.good, 'start here')}
       ${tile('Attendance last week', weeks.length ? `${weeks[weeks.length - 1]}%` : '—', BAND[bandOf(DIMENSIONS[1], weeks.at(-1) ?? null)], change === null ? 'no trend yet' : `${change >= 0 ? '▲ +' : '▼ '}${Math.abs(change)} vs week before`)}
-      ${tile('New tests this week', String(testsThisWeek), '#274f87', active === null ? 'released' : `${active}% coded last week`)}
+      ${tile('New Tests This Week', String(testsThisWeek), '#274f87', active === null ? 'released' : `${active}% coded last week`)}
     </tr></table>
   </td></tr>`;
 }
@@ -550,9 +550,9 @@ function reportEmail(
     ? `/insights?campus=${encodeURIComponent(options.campus)}`
     : '/insights';
   const title = options.campus ?? 'All Campuses';
-  const subject = `Weekly report · ${title} · ${week}`;
+  const subject = `Weekly Report · ${title} · ${week}`;
   const html = frame({
-    kicker: 'Weekly report',
+    kicker: 'Weekly Report',
     title,
     subtitle: `Week of ${week}`,
     preheader: `Overall ${scope.overall ?? '—'} · ${scope.critical} at risk on 3+ fronts · ${points[0]?.title ?? 'no pain points'}`,
@@ -673,7 +673,7 @@ if (saveTo) {
   const directory = await staffDirectory(sql);
   const emails: Email[] = [];
   const hqEmail = await addNotice(sql, directory, {
-    title: `Weekly report: all campuses (${week})`,
+    title: `Weekly Report: All Campuses (${week})`,
     body:
       overall.points
         .slice(0, 3)
