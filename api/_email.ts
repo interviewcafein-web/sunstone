@@ -1,12 +1,109 @@
-// Sends email through Resend's HTTP API (https://resend.com). Configure:
-//   RESEND_API_KEY  the API key
-//   EMAIL_FROM      the sender, on a domain verified in Resend,
-//                   e.g. "Sunstone PRIME Vertex <noreply@vertex.sunstone.in>"
-// Locally, without RESEND_API_KEY, the email is printed to the dev server's terminal instead,
-// so sign-in codes can be tried without sending anything.
+// Sends email through a chain of providers, so running out of one free plan does not stop
+// sign-in codes: Resend first, then Brevo, then Mailjet, each used only when configured.
+// When a provider refuses (daily quota used up, rate limit, outage), the next one sends it.
+//
+//   EMAIL_FROM          the sender, e.g. "Sunstone PRIME Vertex <noreply@vertex.sunstone.in>"
+//                       (its domain must be verified with each provider)
+//   RESEND_API_KEY      Resend (free: 100 a day, 3,000 a month)
+//   BREVO_API_KEY       Brevo, backup (free: 300 a day)
+//   MAILJET_API_KEY     Mailjet, second backup (free: 200 a day),
+//   MAILJET_SECRET_KEY    with its secret key
+//
+// Locally, with no provider configured, the email is printed to the dev server's terminal
+// instead, so sign-in codes can be tried without sending anything.
+
+const setting = (name: string) => process.env[name]?.trim() || undefined;
+
+/** "Name <address>" → its parts. */
+function sender(from: string) {
+  const match = from.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
+  return match
+    ? { name: match[1].replace(/^"|"$/g, ''), email: match[2] }
+    : { name: '', email: from.trim() };
+}
+
+const list = (to: string | string[]) => (Array.isArray(to) ? to : [to]);
+
+interface Provider {
+  name: string;
+  ready: () => boolean;
+  send: (email: Email, from: string) => Promise<Response>;
+}
+
+const PROVIDERS: Provider[] = [
+  {
+    name: 'Resend',
+    ready: () => Boolean(setting('RESEND_API_KEY')),
+    send: ({ to, cc, subject, text, html }, from) =>
+      fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${setting('RESEND_API_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from,
+          to: list(to),
+          ...(cc?.length ? { cc } : {}),
+          subject,
+          text,
+          html,
+        }),
+      }),
+  },
+  {
+    name: 'Brevo',
+    ready: () => Boolean(setting('BREVO_API_KEY')),
+    send: ({ to, cc, subject, text, html }, from) =>
+      fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': setting('BREVO_API_KEY')!,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          sender: sender(from),
+          to: list(to).map((email) => ({ email })),
+          ...(cc?.length ? { cc: cc.map((email) => ({ email })) } : {}),
+          subject,
+          textContent: text,
+          htmlContent: html,
+        }),
+      }),
+  },
+  {
+    name: 'Mailjet',
+    ready: () => Boolean(setting('MAILJET_API_KEY') && setting('MAILJET_SECRET_KEY')),
+    send: ({ to, cc, subject, text, html }, from) => {
+      const { name, email } = sender(from);
+      return fetch('https://api.mailjet.com/v3.1/send', {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${btoa(`${setting('MAILJET_API_KEY')}:${setting('MAILJET_SECRET_KEY')}`)}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          Messages: [
+            {
+              From: { Email: email, Name: name },
+              To: list(to).map((address) => ({ Email: address })),
+              ...(cc?.length ? { Cc: cc.map((address) => ({ Email: address })) } : {}),
+              Subject: subject,
+              TextPart: text,
+              HTMLPart: html,
+            },
+          ],
+        }),
+      });
+    },
+  },
+];
+
+const ready = () => PROVIDERS.filter((provider) => provider.ready());
 
 export const canSendEmail = () =>
-  Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM) || !process.env.VERCEL;
+  Boolean(ready().length && setting('EMAIL_FROM')) || !process.env.VERCEL;
 
 export interface Email {
   to: string | string[];
@@ -17,39 +114,58 @@ export interface Email {
   html: string;
 }
 
-export async function sendEmail({ to, cc, subject, text, html }: Email): Promise<void> {
-  const key = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM;
-  if (!key || !from) {
+/** Sends one email through the first provider that accepts it; returns that provider's name. */
+export async function sendEmail(email: Email): Promise<string> {
+  const from = setting('EMAIL_FROM');
+  const providers = ready();
+  if (!providers.length || !from) {
     if (process.env.VERCEL)
-      throw new Error('Email is not configured (RESEND_API_KEY, EMAIL_FROM).');
-    console.log(`\n[email to ${to}] ${subject}\n${text}\n`);
-    return;
+      throw new Error('Email is not configured (EMAIL_FROM and a provider key).');
+    console.log(`\n[email to ${email.to}] ${email.subject}\n${email.text}\n`);
+    return 'terminal';
   }
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from,
-      to: Array.isArray(to) ? to : [to],
-      ...(cc?.length ? { cc } : {}),
-      subject,
-      text,
-      html,
-    }),
-  });
-  if (!response.ok) {
-    throw new Error(`Resend ${response.status}: ${(await response.text()).slice(0, 300)}`);
+  const failures: string[] = [];
+  for (const provider of providers) {
+    try {
+      const response = await provider.send(email, from);
+      if (response.ok) return provider.name;
+      failures.push(
+        `${provider.name} ${response.status}: ${(await response.text()).slice(0, 200)}`
+      );
+    } catch (error) {
+      failures.push(`${provider.name}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
+  throw new Error(`No email provider could send it. ${failures.join(' | ')}`);
 }
 
-/** The sign-in code email: plain, with the code large and nothing else to click. */
-export function signInCodeEmail(code: string, minutes: number) {
-  const subject = `${code} is your Sunstone PRIME Vertex sign-in code`;
-  const text = `Your sign-in code is ${code}
+/** What a code email is for: staff sign-in (the default) or the student form. */
+const CODE_PURPOSES = {
+  signIn: {
+    subject: 'your Sunstone PRIME Vertex sign-in code',
+    lead: 'Your sign-in code is',
+    ignore: 'If you did not try to sign in, you can ignore this email.',
+  },
+  studentForm: {
+    subject: 'your code to add your coding profiles',
+    lead: 'Your code to add your coding profiles is',
+    ignore:
+      'If you did not ask for it, you can ignore this email: nothing changes without the code.',
+  },
+};
 
-It expires in ${minutes} minutes. If you did not try to sign in, you can ignore this email.
+/** A one-time code email: plain, with the code large and nothing else to click. */
+export function signInCodeEmail(
+  code: string,
+  minutes: number,
+  purpose: keyof typeof CODE_PURPOSES = 'signIn'
+) {
+  const { subject: about, lead, ignore } = CODE_PURPOSES[purpose];
+  const subject = `${code} is ${about}`;
+  const text = `${lead} ${code}
+
+It expires in ${minutes} minutes. ${ignore}
 
 Sunstone PRIME Vertex`;
   const html = `<!doctype html><html><body style="margin:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;color:#0f172a">
@@ -57,9 +173,9 @@ Sunstone PRIME Vertex`;
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:440px;background:#ffffff;border-radius:14px;overflow:hidden">
 <tr><td style="background:#1a3e70;padding:20px 28px;color:#ffffff;font-size:16px;font-weight:bold">Sunstone PRIME <span style="color:#f59e0b">Vertex</span></td></tr>
 <tr><td style="padding:28px">
-<p style="margin:0 0 12px;font-size:15px">Your sign-in code is</p>
+<p style="margin:0 0 12px;font-size:15px">${lead}</p>
 <p style="margin:0 0 20px;font-size:34px;font-weight:bold;letter-spacing:8px;color:#1a3e70">${code}</p>
-<p style="margin:0;font-size:13px;color:#64748b">It expires in ${minutes} minutes. If you did not try to sign in, you can ignore this email.</p>
+<p style="margin:0;font-size:13px;color:#64748b">It expires in ${minutes} minutes. ${ignore}</p>
 </td></tr></table></td></tr></table></body></html>`;
   return { subject, text, html };
 }
@@ -254,36 +370,51 @@ Sunstone PRIME Vertex`;
 }
 
 /** Sends many emails at once through Resend's batch endpoint (up to 100 per request). */
+/**
+ * Sends many emails: Resend's batch API in hundreds, and whatever it refuses one by one
+ * through the chain (so the backups take over when Resend's quota runs out).
+ */
 export async function sendEmails(emails: Email[]): Promise<number> {
-  const key = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM;
-  if (!key || !from) {
+  const from = setting('EMAIL_FROM');
+  const key = setting('RESEND_API_KEY');
+  if (!ready().length || !from) {
     if (process.env.VERCEL)
-      throw new Error('Email is not configured (RESEND_API_KEY, EMAIL_FROM).');
+      throw new Error('Email is not configured (EMAIL_FROM and a provider key).');
     for (const email of emails) console.log(`\n[email to ${email.to}] ${email.subject}\n`);
     return emails.length;
   }
   let sent = 0;
   for (let start = 0; start < emails.length; start += 100) {
     const chunk = emails.slice(start, start + 100);
-    const response = await fetch('https://api.resend.com/emails/batch', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(
-        chunk.map(({ to, cc, subject, text, html }) => ({
-          from,
-          to: Array.isArray(to) ? to : [to],
-          ...(cc?.length ? { cc } : {}),
-          subject,
-          text,
-          html,
-        }))
-      ),
-    });
-    if (!response.ok) {
-      throw new Error(`Resend ${response.status}: ${(await response.text()).slice(0, 300)}`);
+    const response = key
+      ? await fetch('https://api.resend.com/emails/batch', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(
+            chunk.map(({ to, cc, subject, text, html }) => ({
+              from,
+              to: list(to),
+              ...(cc?.length ? { cc } : {}),
+              subject,
+              text,
+              html,
+            }))
+          ),
+        }).catch(() => null)
+      : null;
+    if (response?.ok) {
+      sent += chunk.length;
+      continue;
     }
-    sent += chunk.length;
+    if (ready().length < 2 && key) {
+      throw new Error(
+        `Resend ${response?.status ?? 'unreachable'}: ${(await response?.text())?.slice(0, 300) ?? ''}`
+      );
+    }
+    for (const email of chunk) {
+      await sendEmail(email);
+      sent++;
+    }
   }
   return sent;
 }

@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ExternalLink,
   Loader2,
+  MailCheck,
   PartyPopper,
   Save,
   XCircle,
@@ -22,8 +23,8 @@ import { ProfileError, type PlatformId } from '@/lib/coding-profiles/types';
 import { cn } from '@/lib/utils';
 
 // The unlisted form students fill in themselves (/coding-usernames, shared as a link and
-// linked from nowhere): their email finds them, then they type a username or paste a profile
-// link for each platform. Each one is checked as they type, first its form and then whether
+// linked from nowhere): their email finds them, a code sent to it proves it is theirs, then
+// they type a username or paste a profile link for each platform. Each one is checked as they type, first its form and then whether
 // the account exists, and nothing wrong can be saved. See api/student-form.ts.
 
 const field =
@@ -41,11 +42,14 @@ interface Found {
   firstName: string;
   campus: string;
   handles: Saved;
+  /** Lets this page save for 30 minutes after the code. */
+  token: string;
 }
 
 class FormError extends Error {
   constructor(
     message: string,
+    readonly status = 0,
     readonly errors?: Partial<Record<PlatformId, string>>
   ) {
     super(message);
@@ -65,7 +69,11 @@ async function post<T>(body: unknown): Promise<T> {
   }
   const data = await response.json().catch(() => ({}));
   if (!response.ok)
-    throw new FormError(data.error ?? 'Something went wrong. Please try again.', data.errors);
+    throw new FormError(
+      data.error ?? 'Something went wrong. Please try again.',
+      response.status,
+      data.errors
+    );
   return data as T;
 }
 
@@ -109,6 +117,7 @@ function useNoIndex() {
 export default function StudentFormPage() {
   useNoIndex();
   const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
   const [found, setFound] = useState<Found | null>(null);
   const [saved, setSaved] = useState<Saved | null>(null);
 
@@ -140,11 +149,16 @@ export default function StudentFormPage() {
             <UsernamesStep
               email={email}
               found={found}
-              onBack={() => setFound(null)}
+              onBack={() => {
+                setFound(null);
+                setSent(false);
+              }}
               onSaved={setSaved}
             />
+          ) : sent ? (
+            <CodeStep email={email} onBack={() => setSent(false)} onFound={setFound} />
           ) : (
-            <EmailStep email={email} setEmail={setEmail} onFound={setFound} />
+            <EmailStep email={email} setEmail={setEmail} onSent={() => setSent(true)} />
           )}
         </div>
       </div>
@@ -159,11 +173,11 @@ export default function StudentFormPage() {
 function EmailStep({
   email,
   setEmail,
-  onFound,
+  onSent,
 }: {
   email: string;
   setEmail: (email: string) => void;
-  onFound: (found: Found) => void;
+  onSent: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -173,7 +187,8 @@ function EmailStep({
     setBusy(true);
     setError('');
     try {
-      onFound(await post<Found>({ action: 'lookup', email }));
+      await post({ action: 'send', email });
+      onSent();
     } catch (problem) {
       setError((problem as Error).message);
     } finally {
@@ -218,8 +233,130 @@ function EmailStep({
         ) : (
           <ArrowRight className="size-4" aria-hidden />
         )}
-        {busy ? 'Finding You…' : 'Continue'}
+        {busy ? 'Sending a Code…' : 'Email Me a Code'}
       </button>
+    </form>
+  );
+}
+
+function CodeStep({
+  email,
+  onBack,
+  onFound,
+}: {
+  email: string;
+  onBack: () => void;
+  onFound: (found: Found) => void;
+}) {
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [wait, setWait] = useState(60);
+
+  useEffect(() => {
+    if (wait <= 0) return;
+    const timer = setTimeout(() => setWait(wait - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [wait]);
+
+  const verify = async (value = code) => {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      onFound(await post<Found>({ action: 'verify', email, code: value }));
+    } catch (problem) {
+      setError((problem as Error).message);
+      setCode('');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resend = async () => {
+    setError('');
+    setNotice('');
+    try {
+      await post({ action: 'send', email });
+      setNotice('A new code is on its way.');
+      setWait(60);
+    } catch (problem) {
+      setError((problem as Error).message);
+    }
+  };
+
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void verify();
+      }}
+    >
+      <div>
+        <button type="button" onClick={onBack} className={linkButton}>
+          <ArrowLeft className="size-3.5" aria-hidden />
+          Change Email
+        </button>
+        <h1 className="mt-2 flex items-center gap-2 text-2xl font-bold tracking-tight text-slate-900">
+          <MailCheck className="text-brand-600 size-6" aria-hidden />
+          Check Your Email
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          We sent a 6-digit code to <span className="font-semibold text-slate-700">{email}</span>.
+          It expires in 10 minutes. Not there? Look in Spam or Promotions.
+        </p>
+      </div>
+      <div>
+        <label htmlFor="code" className="mb-1 block text-xs font-medium text-slate-600">
+          6-Digit Code
+        </label>
+        <input
+          id="code"
+          value={code}
+          onChange={(event) => {
+            const value = event.target.value.replace(/\D/g, '').slice(0, 6);
+            setCode(value);
+            // Pasting or typing the last digit goes on straight away.
+            if (value.length === 6 && !busy) void verify(value);
+          }}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          autoFocus
+          required
+          pattern="\d{6}"
+          className={cn(
+            field,
+            'border-slate-300 py-3 text-center font-mono text-xl tracking-[0.5em]'
+          )}
+        />
+      </div>
+      {error && (
+        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</p>
+      )}
+      <button type="submit" disabled={busy || code.length !== 6} className={primaryButton}>
+        {busy ? (
+          <Loader2 className="size-4 animate-spin" aria-hidden />
+        ) : (
+          <ArrowRight className="size-4" aria-hidden />
+        )}
+        {busy ? 'Checking…' : 'Continue'}
+      </button>
+      <p className="text-center text-xs text-slate-500">
+        {wait > 0 ? (
+          `You can ask for a new code in ${wait} s.`
+        ) : (
+          <button type="button" onClick={() => void resend()} className={linkButton}>
+            Send a New Code
+          </button>
+        )}
+      </p>
     </form>
   );
 }
@@ -249,6 +386,7 @@ function UsernamesStep({
   }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [expired, setExpired] = useState(false);
   const [serverErrors, setServerErrors] = useState<Partial<Record<PlatformId, string>>>({});
   const settled = useDebounced(values, 600);
 
@@ -294,11 +432,17 @@ function UsernamesStep({
     setBusy(true);
     setError('');
     try {
-      const result = await post<{ handles: Saved }>({ action: 'save', email, handles: values });
+      const result = await post<{ handles: Saved }>({
+        action: 'save',
+        email,
+        token: found.token,
+        handles: values,
+      });
       onSaved(result.handles);
     } catch (problem) {
       setError((problem as Error).message);
       if (problem instanceof FormError && problem.errors) setServerErrors(problem.errors);
+      if (problem instanceof FormError && problem.status === 401) setExpired(true);
     } finally {
       setBusy(false);
     }
@@ -340,7 +484,12 @@ function UsernamesStep({
 
       {error && (
         <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
+          {error}{' '}
+          {expired && (
+            <button type="button" onClick={onBack} className="font-semibold underline">
+              Get a New Code
+            </button>
+          )}
         </p>
       )}
       <button

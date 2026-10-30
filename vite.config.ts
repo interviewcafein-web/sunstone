@@ -114,6 +114,8 @@ export default defineConfig(({ mode }) => {
     'CRON_',
     'GOOGLE_',
     'RESEND_',
+    'BREVO_',
+    'MAILJET_',
     'EMAIL_',
     'STAFF_',
     'GROQ_',

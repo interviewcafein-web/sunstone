@@ -17,6 +17,7 @@ import {
   isEmail,
   isStaff,
   json,
+  newCode,
   normalizeEmail,
   sameText,
   sessionCookie,
@@ -35,14 +36,6 @@ const SENT = {
   ok: true,
   message: 'If this email has access, a sign-in code is on its way. It expires in 10 minutes.',
 };
-
-function newCode(): string {
-  // Uniform over 000000-999999: reject the few values that would bias the modulo.
-  const values = new Uint32Array(1);
-  do crypto.getRandomValues(values);
-  while (values[0] >= 4_294_000_000);
-  return String(values[0] % 1_000_000).padStart(6, '0');
-}
 
 const codeHash = (email: string, code: string) => digest(`otp:${email}:${code}`);
 

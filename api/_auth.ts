@@ -201,6 +201,15 @@ export async function digest(value: string) {
   return toBase64Url(await hmac(value));
 }
 
+/** A random 6-digit code for emailed sign-in, uniform over 000000-999999. */
+export function newCode(): string {
+  // Reject the few values that would bias the modulo.
+  const values = new Uint32Array(1);
+  do crypto.getRandomValues(values);
+  while (values[0] >= 4_294_000_000);
+  return String(values[0] % 1_000_000).padStart(6, '0');
+}
+
 /** Compares two strings in constant time. */
 export const sameText = (a: string, b: string) => sameBytes(encoder.encode(a), encoder.encode(b));
 
