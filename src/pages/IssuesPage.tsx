@@ -19,6 +19,7 @@ import {
   Presentation,
   RotateCcw,
   Send,
+  UserCheck,
   UserX,
   Users,
   Wifi,
@@ -91,12 +92,12 @@ function Badge({ label, color }: { label: string; color: string }) {
 
 /** Campus issues: raise, follow and resolve the operational problems at each campus. */
 export default function IssuesPage() {
-  const { id, status = 'active', campus, raise } = route.useSearch();
+  const { id, status = 'active', campus, raise, mine } = route.useSearch();
   const navigate = route.useNavigate();
   const setSearch = (patch: Record<string, unknown>) =>
     navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true });
 
-  const issues = useIssues(status as IssueFilter, campus);
+  const issues = useIssues(status as IssueFilter, campus, true, mine);
   const data = issues.data;
 
   return (
@@ -158,6 +159,30 @@ export default function IssuesPage() {
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          aria-pressed={Boolean(mine)}
+          onClick={() => setSearch({ mine: mine ? undefined : true })}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition',
+            mine
+              ? 'border-brand-700 bg-brand-700 text-white'
+              : 'bg-surface border-slate-300 text-slate-600 hover:border-slate-400'
+          )}
+        >
+          <UserCheck className="size-4" aria-hidden />
+          Assigned to Me
+          {data && data.mineCount > 0 && (
+            <span
+              className={cn(
+                'rounded-full px-1.5 text-[11px] leading-4 font-bold',
+                mine ? 'bg-white/25 text-white' : 'bg-red-500 text-white'
+              )}
+            >
+              {data.mineCount}
+            </span>
+          )}
+        </button>
         {data && data.campuses.length > 1 && (
           <select
             value={campus ?? ''}
@@ -507,7 +532,9 @@ function UpdateLine({ update }: { update: IssueUpdate }) {
   }
   const what =
     update.kind === 'assign'
-      ? `assigned it to ${update.assignee ? personName(update.assignee) : 'someone'}`
+      ? update.assignee?.email === update.author.email
+        ? 'took it on'
+        : `assigned it to ${update.assignee ? personName(update.assignee) : 'someone'}`
       : update.status === 'resolved'
         ? 'marked it resolved'
         : update.status === 'open'
@@ -593,6 +620,65 @@ function IssueDialog({
             </p>
           )}
 
+          {canChange && issue.status !== 'resolved' && (
+            <div className="rounded-2xl border border-slate-200 p-3.5">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+                <UserCheck className="size-3.5" aria-hidden />
+                Responsible
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={issue.assignedTo.email}
+                  disabled={busy}
+                  onChange={(event) =>
+                    assign.mutate({ id, assignee: event.target.value }, { onError: fail })
+                  }
+                  aria-label="Assigned to"
+                  className={cn(field, 'w-auto min-w-64 flex-1')}
+                >
+                  {!team.some((member) => member.email === issue.assignedTo.email) && (
+                    <option value={issue.assignedTo.email}>{personName(issue.assignedTo)}</option>
+                  )}
+                  <optgroup label="Central Team (HQ)">
+                    {team
+                      .filter((member) => member.role !== 'campus')
+                      .map((member) => (
+                        <option key={member.email} value={member.email}>
+                          {personName(member)}
+                          {member.email === data.me ? ' (You)' : ''}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <optgroup label="Campus Staff">
+                    {team
+                      .filter((member) => member.role === 'campus')
+                      .map((member) => (
+                        <option key={member.email} value={member.email}>
+                          {personName(member)}
+                          {member.campus ? ` · ${member.campus}` : ''}
+                          {member.email === data.me ? ' (You)' : ''}
+                        </option>
+                      ))}
+                  </optgroup>
+                </select>
+                {data.manages && issue.assignedTo.email !== data.me && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className={quietButton}
+                    onClick={() => assign.mutate({ id, assignee: data.me }, { onError: fail })}
+                  >
+                    <UserCheck className="size-4" aria-hidden />
+                    Assign to Me
+                  </button>
+                )}
+              </div>
+              <p className="mt-1.5 text-xs text-slate-500">
+                Whoever holds it is responsible: they update the status, and can hand it on.
+              </p>
+            </div>
+          )}
+
           {(canChange || canReopen) && (
             <div className="rounded-2xl border border-slate-200 p-3.5">
               <p className="mb-2 text-xs font-semibold text-slate-600">Update the Status</p>
@@ -648,26 +734,6 @@ function IssueDialog({
                     <RotateCcw className="size-4" aria-hidden />
                     Reopen
                   </button>
-                )}
-                {data.manages && issue.status !== 'resolved' && team.length > 0 && (
-                  <select
-                    value={issue.assignedTo.email}
-                    disabled={busy}
-                    onChange={(event) =>
-                      assign.mutate({ id, assignee: event.target.value }, { onError: fail })
-                    }
-                    aria-label="Assigned to"
-                    className="bg-surface ml-auto rounded-xl border border-slate-300 px-3 py-2 text-sm"
-                  >
-                    {!team.some((member) => member.email === issue.assignedTo.email) && (
-                      <option value={issue.assignedTo.email}>{personName(issue.assignedTo)}</option>
-                    )}
-                    {team.map((member) => (
-                      <option key={member.email} value={member.email}>
-                        Assign to {personName(member)}
-                      </option>
-                    ))}
-                  </select>
                 )}
               </div>
             </div>

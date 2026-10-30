@@ -27,10 +27,13 @@ async function call<T>(query = '', init?: RequestInit): Promise<T> {
 
 const post = <T>(body: unknown) => call<T>('', { method: 'POST', body: JSON.stringify(body) });
 
-export const useIssues = (filter: IssueFilter, campus?: number, enabled = true) =>
+export const useIssues = (filter: IssueFilter, campus?: number, enabled = true, mine = false) =>
   useQuery({
-    queryKey: ['issues', filter, campus ?? null],
-    queryFn: () => call<IssuesResponse>(`?status=${filter}${campus ? `&campus=${campus}` : ''}`),
+    queryKey: ['issues', filter, campus ?? null, mine],
+    queryFn: () =>
+      call<IssuesResponse>(
+        `?status=${filter}${campus ? `&campus=${campus}` : ''}${mine ? '&mine=1' : ''}`
+      ),
     enabled,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,

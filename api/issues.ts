@@ -10,9 +10,10 @@
 //   POST /api/issues { action: 'assign', id, assignee }
 //
 // Who may do what: campus staff see and raise issues for their campuses; HQ and super admins
-// see every campus. Replies are open to anyone who can see the issue. The status changes by
-// HQ, super admins or the assignee; the person who raised it may reopen it. Only HQ and super
-// admins reassign. Each new issue is emailed (and pushed to the app) to the assignee and to HQ
+// see every campus, and anyone sees the issues assigned to them. Replies are open to anyone
+// who can see the issue. The status changes by HQ, super admins or the assignee (the holder);
+// the person who raised it may reopen it. HQ, super admins and the holder hand it on, to
+// anyone on the team. Each new issue is emailed (and pushed to the app) to the assignee and to HQ
 // (Sarvesh and Tarun Sharma, see DEFAULT_NOTIFY); each reply and change to the others on it:
 // the person who raised it and the assignee.
 
@@ -63,52 +64,73 @@ const FROM = `from issues i
   left join staff r on r.email = i.raised_by
   left join staff a on a.email = i.assigned_to`;
 
-/** Campus staff see their campuses; everyone else every campus. ($1 = the campus ids or null) */
-const VISIBLE = `($1::int[] is null or i.campus_id = any($1::int[]))`;
+/**
+ * Campus staff see their campuses' issues and any issue assigned to them; everyone else every
+ * campus. `campuses` and `me` are the parameters holding the campus ids (or null) and the email.
+ */
+const visible = (campuses: string, me: string) =>
+  `(${campuses}::int[] is null or i.campus_id = any(${campuses}::int[]) or i.assigned_to = ${me})`;
 
 const me = (viewer: Viewer) => normalizeEmail(viewer.user);
 
 async function list(viewer: Viewer, url: URL) {
   const status = url.searchParams.get('status') ?? 'active';
   const campus = Number(url.searchParams.get('campus')) || null;
+  const mine = url.searchParams.get('mine') === '1';
   const statusFilter =
     status === 'resolved'
       ? `i.status = 'resolved'`
       : status === 'all'
         ? 'true'
         : `i.status <> 'resolved'`;
-  const [issues, [{ open }], campuses, team] = await Promise.all([
+  const [issues, [{ open, mine: mineCount }], campuses, team] = await Promise.all([
     db().query(
       `select ${ISSUE_FIELDS} ${FROM}
-       where ${VISIBLE} and ${statusFilter} and ($2::int is null or i.campus_id = $2)
+       where ${visible('$1', '$3')} and ${statusFilter} and ($2::int is null or i.campus_id = $2)
+         and (not $4::boolean or i.assigned_to = $3)
        order by case i.status when 'open' then 0 when 'in_progress' then 1 else 2 end,
                 case i.priority when 'urgent' then 0 when 'high' then 1 else 2 end,
                 i.created_at desc
        limit 300`,
-      [viewer.campusIds, campus]
+      [viewer.campusIds, campus, me(viewer), mine]
     ),
     db().query(
-      `select count(*)::int as open from issues i where ${VISIBLE} and i.status <> 'resolved'`,
-      [viewer.campusIds]
+      `select count(*)::int as open, count(*) filter (where i.assigned_to = $2)::int as mine
+       from issues i where ${visible('$1', '$2')} and i.status <> 'resolved'`,
+      [viewer.campusIds, me(viewer)]
     ),
     db().query(
       `select campus_id::int as id, name from ${CAMPUSES} c
        where $1::int[] is null or campus_id = any($1::int[]) order by name`,
       [viewer.campusIds]
     ),
-    managesTeam(viewer)
-      ? db().query(
-          `select email, name from staff where active and role in ('hq', 'super_admin') order by coalesce(name, email)`
-        )
-      : Promise.resolve([]),
+    // Who an issue can be handed to: every active staff member for HQ; HQ and their own
+    // campuses' staff for campus staff (who pass on issues assigned to them).
+    db().query(
+      `select s.email, s.name, s.role,
+              (select string_agg(c.name, ', ' order by c.name) from ${CAMPUSES} c
+               where c.campus_id = any(s.campus_ids)) as campus
+       from staff s
+       where s.active and ($1::int[] is null or s.role <> 'campus' or s.campus_ids && $1::int[])
+       order by (s.role = 'campus'), coalesce(s.name, s.email)`,
+      [viewer.campusIds]
+    ),
   ]);
-  return { issues, openCount: open, campuses, team, manages: managesTeam(viewer), me: me(viewer) };
+  return {
+    issues,
+    openCount: open,
+    mineCount,
+    campuses,
+    team,
+    manages: managesTeam(viewer),
+    me: me(viewer),
+  };
 }
 
 async function findIssue(viewer: Viewer, id: number) {
   const [issue] = await db().query(
-    `select ${ISSUE_FIELDS} ${FROM} where i.id = $2 and ${VISIBLE}`,
-    [viewer.campusIds, id]
+    `select ${ISSUE_FIELDS} ${FROM} where i.id = $2 and ${visible('$1', '$3')}`,
+    [viewer.campusIds, id, me(viewer)]
   );
   return issue ?? null;
 }
@@ -277,19 +299,29 @@ async function setStatus(viewer: Viewer, body: Record<string, unknown>) {
   return json(200, await detail(viewer, id));
 }
 
+/**
+ * Hands an issue to someone, who then holds it: HQ and super admins, or whoever holds it now,
+ * may. HQ can choose any active staff member; campus staff choose HQ or their own campuses'
+ * staff. The new holder, the one before and the person who raised it are told.
+ */
 async function assign(viewer: Viewer, body: Record<string, unknown>) {
-  if (!managesTeam(viewer)) return json(403, { error: 'Only HQ can reassign issues.' });
   const id = Number(body.id);
   const to = normalizeEmail(String(body.assignee ?? ''));
-  const [member] = await db().query(
-    `select email, name from staff where email = $1 and active and role in ('hq', 'super_admin')`,
-    [to]
-  );
-  if (!member) return json(400, { error: 'Choose someone from the central team.' });
   const issue = Number.isInteger(id) ? await findIssue(viewer, id) : null;
   if (!issue) return json(404, { error: 'Issue not found.' });
-  if (issue.assignedTo.email === to) return json(200, await detail(viewer, id));
   const actor = me(viewer);
+  if (!managesTeam(viewer) && issue.assignedTo.email !== actor) {
+    return json(403, { error: 'Only HQ or the person it is assigned to can hand it on.' });
+  }
+  const [member] = await db().query(
+    `select email, name from staff
+     where email = $1 and active
+       and ($2::int[] is null or role <> 'campus' or campus_ids && $2::int[])`,
+    [to, viewer.campusIds]
+  );
+  if (!member) return json(400, { error: 'Choose someone on the Vertex team.' });
+  if (issue.assignedTo.email === to) return json(200, await detail(viewer, id));
+
   await db().query(`update issues set assigned_to = $2, updated_at = now() where id = $1`, [
     id,
     to,
@@ -298,18 +330,37 @@ async function assign(viewer: Viewer, body: Record<string, unknown>) {
     `insert into issue_updates (issue_id, author, kind, assignee) values ($1, $2, 'assign', $3)`,
     [id, actor, to]
   );
-  await tell(
-    [to],
-    actor,
-    id,
-    {
-      title: `Assigned to you: ${categoryLabel(issue.category)} at ${issue.campus}`,
-      body: `${viewer.name ?? actor} assigned you this issue.\n\n${issue.details}`,
-      level: issue.priority === 'urgent' ? 'urgent' : 'info',
-    },
-    viewer.name ?? actor
-  );
-  return json(200, await detail(viewer, id));
+  const who = viewer.name ?? actor;
+  const holder = member.name ?? to;
+  const what = `${categoryLabel(issue.category)} at ${issue.campus}`;
+  await Promise.all([
+    tell(
+      [to],
+      actor,
+      id,
+      {
+        title: `Assigned to you: ${what}`,
+        body: `${who} made you responsible for this issue.\n\n${issue.details}${issue.location ? `\n\nWhere: ${issue.location}` : ''}`,
+        level:
+          issue.priority === 'urgent' ? 'urgent' : issue.priority === 'high' ? 'important' : 'info',
+      },
+      who
+    ),
+    tell(
+      [issue.raisedBy.email, issue.assignedTo.email].filter((email) => email !== to),
+      actor,
+      id,
+      {
+        title: `Now with ${holder}: ${what}`,
+        body:
+          to === actor ? `${who} took this issue on.` : `${who} assigned this issue to ${holder}.`,
+        level: 'info',
+      },
+      who
+    ),
+  ]);
+  // Handed to someone else, the issue may no longer be one the viewer can see.
+  return json(200, (await detail(viewer, id)) ?? { ok: true });
 }
 
 export default async function handler(request: Request): Promise<Response> {

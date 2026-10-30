@@ -14,6 +14,12 @@ export interface Push {
 /** Sends `push` to every registered phone of these people; returns how many were sent. */
 export async function pushTo(emails: string[], push: Push): Promise<number> {
   if (!emails.length) return 0;
+  // Local development never reaches real phones (set PUSH_LOCAL=1 to try it on purpose);
+  // Vercel and the GitHub Actions jobs (CI) always send.
+  if (!process.env.VERCEL && !process.env.CI && process.env.PUSH_LOCAL !== '1') {
+    console.log(`\n[push to ${emails.join(', ')}] ${push.title}\n${push.body}\n`);
+    return 0;
+  }
   const devices = await db()`
     select token from push_devices where not disabled and email = any(${emails}::text[])`;
   const tokens = devices.map((row) => String(row.token));

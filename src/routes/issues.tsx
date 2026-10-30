@@ -10,6 +10,8 @@ export interface IssuesSearch {
   campus?: number;
   /** The Raise an Issue form is open. */
   raise?: boolean;
+  /** Only the issues assigned to the viewer. */
+  mine?: boolean;
 }
 
 const number = (value: unknown) => {
@@ -23,6 +25,7 @@ export const Route = createFileRoute('/issues')({
     status: search.status === 'resolved' || search.status === 'all' ? search.status : undefined,
     campus: number(search.campus),
     raise: search.raise === true || search.raise === 'true' ? true : undefined,
+    mine: search.mine === true || search.mine === 'true' ? true : undefined,
   }),
   component: () => (
     <RequireLogin>

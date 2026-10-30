@@ -64,6 +64,13 @@ export interface Person {
   name: string | null;
 }
 
+/** Someone an issue can be assigned to. */
+export interface TeamMember extends Person {
+  role: 'super_admin' | 'hq' | 'campus';
+  /** Their campuses' names, for campus staff. */
+  campus: string | null;
+}
+
 export interface Issue {
   id: number;
   campusId: number;
@@ -97,11 +104,13 @@ export interface IssuesResponse {
   issues: Issue[];
   /** Open or in progress, among the issues the viewer can see. */
   openCount: number;
+  /** Open or in progress and assigned to the viewer. */
+  mineCount: number;
   /** Campuses the viewer may raise an issue for. */
   campuses: { id: number; name: string }[];
-  /** HQ members an issue can be assigned to (HQ and super admins only). */
-  team: Person[];
-  /** Whether the viewer can change status and assignee on any issue. */
+  /** Who an issue can be assigned to: everyone for HQ; HQ and their campuses' staff otherwise. */
+  team: TeamMember[];
+  /** Whether the viewer can change status and assignee on any issue (HQ and super admins). */
   manages: boolean;
   me: string;
 }
