@@ -797,16 +797,20 @@ async function attendance(campusId: number, batch: string | null) {
      order by prime desc, marks desc limit 30`,
     params
   );
-  // Instructors teach sections, not batches, so this is for the whole campus.
-  const facultyQuery = db()`
-    select faculty_id, min(faculty) as faculty, count(*)::int as sessions,
-           sum(marked)::int as marks, round(100.0 * sum(present) / nullif(sum(marked), 0))::int as pct,
-           string_agg(distinct subject, ', ') as subjects,
-           bool_or(subject ~* '(^|[^a-z])prime([^a-z]|$)|competitive coding') as prime,
-           max(lecture_date)::text as last_class
-    from att_sessions where campus_id = ${campusId} and faculty_id is not null
-    group by faculty_id having count(*) >= 3
-    order by prime desc, sessions desc`;
+  // PRIME coding domain instructors only, with attendance in their PRIME coding classes; a
+  // class counts for the batch of the students it marked.
+  const facultyQuery = db().query(
+    `select a.faculty_id, min(a.faculty) as faculty, count(*)::int as sessions,
+            sum(a.marked)::int as marks, round(100.0 * sum(a.present) / nullif(sum(a.marked), 0))::int as pct,
+            string_agg(distinct a.subject, ', ') as subjects, true as prime,
+            max(a.lecture_date)::text as last_class
+     from att_sessions a join students s on s.lms_user_id = a.first_student
+     where a.campus_id = $1 and a.faculty_id is not null and (${PRIME_CODING})
+       and ${COHORT.replace(/admission_year|program/g, (column) => `s.${column}`)}
+     group by a.faculty_id having count(*) >= 3
+     order by sessions desc`,
+    params
+  );
   const [[overall], weeks, subjects, faculty, [{ synced }]] = await together([
     overallQuery,
     weeksQuery,

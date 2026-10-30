@@ -215,7 +215,7 @@ export function AttendanceTab({ data }: { data: CampusAttendance }) {
           <div className="px-5 pt-5">
             <h2 className="text-lg font-bold">By instructor</h2>
             <p className="text-sm text-slate-500">
-              Attendance in their classes (whole campus). PRIME instructors first.
+              PRIME coding domain instructors, with attendance in their PRIME coding classes.
             </p>
           </div>
           <div className="mt-3 max-h-[28rem] overflow-y-auto">
@@ -224,14 +224,7 @@ export function AttendanceTab({ data }: { data: CampusAttendance }) {
                 {data.faculty.map((person) => (
                   <tr key={person.faculty_id} className="border-t border-dotted border-slate-200">
                     <td className="px-5 py-2.5">
-                      <p className="font-medium">
-                        {person.faculty}
-                        {person.prime && (
-                          <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
-                            PRIME
-                          </span>
-                        )}
-                      </p>
+                      <p className="font-medium">{person.faculty}</p>
                       <p className="line-clamp-1 text-xs text-slate-500" title={person.subjects}>
                         {person.subjects}
                       </p>

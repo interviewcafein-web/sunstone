@@ -11,17 +11,27 @@ export function subjectName(raw: string): string {
 /**
  * A person's name with each word capitalised: "Shivam chaturvedi" → "Shivam Chaturvedi",
  * "DR. ATUL NANDWAL" → "Dr. Atul Nandwal", "Manisha A s" → "Manisha A S". Words typed in mixed
- * case on purpose ("McDonald") are kept.
+ * case on purpose ("McDonald") are kept, and a name typed twice for someone with a single name
+ * reads once ("Sudhanshu Sudhanshu" → "Sudhanshu", "Neha Gupta Gupta" → "Neha Gupta").
  */
 export function personName(raw: string): string {
-  return raw
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/\p{L}+/gu, (word) =>
-      word === word.toLowerCase() || word === word.toUpperCase()
-        ? word[0].toUpperCase() + word.slice(1).toLowerCase()
-        : word
-    );
+  return (
+    raw
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\p{L}+/gu, (word) =>
+        word === word.toLowerCase() || word === word.toUpperCase()
+          ? word[0].toUpperCase() + word.slice(1).toLowerCase()
+          : word
+      )
+      .split(' ')
+      // A full word typed twice; initials stay ("A A Kumar").
+      .filter(
+        (word, index, words) =>
+          index === 0 || word.length < 3 || word.toLowerCase() !== words[index - 1].toLowerCase()
+      )
+      .join(' ')
+  );
 }
 
 /** Short words kept lower case inside a title, and abbreviations kept in capitals. */
