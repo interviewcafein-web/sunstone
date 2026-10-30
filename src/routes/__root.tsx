@@ -34,6 +34,18 @@ function RootComponent() {
   const user = session.data;
   // The login page is the sign-in form itself; a "Staff Login" button there only repeats it.
   const onLoginPage = useRouterState({ select: (state) => state.location.pathname === '/login' });
+  // The student form stands alone: no staff header, menu, banner or Ask button.
+  const studentForm = useRouterState({
+    select: (state) => state.location.pathname === '/coding-usernames',
+  });
+
+  if (studentForm) {
+    return (
+      <main id="main" className="flex min-h-dvh w-full flex-col px-4 py-8 sm:py-12">
+        <Outlet />
+      </main>
+    );
+  }
 
   return (
     <div className="flex min-h-dvh flex-col">

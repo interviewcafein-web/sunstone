@@ -262,7 +262,7 @@ function EmailCodeForm({ next }: { next?: string }) {
       >
         <div>
           <label htmlFor="email" className="mb-1 block text-xs font-medium text-slate-600">
-            Work email
+            Work Email
           </label>
           <input
             id="email"
@@ -282,7 +282,7 @@ function EmailCodeForm({ next }: { next?: string }) {
           ) : (
             <Mail className="size-4" aria-hidden />
           )}
-          {busy ? 'Sending…' : 'Email me a sign-in code'}
+          {busy ? 'Sending…' : 'Email Me a Sign-In Code'}
         </button>
       </form>
     );

@@ -8,6 +8,8 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
+import { createFileRoute } from '@tanstack/react-router'
+
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
@@ -22,6 +24,8 @@ import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as TeamRouteImport } from './routes/team'
 import { Route as SSlugRouteImport } from './routes/s.$slug'
 import { Route as SSlugCardRouteImport } from './routes/s.$slug_.card'
+
+const CodingUsernamesLazyRouteImport = createFileRoute('/coding-usernames')()
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -48,6 +52,13 @@ const CampusesRoute = CampusesRouteImport.update({
   path: '/campuses',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/campuses.lazy').then((d) => d.Route))
+const CodingUsernamesLazyRoute = CodingUsernamesLazyRouteImport.update({
+  id: '/coding-usernames',
+  path: '/coding-usernames',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/coding-usernames.lazy').then((d) => d.Route),
+)
 const InsightsRoute = InsightsRouteImport.update({
   id: '/insights',
   path: '/insights',
@@ -101,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
   '/team': typeof TeamRoute
+  '/coding-usernames': typeof CodingUsernamesLazyRoute
   '/s/$slug': typeof SSlugRoute
   '/s/$slug/card': typeof SSlugCardRoute
 }
@@ -116,6 +128,7 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
   '/team': typeof TeamRoute
+  '/coding-usernames': typeof CodingUsernamesLazyRoute
   '/s/$slug': typeof SSlugRoute
   '/s/$slug/card': typeof SSlugCardRoute
 }
@@ -132,6 +145,7 @@ export interface FileRoutesById {
   '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
   '/team': typeof TeamRoute
+  '/coding-usernames': typeof CodingUsernamesLazyRoute
   '/s/$slug': typeof SSlugRoute
   '/s/$slug_/card': typeof SSlugCardRoute
 }
@@ -149,6 +163,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/resources'
     | '/team'
+    | '/coding-usernames'
     | '/s/$slug'
     | '/s/$slug/card'
   fileRoutesByTo: FileRoutesByTo
@@ -164,6 +179,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/resources'
     | '/team'
+    | '/coding-usernames'
     | '/s/$slug'
     | '/s/$slug/card'
   id:
@@ -179,6 +195,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/resources'
     | '/team'
+    | '/coding-usernames'
     | '/s/$slug'
     | '/s/$slug_/card'
   fileRoutesById: FileRoutesById
@@ -195,6 +212,7 @@ export interface RootRouteChildren {
   ProfileRoute: typeof ProfileRoute
   ResourcesRoute: typeof ResourcesRoute
   TeamRoute: typeof TeamRoute
+  CodingUsernamesLazyRoute: typeof CodingUsernamesLazyRoute
   SSlugRoute: typeof SSlugRoute
   SSlugCardRoute: typeof SSlugCardRoute
 }
@@ -234,6 +252,13 @@ declare module '@tanstack/react-router' {
       path: '/campuses'
       fullPath: '/campuses'
       preLoaderRoute: typeof CampusesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/coding-usernames': {
+      id: '/coding-usernames'
+      path: '/coding-usernames'
+      fullPath: '/coding-usernames'
+      preLoaderRoute: typeof CodingUsernamesLazyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/insights': {
@@ -307,6 +332,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProfileRoute: ProfileRoute,
   ResourcesRoute: ResourcesRoute,
   TeamRoute: TeamRoute,
+  CodingUsernamesLazyRoute: CodingUsernamesLazyRoute,
   SSlugRoute: SSlugRoute,
   SSlugCardRoute: SSlugCardRoute,
 }
