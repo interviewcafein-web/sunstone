@@ -1,11 +1,13 @@
+import { Fragment } from 'react';
 import { Document, Image, Page, Text, View } from '@react-pdf/renderer';
 
-import { lmsDate, type StudentMetrics } from '@/lib/assessments';
+import { lmsDate, type ReportCampusDelivery, type StudentMetrics } from '@/lib/assessments';
 import { cohortLabel } from '@/lib/cohorts';
 import { PLATFORMS } from '@/lib/coding-profiles/platforms';
 import type { PlatformId } from '@/lib/coding-profiles/types';
 import { BAND_COLORS, bandOf, dimensionById, type StudentInsight } from '@/lib/insights';
 import { ZONE_BASIS, ZONES, zoneById, type ZoneResult } from '@/lib/students/zones';
+import { DeliveryComparisonPage, DeliveryPage } from '@/reports/Delivery';
 import { HealthComparisonPage, InsightsPage } from '@/reports/Insights';
 import { UnusualScoresPage, type ReportFlaggedTest } from '@/reports/UnusualScores';
 import {
@@ -54,6 +56,8 @@ export interface CampusReportData {
   allCampuses?: boolean;
   /** Tests with unusually high, uniform scores (possible copying), for the report's campuses. */
   flaggedTests?: ReportFlaggedTest[];
+  /** PRIME coding delivery and instructors, per campus of the report. */
+  delivery?: ReportCampusDelivery[];
 }
 
 const SHORT: Record<PlatformId, string> = {
@@ -137,11 +141,15 @@ export function CampusReport({ data }: { data: CampusReportData }) {
   );
 
   const flagged = data.flaggedTests ?? [];
+  const delivery = data.delivery ?? [];
+  const deliveryOf = (campus: string) => delivery.find((entry) => entry.campus === campus);
   if (!data.allCampuses) {
+    const entry = deliveryOf(data.title) ?? delivery[0];
     return document(
       <>
         <CampusPages data={data} kind="Campus Progress Report" withHeader />
         <UnusualScoresPage tests={flagged} label={label} showCampus={false} />
+        {entry && <DeliveryPage entry={entry} label={label} />}
       </>
     );
   }
@@ -159,13 +167,23 @@ export function CampusReport({ data }: { data: CampusReportData }) {
       <ComparisonPage data={data} campuses={campuses} label={label} />
       <HealthComparisonPage insights={data.rows.map((row) => row.insight)} label={label} />
       <UnusualScoresPage tests={flagged} label={label} showCampus />
-      {campuses.map((campus) => (
-        <CampusPages
-          key={campus}
-          data={{ ...data, title: campus, rows: data.rows.filter((row) => row.campus === campus) }}
-          kind="Campus Progress Report"
-        />
-      ))}
+      <DeliveryComparisonPage entries={delivery} label={label} />
+      {campuses.map((campus) => {
+        const entry = deliveryOf(campus);
+        return (
+          <Fragment key={campus}>
+            <CampusPages
+              data={{
+                ...data,
+                title: campus,
+                rows: data.rows.filter((row) => row.campus === campus),
+              }}
+              kind="Campus Progress Report"
+            />
+            {entry && <DeliveryPage entry={entry} label={[campus, ...data.filters].join(' · ')} />}
+          </Fragment>
+        );
+      })}
     </>
   );
 }

@@ -1,5 +1,6 @@
-// The weekly report: the 360° view (coding, attendance, PRIME tests, AMCAT, exams), pain
-// points, top performers and who needs attention, by email and in the bell.
+// The weekly report: the 360° view (coding, attendance, PRIME Mock Tests, AMCAT, exams), pain
+// points, PRIME coding delivery (the campus page's Syllabus vs Delivery), top performers and who
+// needs attention, by email and in the bell.
 //   HQ gets the all-campus report; each campus's staff get their campus's report, with every
 //   HQ member and super admin copied in.
 // It uses the same model as the 360° page (src/lib/insights.ts), so the numbers match.
@@ -31,6 +32,7 @@ import {
   type PainPoint,
   type StudentInsight,
 } from '../src/lib/insights';
+import type { CampusDelivery } from '../src/lib/assessments';
 import type { Integrity } from '../src/lib/integrity';
 import { BAND, SITE, escape, frame, pill, section, table } from './_email-blocks';
 import { addNotice, staffDirectory } from './_notify';
@@ -95,9 +97,25 @@ interface FlaggedTest {
   integrity: Integrity;
 }
 const flaggedByCampus = new Map<number, FlaggedTest[]>();
+// PRIME coding delivery and PRIME coding instructors, per campus id (from the same campus page).
+interface DeliveryEntry {
+  campus: string;
+  delivery: CampusDelivery | null;
+  instructors: { name: string; classes: number; pct: number | null }[];
+}
+const deliveryByCampus = new Map<number, DeliveryEntry>();
 const since = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
 for (const row of campusRows) {
   const detail = await campusDetail(Number(row.id), null);
+  deliveryByCampus.set(Number(row.id), {
+    campus: String(row.name),
+    delivery: detail.delivery as CampusDelivery | null,
+    instructors: (detail.attendance.faculty as Record<string, unknown>[]).map((person) => ({
+      name: String(person.faculty),
+      classes: Number(person.sessions),
+      pct: person.pct === null ? null : Number(person.pct),
+    })),
+  });
   const tests = [
     ...detail.subjectTests,
     ...detail.subjects.flatMap((subject) =>
@@ -359,6 +377,158 @@ function unusualScores(tests: FlaggedTest[], showCampus: boolean) {
   );
 }
 
+// --- PRIME coding delivery -------------------------------------------------------------------
+
+const share = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
+const paceColor = (pct: number) => (pct >= 75 ? BAND.good : pct >= 40 ? BAND.ok : BAND.risk);
+const shortDay = (value: string | null | undefined) =>
+  value
+    ? new Date(`${String(value).slice(0, 10)}T00:00:00+05:30`).toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        timeZone: 'Asia/Kolkata',
+      })
+    : '—';
+const hours = (value: number) => `${value.toLocaleString('en-IN')} h`;
+
+/** Verified (and awaiting, lighter) of allocated, as a bar. */
+const progressBar = (verified: number, pending: number) => `
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#eef2f6;border-radius:999px"><tr>
+  ${verified > 0 ? `<td width="${Math.min(100, verified)}%" style="height:8px;background:${paceColor(verified)};border-radius:999px"></td>` : ''}
+  ${pending > 0 ? `<td width="${Math.min(100 - Math.min(100, verified), pending)}%" style="height:8px;background:${BAND.ok}80"></td>` : ''}
+  <td style="height:8px"></td>
+</tr></table>`;
+
+/** One campus's PRIME coding delivery, for its weekly email. */
+function deliverySection(entry: DeliveryEntry | undefined) {
+  const data = entry?.delivery;
+  if (!entry || (!data && !entry.instructors.length)) return '';
+  let inner = '';
+  if (data) {
+    const done = share(data.delivered, data.allocated);
+    const pending = share(data.pending, data.allocated);
+    const remaining = Math.max(0, data.allocated - data.delivered - data.pending);
+    inner += `
+<div style="font-size:14px;color:#0f172a"><b style="font-size:22px;color:${paceColor(done)}">${done}%</b>
+  &nbsp;<b>${hours(data.delivered)}</b> verified of ${hours(data.allocated)} allocated
+  · ${hours(data.pending)} awaiting verification · ${hours(remaining)} still to go</div>
+<div style="margin-top:8px">${progressBar(done, pending)}</div>`;
+    const behind = (data.sections as Record<string, unknown>[])
+      .filter((row) => Number(row.allocated) > 0)
+      .map((row) => ({
+        label: `${cohortLabel(String(row.program), Number(row.batch_year))}${row.section ? ` · ${row.section}` : ''}`,
+        delivered: Number(row.delivered),
+        allocated: Number(row.allocated),
+        pct: share(Number(row.delivered), Number(row.allocated)),
+      }))
+      .sort((a, b) => a.pct - b.pct)
+      .slice(0, 5);
+    if (behind.length) {
+      inner +=
+        `<div style="margin-top:14px;font-size:12px;font-weight:bold;color:#475569">Sections furthest behind</div>` +
+        table(
+          [
+            { label: 'Batch · section' },
+            { label: 'Verified', align: 'right' },
+            { label: 'Done', align: 'right' },
+          ],
+          behind.map((row) => [
+            escape(row.label),
+            `${row.delivered} / ${hours(row.allocated)}`,
+            `<b style="color:${paceColor(row.pct)}">${row.pct}%</b>`,
+          ])
+        );
+    }
+    const trainers = data.trainers as Record<string, unknown>[];
+    if (trainers.length) {
+      inner +=
+        `<div style="margin-top:14px;font-size:12px;font-weight:bold;color:#475569">By trainer</div>` +
+        table(
+          [
+            { label: 'Trainer' },
+            { label: 'Verified', align: 'right' },
+            { label: 'Awaiting', align: 'right' },
+            { label: 'Classes', align: 'right' },
+            { label: 'Last logged', align: 'right' },
+          ],
+          trainers.map((trainer) => [
+            `<b>${escape(String(trainer.name))}</b>${Number(trainer.rejected) ? `<div style="font-size:11px;color:${BAND.risk}">${trainer.rejected} entries rejected</div>` : ''}`,
+            hours(Number(trainer.hours)),
+            Number(trainer.pending_hours)
+              ? `<span style="color:${BAND.ok}">${hours(Number(trainer.pending_hours))}</span>`
+              : '—',
+            String(trainer.classes),
+            shortDay(trainer.last_logged as string | null),
+          ])
+        );
+    }
+    if (data.unlogged && data.unlogged.classes > 0) {
+      inner += `<div style="margin-top:14px;padding:10px 12px;border:1px solid #fcd34d;background:#fffbeb;border-radius:10px;font-size:13px;color:#78350f">
+  <b>${data.unlogged.classes} class${data.unlogged.classes === 1 ? '' : 'es'} not logged yet</b>: PRIME coding classes in the LMS time table on days the trainer logged nothing in the tracker (${escape(
+    data.unlogged.trainers.map((trainer) => `${trainer.name} ${trainer.classes}`).join(', ')
+  )}).</div>`;
+    }
+  }
+  if (entry.instructors.length) {
+    inner += `<div style="margin-top:14px;font-size:13px;color:#334155"><b>PRIME coding instructors</b> (attendance in their classes): ${entry.instructors
+      .map((person) => `${escape(person.name)} ${person.pct === null ? '—' : `${person.pct}%`}`)
+      .join(' · ')}</div>`;
+  }
+  const notes = data
+    ? [
+        data.duplicates > 0 ? `${data.duplicates} repeat submissions counted once` : '',
+        `last class ${shortDay(data.last_class)}`,
+      ].filter(Boolean)
+    : [];
+  return section(
+    '📚 PRIME coding delivery',
+    inner,
+    `From the delivery tracker: allocated hours, verified, awaiting verification and still to go.${notes.length ? ` ${notes.join('; ')}.` : ''}`
+  );
+}
+
+/** Every campus's PRIME coding delivery, furthest behind first, for HQ's email. */
+function deliveryComparison(entries: DeliveryEntry[]) {
+  const rows = entries
+    .filter((entry) => entry.delivery)
+    .map((entry) => ({
+      entry,
+      data: entry.delivery!,
+      pct: share(entry.delivery!.delivered, entry.delivery!.allocated),
+    }))
+    .sort((a, b) => a.pct - b.pct);
+  if (!rows.length) return '';
+  const total = rows.reduce(
+    (sum, row) => ({
+      allocated: sum.allocated + row.data.allocated,
+      delivered: sum.delivered + row.data.delivered,
+    }),
+    { allocated: 0, delivered: 0 }
+  );
+  return section(
+    '📚 PRIME coding delivery by campus',
+    table(
+      [
+        { label: 'Campus' },
+        { label: 'Verified', align: 'right' },
+        { label: 'Done', align: 'right' },
+        { label: 'Awaiting', align: 'right' },
+        { label: 'Not logged', align: 'right' },
+      ],
+      rows.map(({ entry, data, pct }) => [
+        `<b>${escape(entry.campus)}</b>`,
+        `<span style="white-space:nowrap">${data.delivered.toLocaleString('en-IN')} / ${hours(data.allocated)}</span>`,
+        `<b style="color:${paceColor(pct)}">${pct}%</b>`,
+        data.pending ? hours(data.pending) : '—',
+        data.unlogged?.classes
+          ? `<span style="color:${BAND.ok};white-space:nowrap">${data.unlogged.classes} class${data.unlogged.classes === 1 ? '' : 'es'}</span>`
+          : '—',
+      ])
+    ),
+    `From the delivery tracker, furthest behind first. All campuses: ${hours(total.delivered)} of ${hours(total.allocated)} verified (${share(total.delivered, total.allocated)}%).`
+  );
+}
+
 function reportEmail(
   scope: GroupStats,
   rows: StudentInsight[],
@@ -369,6 +539,9 @@ function reportEmail(
     benchmark?: GroupStats;
     testsThisWeek: number;
     flagged: FlaggedTest[];
+    /** The campus's delivery (campus emails), or every campus's (HQ's email). */
+    delivery?: DeliveryEntry;
+    deliveryAll?: DeliveryEntry[];
   }
 ) {
   const noun = options.campus ? 'Batch' : 'Campus';
@@ -389,6 +562,9 @@ function reportEmail(
       pains(points) +
       fronts(scope, options.benchmark) +
       (groups.length > 1 ? comparison(groups, noun) : '') +
+      (options.deliveryAll
+        ? deliveryComparison(options.deliveryAll)
+        : deliverySection(options.delivery)) +
       unusualScores(options.flagged, !options.campus) +
       people(rows, !options.campus),
     cta: { label: 'Open the 360° view', href: `${SITE}${link}` },
@@ -408,6 +584,12 @@ function reportEmail(
       (d) =>
         `${d.label}: ${scope.dims[d.id].avg ?? '—'}${d.suffix} (${scope.dims[d.id].coverage}% have data)`
     ),
+    ...(options.delivery?.delivery
+      ? [
+          '',
+          `PRIME coding delivery: ${options.delivery.delivery.delivered} of ${options.delivery.delivery.allocated} h verified, ${options.delivery.delivery.pending} h awaiting verification`,
+        ]
+      : []),
     '',
     `Open: ${SITE}${link}`,
   ].join('\n');
@@ -429,6 +611,7 @@ const allFlagged = [...flaggedByCampus.values()]
 const overall = reportEmail(all, insights, campusGroups, {
   testsThisWeek: totalNewTests,
   flagged: allFlagged,
+  deliveryAll: [...deliveryByCampus.values()],
 });
 
 const campusReports = campusGroups.map((group) => {
@@ -445,6 +628,7 @@ const campusReports = campusGroups.map((group) => {
       benchmark: all,
       testsThisWeek: campus ? (newTests.get(Number(campus.id)) ?? 0) : 0,
       flagged: campus ? (flaggedByCampus.get(Number(campus.id)) ?? []) : [],
+      delivery: campus ? deliveryByCampus.get(Number(campus.id)) : undefined,
     }),
   };
 });

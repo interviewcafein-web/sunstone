@@ -17,7 +17,7 @@ import { useStudents } from '@/hooks/useStudents';
 import { PLATFORM_IDS, SOLVING_PLATFORM_IDS } from '@/lib/coding-profiles/platforms';
 import { ProfileError, type PlatformId } from '@/lib/coding-profiles/types';
 import { useTour } from '@/hooks/useTour';
-import { fetchFlaggedTests, useStudentMetrics, type StudentMetrics } from '@/lib/assessments';
+import { fetchReportExtras, useStudentMetrics, type StudentMetrics } from '@/lib/assessments';
 import { buildInsights, type StudentInsight } from '@/lib/insights';
 import { useSession } from '@/lib/session';
 import type { Student } from '@/lib/students/types';
@@ -233,12 +233,18 @@ export default function StudentsPage() {
           (platform, handle) => summaries.byKey.get(summaryKey(platform, handle))?.data
         ).map((insight) => [insight.student, insight])
       );
-      // Tests with unusual scores at the report's campuses; the report goes ahead without them
-      // if they cannot be loaded.
-      const flaggedTests = await fetchFlaggedTests(
+      // From each campus page: tests with unusual scores, PRIME coding delivery and instructors.
+      // The report goes ahead without them if they cannot be loaded.
+      const cohort =
+        search.course && search.batch
+          ? `${search.course}:${search.batch}`
+          : search.course
+            ? `${search.course}:`
+            : search.batch || undefined;
+      const { flaggedTests, delivery } = await fetchReportExtras(
         [...new Set(rows.map((row) => row.student.campus))],
-        search.batch || undefined
-      ).catch(() => []);
+        cohort
+      ).catch(() => ({ flaggedTests: [], delivery: [] }));
       await downloadCampusReport({
         origin: window.location.origin,
         title: search.campus ?? 'All campuses',
@@ -249,6 +255,7 @@ export default function StudentsPage() {
         rows: rows.map((row) => toReportRow(row, insights.get(row.student)!)),
         allCampuses: !search.campus,
         flaggedTests,
+        delivery,
       });
       setReportState('idle');
     } catch (error) {

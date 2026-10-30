@@ -484,46 +484,71 @@ export interface FlaggedTest {
   integrity: Integrity;
 }
 
+/** One campus's PRIME coding delivery and PRIME coding instructors, for the PDF reports. */
+export interface ReportCampusDelivery {
+  campus: string;
+  delivery: CampusDelivery | null;
+  instructors: { name: string; classes: number; attendance: number | null }[];
+}
+
 /**
- * The tests with unusually high, uniform scores at the named campuses (and batch), for the PDF
- * reports: one request per campus, side by side. A campus that fails to load is left out.
+ * What the PDF reports need from each campus page at the named campuses (and batch): tests with
+ * unusually high, uniform scores, PRIME coding delivery and PRIME coding instructors. One
+ * request per campus, side by side; a campus that fails to load is left out.
  */
-export async function fetchFlaggedTests(
+export async function fetchReportExtras(
   campusNames: string[],
   batch?: string
-): Promise<FlaggedTest[]> {
+): Promise<{ flaggedTests: FlaggedTest[]; delivery: ReportCampusDelivery[] }> {
   const { campuses } = await get<{ campuses: CampusOverview[] }>({ view: 'campuses' });
   const wanted = campuses.filter((campus) => campusNames.includes(campus.name));
-  const details = await Promise.all(
-    wanted.map((campus) =>
-      get<CampusDetail>({ view: 'campus', campus: campus.id, batch })
-        .then((detail) => ({ campus, detail }))
-        .catch(() => null)
-    )
+  // A few campuses at a time (the all-campus report asks for every campus), each tried twice.
+  const load = (campus: CampusOverview) =>
+    get<CampusDetail>({ view: 'campus', campus: campus.id, batch })
+      .catch(() => get<CampusDetail>({ view: 'campus', campus: campus.id, batch }))
+      .then((detail) => ({ campus, detail }))
+      .catch(() => null);
+  const results: ({ campus: CampusOverview; detail: CampusDetail } | null)[] = [];
+  for (let start = 0; start < wanted.length; start += 4) {
+    results.push(...(await Promise.all(wanted.slice(start, start + 4).map(load))));
+  }
+  const details = results.filter(
+    (entry): entry is { campus: CampusOverview; detail: CampusDetail } => entry !== null
   );
-  return details.flatMap((entry) => {
-    if (!entry) return [];
-    const { campus, detail } = entry;
-    const tests: CampusTest[] = [
-      ...detail.subjectTests,
-      ...detail.subjects.flatMap((subject) =>
-        subject.modules.flatMap((module) => [
-          ...module.tests,
-          ...module.folders.flatMap((folder) => folder.tests),
-        ])
-      ),
-    ];
-    return tests
-      .filter((test) => test.integrity)
-      .map((test) => ({
-        campus: campus.name,
-        name: test.name,
-        category: test.category,
-        submitted: test.submitted,
-        released: test.released_at,
-        integrity: test.integrity!,
-      }));
-  });
+  return {
+    flaggedTests: details.flatMap(({ campus, detail }) => flaggedIn(campus.name, detail)),
+    delivery: details.map(({ campus, detail }) => ({
+      campus: campus.name,
+      delivery: detail.delivery,
+      instructors: detail.attendance.faculty.map((person) => ({
+        name: person.faculty,
+        classes: person.sessions,
+        attendance: person.pct,
+      })),
+    })),
+  };
+}
+
+function flaggedIn(campusName: string, detail: CampusDetail): FlaggedTest[] {
+  const tests: CampusTest[] = [
+    ...detail.subjectTests,
+    ...detail.subjects.flatMap((subject) =>
+      subject.modules.flatMap((module) => [
+        ...module.tests,
+        ...module.folders.flatMap((folder) => folder.tests),
+      ])
+    ),
+  ];
+  return tests
+    .filter((test) => test.integrity)
+    .map((test) => ({
+      campus: campusName,
+      name: test.name,
+      category: test.category,
+      submitted: test.submitted,
+      released: test.released_at,
+      integrity: test.integrity!,
+    }));
 }
 
 export const useTestDetail = (
