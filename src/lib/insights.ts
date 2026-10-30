@@ -287,6 +287,13 @@ export interface PainPoint {
 const pct = (part: number, whole: number) => (whole ? Math.round((part / whole) * 100) : 0);
 
 /**
+ * A front's name inside a sentence: "coding practice", "internal exams", but names that are
+ * written in capitals keep them ("PRIME Mock Tests", "AMCAT").
+ */
+const inSentence = (label: string) =>
+  /^[A-Z]{2,}/.test(label) ? label : label[0].toLowerCase() + label.slice(1);
+
+/**
  * What needs attention in `scope`, most pressing first. With `groups` (campuses or batches)
  * it also points at the ones that trail the rest.
  */
@@ -307,7 +314,7 @@ export function findPainPoints(
         points.push({
           severity: severityOf(share),
           dimension: dimension.id,
-          title: `${share}% of students are at risk on ${dimension.label.toLowerCase()}`,
+          title: `${share}% of students are at risk on ${inSentence(dimension.label)}`,
           detail: `${stats.risk.toLocaleString('en-IN')} of ${stats.n.toLocaleString('en-IN')} below ${dimension.risk}${dimension.suffix}${dimension.id === 'coding' ? ' solved' : ''}. Average ${stats.avg}${dimension.suffix}.`,
           weight: share,
         });
@@ -330,7 +337,7 @@ export function findPainPoints(
             ? `${missing.toLocaleString('en-IN')} students: no LeetCode, GFG, Codeforces or CodeChef username in the form, or one that is not a username.`
             : dimension.id === 'amcat'
               ? `${missing.toLocaleString('en-IN')} students have not taken an AMCAT yet.`
-              : `${missing.toLocaleString('en-IN')} students without ${dimension.label.toLowerCase()} records.`,
+              : `${missing.toLocaleString('en-IN')} students without ${inSentence(dimension.label)} records.`,
         weight: (100 - covered) * 0.8,
       });
     }
@@ -345,7 +352,7 @@ export function findPainPoints(
         points.push({
           severity: gap >= 15 ? 'high' : 'medium',
           dimension: dimension.id,
-          title: `${worst.key} trails on ${dimension.label.toLowerCase()}`,
+          title: `${worst.key} trails on ${inSentence(dimension.label)}`,
           detail: `${worst.dims[dimension.id].avg}${dimension.suffix} against ${stats.avg}${dimension.suffix} overall, lowest of ${ranked.length} ${groupNoun}.`,
           weight: gap * 2,
         });

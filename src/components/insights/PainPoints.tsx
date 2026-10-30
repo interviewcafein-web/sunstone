@@ -69,19 +69,32 @@ function SuggestedActions({ scope, points }: { scope: string; points: PainPoint[
       ),
   });
   if (ask.isIdle) {
+    // Right under the heading, so it is the first thing seen with the pain points.
     return (
-      <button
-        type="button"
-        onClick={() => ask.mutate()}
-        className="text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/30 mt-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold"
-      >
-        <Sparkles className="size-4 text-amber-500" aria-hidden />
-        Suggest actions
-      </button>
+      <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-300/70 bg-gradient-to-r from-amber-50 via-amber-50/60 to-white p-3 dark:border-amber-500/30 dark:from-amber-500/15 dark:via-amber-500/5 dark:to-transparent">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-300 to-amber-500 text-white shadow-sm">
+          <Sparkles className="size-5" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-slate-800">AI action plan</p>
+          <p className="text-xs text-slate-600 dark:text-slate-400">
+            Not sure where to start? Get concrete next steps for these pain points: who does what,
+            and what to do first this week.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => ask.mutate()}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-gradient-to-r from-amber-400 to-amber-500 px-4 py-2 text-sm font-bold text-slate-900 shadow-[0_6px_16px_-6px_rgb(245_158_11/0.8)] transition-transform hover:-translate-y-0.5 hover:from-amber-300 hover:to-amber-500"
+        >
+          <Sparkles className="size-4" aria-hidden />
+          Suggest actions
+        </button>
+      </div>
     );
   }
   return (
-    <div className="mt-4 rounded-xl border border-amber-200/70 bg-gradient-to-br from-amber-50/80 to-white p-4 dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent">
+    <div className="mt-4 rounded-xl border border-amber-300/70 bg-gradient-to-br from-amber-50/80 to-white p-4 dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent">
       <p className="flex items-center gap-1.5 text-sm font-bold">
         <Sparkles className="size-4 text-amber-500" aria-hidden />
         Suggested actions
@@ -143,6 +156,7 @@ export function PainPoints({
         </h2>
         {action ?? <span className="text-xs text-slate-500">Most pressing first</span>}
       </div>
+      {scope && points.length > 0 && <SuggestedActions key={scope} scope={scope} points={points} />}
       {points.length === 0 ? (
         <p className="mt-6 flex items-center gap-2 text-sm text-emerald-700">
           <Sparkles className="size-4" aria-hidden />
@@ -203,7 +217,6 @@ export function PainPoints({
           {showAll ? 'Show fewer' : `Show all ${points.length}`}
         </button>
       )}
-      {scope && points.length > 0 && <SuggestedActions key={scope} scope={scope} points={points} />}
     </section>
   );
 }
