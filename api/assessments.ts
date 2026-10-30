@@ -14,7 +14,7 @@
 // LMS times are India time without a zone, so "now" is compared in India time too.
 
 import { type Viewer, json, seesCampus, sessionViewer } from './_auth';
-import { db } from './_db';
+import { db, together } from './_db';
 import { integrityOf } from '../src/lib/integrity';
 
 export const config = { runtime: 'edge' };
@@ -54,10 +54,12 @@ const SCOPE = `
     join lms_tests t on t.id = e.test_id
     left join lms_test_results tr on tr.test_id = e.test_id and tr.lms_user_id = e.lms_user_id)`;
 
+const lastSyncQuery = () =>
+  db()`select ran_at::text as ran_at from sync_state where name = 'assessments'`;
+const syncedAtOf = (rows: Record<string, unknown>[]) => (rows[0] ? String(rows[0].ran_at) : null);
+
 async function lastSync() {
-  const [row] =
-    await db()`select ran_at::text as ran_at from sync_state where name = 'assessments'`;
-  return row ? String(row.ran_at) : null;
+  return syncedAtOf(await lastSyncQuery());
 }
 
 export type TestStatus = 'completed' | 'live' | 'scheduled' | 'unscheduled';
@@ -70,7 +72,7 @@ function statusOf(released: string | null, due: string | null, now: string): Tes
 }
 
 async function campuses(viewer: Viewer) {
-  const rows = await db().query(
+  const rowsQuery = db().query(
     `with roster as (
        select lms_user_id, campus_id, campus from students
        where on_platform and campus_id is not null and ($1::int[] is null or campus_id = any($1::int[]))),
@@ -109,7 +111,7 @@ async function campuses(viewer: Viewer) {
   );
   // Weekly trends per campus over the last ten weeks: attendance, and the average score on
   // tests released that week.
-  const attendanceWeeks = await db().query(
+  const attendanceWeeksQuery = db().query(
     `select s.campus_id, w.week, round(100.0 * sum(w.present) / nullif(sum(w.sessions), 0))::int as pct
      from att_student_week w join students s using (lms_user_id)
      where s.on_platform and ($1::int[] is null or s.campus_id = any($1::int[]))
@@ -117,7 +119,7 @@ async function campuses(viewer: Viewer) {
      group by s.campus_id, w.week order by w.week`,
     [viewer.campusIds]
   );
-  const testWeeks = await db().query(
+  const testWeeksQuery = db().query(
     `with scored as (
        select s.campus_id, date_trunc('week', min(r.release_at)) as week,
               max(tr.marks / nullif(coalesce(tr.max_marks, t.max_marks), 0) * 100) as pct
@@ -133,6 +135,13 @@ async function campuses(viewer: Viewer) {
      group by campus_id, week order by week`,
     [viewer.campusIds]
   );
+  const [rows, attendanceWeeks, testWeeks, synced] = await together([
+    rowsQuery,
+    attendanceWeeksQuery,
+    testWeeksQuery,
+    lastSyncQuery(),
+  ]);
+  const syncedAt = syncedAtOf(synced);
   const series = (rows2: Record<string, unknown>[], campusId: unknown) =>
     rows2.filter((row) => row.campus_id === campusId).map((row) => Number(row.pct));
   return {
@@ -141,7 +150,7 @@ async function campuses(viewer: Viewer) {
       attendance_weeks: series(attendanceWeeks, campus.id),
       test_weeks: series(testWeeks, campus.id),
     })),
-    syncedAt: await lastSync(),
+    syncedAt,
   };
 }
 
@@ -171,11 +180,89 @@ interface GroupRow {
 
 export async function campus(campusId: number, batch: string | null) {
   const params = [campusId, batch];
-  const [{ now }] = await db().query(`select ${NOW}::text as now`);
+  // Everything that does not need the list of tests goes out at once, alongside the tests;
+  // only the leaderboards and the per-student marks wait for the tests.
+  const side = Promise.all([
+    attendance(campusId, batch),
+    amcatRounds(campusId, batch),
+    internalExams(campusId, batch),
+    delivery(campusId, batch).catch((error) => {
+      console.error('[assessments] delivery', error);
+      return null;
+    }),
+    lastSync(),
+  ]);
+  side.catch(() => undefined); // awaited below; this only keeps an early failure from going unhandled
+  const countsQuery = db().query(
+    `with ${SCOPE}
+     select (select count(*) from roster)::int as students,
+            (select count(distinct lms_user_id) from sec)::int as in_prime`,
+    params
+  );
+  // Every student on the campus (in PRIME sections or not), with tests, attendance and AMCAT.
+  const studentsQuery = db().query(
+    `with ${SCOPE},
+     tests as (
+       select lms_user_id, count(*)::int as released,
+              count(*) filter (where submitted)::int as submitted,
+              round(avg(pct) filter (where submitted))::int as avg_pct,
+              max(submitted_at)::text as last_submitted_at
+       from res group by lms_user_id),
+     att as (
+       select lms_user_id, sum(sessions)::int as sessions, sum(present)::int as present,
+              sum(sessions) filter (where ${PRIME_SUBJECT})::int as prime_sessions,
+              sum(present) filter (where ${PRIME_SUBJECT})::int as prime_present
+       from att_student_subject where lms_user_id in (select lms_user_id from roster)
+       group by lms_user_id),
+     exams as (
+       select m.lms_user_id, round(avg(m.marks / nullif(e.max_marks, 0) * 100))::int as exam_avg
+       from exm_marks m join exm_exams e on e.id = m.exam_id
+       where e.kind = 'other' and m.lms_user_id in (select lms_user_id from roster)
+       group by m.lms_user_id),
+     amcat as (
+       select a.lms_user_id, count(distinct a.id)::int as sittings,
+              round(avg((x->>'score')::numeric) filter (where x->>'score' ~ '^[0-9.]+$'))::int as avg_score
+       from amcat_sittings a cross join lateral jsonb_array_elements(a.sections) x
+       where a.lms_user_id in (select lms_user_id from roster)
+       group by a.lms_user_id)
+     select r.name, r.username, r.admission_year, r.program,
+            coalesce(t.released, 0) as released, coalesce(t.submitted, 0) as submitted,
+            t.avg_pct, t.last_submitted_at,
+            round(100.0 * at.present / nullif(at.sessions, 0))::int as attendance_pct,
+            coalesce(at.sessions, 0) as sessions,
+            round(100.0 * at.prime_present / nullif(at.prime_sessions, 0))::int as prime_attendance_pct,
+            coalesce(am.sittings, 0) as amcat, am.avg_score as amcat_avg, ex.exam_avg
+     from roster r
+     left join tests t using (lms_user_id)
+     left join att at using (lms_user_id)
+     left join amcat am using (lms_user_id)
+     left join exams ex using (lms_user_id)
+     where t.lms_user_id is not null or at.lms_user_id is not null or am.lms_user_id is not null
+        or ex.lms_user_id is not null
+     order by t.avg_pct desc nulls last, t.submitted desc nulls last, r.name`,
+    params
+  );
+  const amcatRowsQuery = db().query(
+    `with ${SCOPE}
+     select r.username, a.test_name, min(a.taken_at)::date::text as taken_on,
+            round(avg((x->>'score')::numeric) filter (where x->>'score' ~ '^[0-9.]+$'))::int as score
+     from amcat_sittings a join roster r using (lms_user_id)
+     cross join lateral jsonb_array_elements(a.sections) x
+     group by r.username, a.test_name`,
+    params
+  );
+  // The campus's cohorts: program and admission year, newest first.
+  const batchesQuery = db()`
+      select program, admission_year, count(*)::int as students from students
+      where on_platform and campus_id = ${campusId} and admission_year is not null
+        and program is not null
+      group by program, admission_year
+      order by admission_year desc, program`;
+  const nowQuery = db().query(`select ${NOW}::text as now`);
 
   // Every test placed in the campus's subjects, section copies merged, with release dates
   // and totals over the students it was given to.
-  const groups = (await db().query(
+  const groupsQuery = db().query(
     `with ${SCOPE},
      stats as (
        select test_id, count(*)::int as eligible, count(*) filter (where submitted)::int as submitted,
@@ -211,10 +298,10 @@ export async function campus(campusId: number, batch: string | null) {
      where p.course_id in (select course_id from courses_in)
      group by lower(trim(c.name)), lower(trim(m.name)), lower(trim(l.title)), lower(trim(t.name)), t.max_marks`,
     params
-  )) as GroupRow[];
+  );
 
   // The syllabus: modules and their sub-folders, merged across copies, in order.
-  const modules = await db().query(
+  const modulesQuery = db().query(
     `with ${SCOPE}
      select lower(trim(c.name)) as subject_key, lower(trim(m.name)) as key, min(m.name) as name,
             -- copies number their modules differently; the average keeps the usual order
@@ -224,7 +311,7 @@ export async function campus(campusId: number, batch: string | null) {
      group by 1, 2 order by 1, position nulls last, name`,
     params
   );
-  const lectures = await db().query(
+  const lecturesQuery = db().query(
     `with ${SCOPE}
      select lower(trim(c.name)) as subject_key, lower(trim(m.name)) as module_key,
             lower(trim(l.title)) as key, min(l.title) as title, avg(l.position) as position
@@ -233,6 +320,25 @@ export async function campus(campusId: number, batch: string | null) {
      group by 1, 2, 3 order by position nulls last, title`,
     params
   );
+
+  const [[{ now }], groupRows, modules, lectures, [counts], students, amcatRows, batchRows] =
+    await together([
+      nowQuery,
+      groupsQuery,
+      modulesQuery,
+      lecturesQuery,
+      countsQuery,
+      studentsQuery,
+      amcatRowsQuery,
+      batchesQuery,
+    ]);
+  const batches = batchRows.map((row) => ({
+    key: `${row.program}:${row.admission_year}`,
+    program: String(row.program),
+    year: Number(row.admission_year),
+    students: Number(row.students),
+  }));
+  const groups = groupRows as GroupRow[];
 
   const tests = groups
     .map(({ avg_exact, spread, ...group }) => ({
@@ -260,17 +366,35 @@ export async function campus(campusId: number, batch: string | null) {
   const boardIds = tests
     .filter((test) => !test.module_key && (test.status === 'completed' || test.status === 'live'))
     .flatMap((test) => test.ids);
-  const boardRows = boardIds.length
-    ? await db().query(
-        `with ${SCOPE}
-         select res.test_id, r.name, r.username, round(res.pct)::int as pct, res.marks,
-                res.submitted_at::text as submitted_at
-         from res join roster r using (lms_user_id)
-         where res.submitted and res.test_id = any($3::int[])
-         order by res.pct desc nulls last, res.submitted_at`,
-        [campusId, batch, boardIds]
-      )
-    : [];
+  // Each student's marks on every Prime Mock Test that is out, for the per-test columns of the
+  // Students tab.
+  const mockIds = tests
+    .filter((test) => !test.module_key && (test.status === 'completed' || test.status === 'live'))
+    .flatMap((test) => test.ids);
+  const followUps = [
+    boardIds.length
+      ? db().query(
+          `with ${SCOPE}
+           select res.test_id, r.name, r.username, round(res.pct)::int as pct, res.marks,
+                  res.submitted_at::text as submitted_at
+           from res join roster r using (lms_user_id)
+           where res.submitted and res.test_id = any($3::int[])
+           order by res.pct desc nulls last, res.submitted_at`,
+          [campusId, batch, boardIds]
+        )
+      : null,
+    mockIds.length
+      ? db().query(
+          `with ${SCOPE}
+           select r.username, res.test_id, res.submitted, res.marks, round(res.pct)::int as pct
+           from res join roster r using (lms_user_id)
+           where res.test_id = any($3::int[])`,
+          [campusId, batch, mockIds]
+        )
+      : null,
+  ];
+  const sent = await together(followUps.filter((query) => query !== null));
+  const [boardRows, mockRows] = followUps.map((query) => (query ? sent.shift()! : []));
 
   const subjectTests = tests
     .filter((test) => !test.module_key)
@@ -356,81 +480,10 @@ export async function campus(campusId: number, batch: string | null) {
       participation: week.eligible ? Math.round((100 * week.submitted) / week.eligible) : null,
     }));
 
-  const [counts] = await db().query(
-    `with ${SCOPE}
-     select (select count(*) from roster)::int as students,
-            (select count(distinct lms_user_id) from sec)::int as in_prime`,
-    params
-  );
-  // Every student on the campus (in PRIME sections or not), with tests, attendance and AMCAT.
-  const students = await db().query(
-    `with ${SCOPE},
-     tests as (
-       select lms_user_id, count(*)::int as released,
-              count(*) filter (where submitted)::int as submitted,
-              round(avg(pct) filter (where submitted))::int as avg_pct,
-              max(submitted_at)::text as last_submitted_at
-       from res group by lms_user_id),
-     att as (
-       select lms_user_id, sum(sessions)::int as sessions, sum(present)::int as present,
-              sum(sessions) filter (where ${PRIME_SUBJECT})::int as prime_sessions,
-              sum(present) filter (where ${PRIME_SUBJECT})::int as prime_present
-       from att_student_subject where lms_user_id in (select lms_user_id from roster)
-       group by lms_user_id),
-     exams as (
-       select m.lms_user_id, round(avg(m.marks / nullif(e.max_marks, 0) * 100))::int as exam_avg
-       from exm_marks m join exm_exams e on e.id = m.exam_id
-       where e.kind = 'other' and m.lms_user_id in (select lms_user_id from roster)
-       group by m.lms_user_id),
-     amcat as (
-       select a.lms_user_id, count(distinct a.id)::int as sittings,
-              round(avg((x->>'score')::numeric) filter (where x->>'score' ~ '^[0-9.]+$'))::int as avg_score
-       from amcat_sittings a cross join lateral jsonb_array_elements(a.sections) x
-       where a.lms_user_id in (select lms_user_id from roster)
-       group by a.lms_user_id)
-     select r.name, r.username, r.admission_year, r.program,
-            coalesce(t.released, 0) as released, coalesce(t.submitted, 0) as submitted,
-            t.avg_pct, t.last_submitted_at,
-            round(100.0 * at.present / nullif(at.sessions, 0))::int as attendance_pct,
-            coalesce(at.sessions, 0) as sessions,
-            round(100.0 * at.prime_present / nullif(at.prime_sessions, 0))::int as prime_attendance_pct,
-            coalesce(am.sittings, 0) as amcat, am.avg_score as amcat_avg, ex.exam_avg
-     from roster r
-     left join tests t using (lms_user_id)
-     left join att at using (lms_user_id)
-     left join amcat am using (lms_user_id)
-     left join exams ex using (lms_user_id)
-     where t.lms_user_id is not null or at.lms_user_id is not null or am.lms_user_id is not null
-        or ex.lms_user_id is not null
-     order by t.avg_pct desc nulls last, t.submitted desc nulls last, r.name`,
-    params
-  );
-  // Each student's marks on every Prime Mock Test that is out, and score on every AMCAT round,
-  // for the per-test columns of the Students tab.
-  const mockIds = subjectTests
-    .filter((test) => test.status === 'completed' || test.status === 'live')
-    .flatMap((test) => test.ids);
-  const mockRows = mockIds.length
-    ? await db().query(
-        `with ${SCOPE}
-         select r.username, res.test_id, res.submitted, res.marks, round(res.pct)::int as pct
-         from res join roster r using (lms_user_id)
-         where res.test_id = any($3::int[])`,
-        [campusId, batch, mockIds]
-      )
-    : [];
   const keyOfTest = new Map(
     subjectTests.flatMap((test) => test.ids.map((id) => [id, test.ids.join(',')] as const))
   );
-  const amcatRows = await db().query(
-    `with ${SCOPE}
-     select r.username, a.test_name, min(a.taken_at)::date::text as taken_on,
-            round(avg((x->>'score')::numeric) filter (where x->>'score' ~ '^[0-9.]+$'))::int as score
-     from amcat_sittings a join roster r using (lms_user_id)
-     cross join lateral jsonb_array_elements(a.sections) x
-     group by r.username, a.test_name`,
-    params
-  );
+  // Each student's score on every AMCAT round, for the per-round columns of the Students tab.
   const perStudent = new Map<
     string,
     {
@@ -462,21 +515,7 @@ export async function campus(campusId: number, batch: string | null) {
     };
   }
 
-  // The campus's cohorts: program and admission year, newest first.
-  const batches = (
-    await db()`
-      select program, admission_year, count(*)::int as students from students
-      where on_platform and campus_id = ${campusId} and admission_year is not null
-        and program is not null
-      group by program, admission_year
-      order by admission_year desc, program`
-  ).map((row) => ({
-    key: `${row.program}:${row.admission_year}`,
-    program: String(row.program),
-    year: Number(row.admission_year),
-    students: Number(row.students),
-  }));
-
+  const [attendanceData, amcatData, examsData, deliveryData, syncedAt] = await side;
   return {
     summary: {
       students: counts.students,
@@ -498,16 +537,13 @@ export async function campus(campusId: number, batch: string | null) {
       mocks: perStudent.get(String(student.username))?.mocks ?? {},
       amcat_rounds: perStudent.get(String(student.username))?.amcat_rounds ?? {},
     })),
-    attendance: await attendance(campusId, batch),
-    amcat: await amcatRounds(campusId, batch),
-    exams: await internalExams(campusId, batch),
-    delivery: await delivery(campusId, batch).catch((error) => {
-      console.error('[assessments] delivery', error);
-      return null;
-    }),
+    attendance: attendanceData,
+    amcat: amcatData,
+    exams: examsData,
+    delivery: deliveryData,
     batches,
     now,
-    syncedAt: await lastSync(),
+    syncedAt,
   };
 }
 
@@ -524,7 +560,7 @@ async function delivery(campusId: number, batch: string | null) {
   const code = campus?.code ? String(campus.code).trim() : null;
   if (!code) return null;
   const params = [code, batch];
-  const [summary] = await db().query(
+  const summaryQuery = db().query(
     `select
        (select coalesce(sum(allocated_hours), 0)::int from dlv_targets where campus_code = $1 and ${DLV_FILTER}) as allocated,
        (select coalesce(sum(planned_hours), 0)::int from dlv_targets where campus_code = $1 and ${DLV_FILTER}) as planned,
@@ -543,8 +579,7 @@ async function delivery(campusId: number, batch: string | null) {
      from dlv_classes_counted where campus_code = $1 and ${DLV_FILTER}`,
     params
   );
-  if (!summary.allocated && !summary.classes && !summary.pending) return null;
-  const sections = await db().query(
+  const sectionsQuery = db().query(
     `with t as (
        select program, batch_year, coalesce(section, '') as section, sum(allocated_hours)::int as allocated,
               sum(planned_hours)::int as planned, sum(students)::int as students
@@ -565,7 +600,7 @@ async function delivery(campusId: number, batch: string | null) {
      order by batch_year desc, program, section`,
     params
   );
-  const trainers = await db().query(
+  const trainersQuery = db().query(
     `select trainer as name,
             round(coalesce(sum(minutes) filter (where status = 'VERIFIED' and ${DLV_VALID}), 0) / 60.0)::int as hours,
             round(coalesce(sum(minutes) filter (where status = 'PENDING VERIFICATION' and ${DLV_VALID}), 0) / 60.0)::int as pending_hours,
@@ -583,7 +618,7 @@ async function delivery(campusId: number, batch: string | null) {
   );
   // A check against the LMS time table: PRIME coding classes there, from the tracker's first
   // class here up to yesterday, with no tracker entry by the same trainer on that day.
-  const lmsDays = await db().query(
+  const lmsDaysQuery = db().query(
     `select min(a.faculty) as name, a.lecture_date::text as day, count(*)::int as classes
      from att_sessions a join students s on s.lms_user_id = a.first_student
      where a.campus_id = $3 and (${PRIME_CODING}) and a.faculty is not null
@@ -593,14 +628,13 @@ async function delivery(campusId: number, batch: string | null) {
      group by a.faculty_id, a.lecture_date`,
     [code, batch, campusId]
   );
-  const trackerDays = await db().query(
+  const trackerDaysQuery = db().query(
     `select trainer as name, class_date::text as day, count(*)::int as classes
      from dlv_classes_counted where campus_code = $1 and ${DLV_FILTER} and trainer is not null
      group by 1, 2`,
     params
   );
-  const unlogged = notLogged(lmsDays as LmsDay[], trackerDays as LmsDay[]);
-  const weeks = await db().query(
+  const weeksQuery = db().query(
     `select date_trunc('week', class_date)::date::text as week, round(sum(minutes) / 60.0)::int as hours
      from dlv_classes_counted where campus_code = $1 and ${DLV_FILTER} and status = 'VERIFIED' and ${DLV_VALID}
        and class_date < date_trunc('week', current_date)
@@ -608,7 +642,7 @@ async function delivery(campusId: number, batch: string | null) {
     params
   );
   // The syllabus of the curricula these batches follow, with hours taught on each topic.
-  const topics = await db().query(
+  const topicsQuery = db().query(
     `with cur as (
        select distinct t.curriculum, t.program from dlv_topics t
        where exists (select 1 from dlv_targets g where g.campus_code = $1 and ${DLV_FILTER.replace(/batch_year/g, 'g.batch_year').replace(/program/g, 'g.program')}
@@ -625,8 +659,19 @@ async function delivery(campusId: number, batch: string | null) {
      order by t.curriculum, t.topic_order`,
     params
   );
-  const [{ synced }] = await db()`
-    select (select ran_at::text from sync_state where name = 'delivery') as synced`;
+  const [[summary], sections, trainers, lmsDays, trackerDays, weeks, topics, [{ synced }]] =
+    await together([
+      summaryQuery,
+      sectionsQuery,
+      trainersQuery,
+      lmsDaysQuery,
+      trackerDaysQuery,
+      weeksQuery,
+      topicsQuery,
+      db()`select (select ran_at::text from sync_state where name = 'delivery') as synced`,
+    ]);
+  if (!summary.allocated && !summary.classes && !summary.pending) return null;
+  const unlogged = notLogged(lmsDays as LmsDay[], trackerDays as LmsDay[]);
   return { ...summary, sections, trainers, unlogged, weeks, topics, syncedAt: synced };
 }
 
@@ -722,7 +767,7 @@ async function attendance(campusId: number, batch: string | null) {
   const ROSTER = `roster as (
     select lms_user_id from students
     where on_platform and campus_id = $1 and ${COHORT})`;
-  const [overall] = await db().query(
+  const overallQuery = db().query(
     `with ${ROSTER}
      select sum(sessions)::int as marks, sum(present)::int as present,
             count(distinct lms_user_id)::int as students,
@@ -731,7 +776,7 @@ async function attendance(campusId: number, batch: string | null) {
      from att_student_subject where lms_user_id in (select lms_user_id from roster)`,
     params
   );
-  const weeks = await db().query(
+  const weeksQuery = db().query(
     `with ${ROSTER}
      select week::text as week, sum(sessions)::int as marks,
             round(100.0 * sum(present) / nullif(sum(sessions), 0))::int as pct
@@ -741,7 +786,7 @@ async function attendance(campusId: number, batch: string | null) {
      group by week order by week`,
     params
   );
-  const subjects = await db().query(
+  const subjectsQuery = db().query(
     `with ${ROSTER}
      select min(subject) as subject, count(distinct lms_user_id)::int as students,
             sum(sessions)::int as marks,
@@ -753,7 +798,7 @@ async function attendance(campusId: number, batch: string | null) {
     params
   );
   // Instructors teach sections, not batches, so this is for the whole campus.
-  const faculty = await db()`
+  const facultyQuery = db()`
     select faculty_id, min(faculty) as faculty, count(*)::int as sessions,
            sum(marked)::int as marks, round(100.0 * sum(present) / nullif(sum(marked), 0))::int as pct,
            string_agg(distinct subject, ', ') as subjects,
@@ -762,8 +807,13 @@ async function attendance(campusId: number, batch: string | null) {
     from att_sessions where campus_id = ${campusId} and faculty_id is not null
     group by faculty_id having count(*) >= 3
     order by prime desc, sessions desc`;
-  const [{ synced }] = await db()`
-    select (select ran_at::text from sync_state where name = 'attendance') as synced`;
+  const [[overall], weeks, subjects, faculty, [{ synced }]] = await together([
+    overallQuery,
+    weeksQuery,
+    subjectsQuery,
+    facultyQuery,
+    db()`select (select ran_at::text from sync_state where name = 'attendance') as synced`,
+  ]);
   return {
     marks: overall?.marks ?? 0,
     pct: overall?.marks ? Math.round((100 * overall.present) / overall.marks) : null,
@@ -800,7 +850,7 @@ const EXAM_MARKS = `
 /** Internal exams (Midterms, End-term) and Mock PI / GD for one campus and batch. */
 async function internalExams(campusId: number, batch: string | null) {
   const params = [campusId, batch];
-  const events = await db().query(
+  const eventsQuery = db().query(
     `with ${EXAM_MARKS}
      select event, kind, count(distinct lms_user_id)::int as students,
             count(distinct lower(coalesce(subject, title)))::int as subjects,
@@ -813,7 +863,7 @@ async function internalExams(campusId: number, batch: string | null) {
      order by case kind when 'other' then 0 else 1 end, event desc`,
     params
   );
-  const subjects = await db().query(
+  const subjectsQuery = db().query(
     `with ${EXAM_MARKS}
      select event, kind, min(coalesce(subject, title)) as subject,
             count(distinct lms_user_id)::int as students,
@@ -826,7 +876,7 @@ async function internalExams(campusId: number, batch: string | null) {
     params
   );
   // Letter grades (subjects graded A+, A, B…), counted per subject.
-  const grades = await db().query(
+  const gradesQuery = db().query(
     `with ${EXAM_MARKS}
      select event, kind, lower(coalesce(subject, title)) as subject_key, grade_text as grade,
             count(*)::int as n
@@ -835,6 +885,26 @@ async function internalExams(campusId: number, batch: string | null) {
      group by 1, 2, 3, 4 order by n desc`,
     params
   );
+  const criteriaQuery = db().query(
+    `with ${EXAM_MARKS}
+     select kind, c->>'name' as name,
+            round(avg((c->>'marks')::numeric / nullif((c->>'max')::numeric, 0) * 100))::int as avg_pct,
+            count(*)::int as scores
+     from mk cross join lateral jsonb_array_elements(
+       case when jsonb_typeof(criteria) = 'array' then criteria else '[]'::jsonb end) c
+     where kind in ('mock_pi', 'mock_gd') and c->>'marks' ~ '^[0-9.]+$'
+     group by kind, c->>'name' order by kind, min(c->>'name')`,
+    params
+  );
+  const syncedQuery = db()`
+    select (select ran_at::text from sync_state where name = 'exams') as synced`;
+  const [events, subjects, grades, criteria, [{ synced }]] = await together([
+    eventsQuery,
+    subjectsQuery,
+    gradesQuery,
+    criteriaQuery,
+    syncedQuery,
+  ]);
   for (const subject of subjects) {
     subject.grades = grades
       .filter(
@@ -846,19 +916,6 @@ async function internalExams(campusId: number, batch: string | null) {
       .slice(0, 5)
       .map(({ grade, n }) => ({ grade, n }));
   }
-  const criteria = await db().query(
-    `with ${EXAM_MARKS}
-     select kind, c->>'name' as name,
-            round(avg((c->>'marks')::numeric / nullif((c->>'max')::numeric, 0) * 100))::int as avg_pct,
-            count(*)::int as scores
-     from mk cross join lateral jsonb_array_elements(
-       case when jsonb_typeof(criteria) = 'array' then criteria else '[]'::jsonb end) c
-     where kind in ('mock_pi', 'mock_gd') and c->>'marks' ~ '^[0-9.]+$'
-     group by kind, c->>'name' order by kind, min(c->>'name')`,
-    params
-  );
-  const [{ synced }] = await db()`
-    select (select ran_at::text from sync_state where name = 'exams') as synced`;
   return { events, subjects, criteria, syncedAt: synced };
 }
 
@@ -874,7 +931,7 @@ async function amcatRounds(campusId: number, batch: string | null) {
       select s.id, s.test_name, s.lms_user_id, x->>'name' as section,
              case when x->>'score' ~ '^[0-9.]+$' then (x->>'score')::numeric end as score
       from s cross join lateral jsonb_array_elements(s.sections) x)`;
-  const rounds = await db().query(
+  const roundsQuery = db().query(
     `with ${BASE}
      select s.test_name, count(distinct s.lms_user_id)::int as students,
             min(s.taken_at)::text as first_at, max(s.taken_at)::text as last_at,
@@ -891,12 +948,13 @@ async function amcatRounds(campusId: number, batch: string | null) {
      from s group by s.test_name order by max(s.taken_at) desc nulls last`,
     params
   );
-  const sections = await db().query(
+  const sectionsQuery = db().query(
     `with ${BASE}
      select section as name, round(avg(score))::int as avg, count(score)::int as takers
      from scores group by section having count(score) > 0 order by takers desc`,
     params
   );
+  const [rounds, sections] = await together([roundsQuery, sectionsQuery]);
   return { rounds, sections };
 }
 
@@ -926,8 +984,8 @@ async function student(viewer: Viewer, username: string) {
   if (!person || !seesCampus(viewer, person.campus_id == null ? null : Number(person.campus_id))) {
     return null;
   }
-  const [{ now }] = await db().query(`select ${NOW}::text as now`);
-  const rows = await db()`
+  const nowQuery = db().query(`select ${NOW}::text as now`);
+  const rowsQuery = db()`
     with mine as (
       select r.test_id, min(r.release_at) as release_at, max(r.due_at) as due_at
       from lms_test_releases r
@@ -963,30 +1021,24 @@ async function student(viewer: Viewer, username: string) {
     from mine join lms_tests t on t.id = mine.test_id
     left join lms_test_results tr on tr.test_id = t.id and tr.lms_user_id = ${person.lms_user_id}
     order by mine.release_at desc nulls last`;
-  const tests = rows.map((row) => ({
-    ...row,
-    // A rank only means something for a submitted test.
-    rank: row.submitted ? row.rank : null,
-    status: statusOf(row.released_at as string | null, row.due_at as string | null, now),
-  }));
-  const amcat = await db()`
+  const amcatQuery = db()`
     select id, test_name, taken_at::text as taken_at, status, sections
     from amcat_sittings where lms_user_id = ${person.lms_user_id}
     order by taken_at desc nulls last`;
-  const attendanceSubjects = await db()`
+  const attendanceSubjectsQuery = db()`
     select min(subject) as subject, sum(sessions)::int as sessions, sum(present)::int as present,
            round(100.0 * sum(present) / nullif(sum(sessions), 0))::int as pct,
            max(last_date)::text as last_date,
            bool_or(subject ~* '(^|[^a-z])prime([^a-z]|$)|competitive coding') as prime
     from att_student_subject where lms_user_id = ${person.lms_user_id}
     group by lower(subject) order by prime desc, sessions desc`;
-  const attendanceWeeks = await db()`
+  const attendanceWeeksQuery = db()`
     select week::text as week, sessions, present,
            round(100.0 * present / nullif(sessions, 0))::int as pct
     from att_student_week
     where lms_user_id = ${person.lms_user_id} and week < date_trunc('week', current_date)::date
     order by week`;
-  const exams = await db()`
+  const examsQuery = db()`
     select e.id,
            coalesce(x.exam_type, 'other') || ':' ||
              to_char(coalesce(e.exam_date, x.start_date, x.end_date), 'YYYY') || '-' ||
@@ -1001,13 +1053,30 @@ async function student(viewer: Viewer, username: string) {
     left join exm_examinations x on x.id = e.examination_id
     where m.lms_user_id = ${person.lms_user_id}
     order by e.exam_date desc nulls last, subject`;
+  const [[{ now }], rows, amcat, attendanceSubjects, attendanceWeeks, exams, synced] =
+    await together([
+      nowQuery,
+      rowsQuery,
+      amcatQuery,
+      attendanceSubjectsQuery,
+      attendanceWeeksQuery,
+      examsQuery,
+      lastSyncQuery(),
+    ]);
+  const syncedAt = syncedAtOf(synced);
+  const tests = rows.map((row) => ({
+    ...row,
+    // A rank only means something for a submitted test.
+    rank: row.submitted ? row.rank : null,
+    status: statusOf(row.released_at as string | null, row.due_at as string | null, now),
+  }));
   return {
     tests,
     amcat,
     exams,
     attendance: { subjects: attendanceSubjects, weeks: attendanceWeeks },
     now,
-    syncedAt: await lastSync(),
+    syncedAt,
   };
 }
 
