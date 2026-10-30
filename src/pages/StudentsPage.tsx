@@ -18,6 +18,7 @@ import { PLATFORM_IDS, SOLVING_PLATFORM_IDS } from '@/lib/coding-profiles/platfo
 import { ProfileError, type PlatformId } from '@/lib/coding-profiles/types';
 import { useTour } from '@/hooks/useTour';
 import { fetchReportExtras, useStudentMetrics, type StudentMetrics } from '@/lib/assessments';
+import type { Issue, IssuesResponse } from '@/lib/issues';
 import { buildInsights, type StudentInsight } from '@/lib/insights';
 import { useSession } from '@/lib/session';
 import type { Student } from '@/lib/students/types';
@@ -241,10 +242,17 @@ export default function StudentsPage() {
           : search.course
             ? `${search.course}:`
             : search.batch || undefined;
-      const { flaggedTests, delivery } = await fetchReportExtras(
-        [...new Set(rows.map((row) => row.student.campus))],
-        cohort
-      ).catch(() => ({ flaggedTests: [], delivery: [] }));
+      const campusNames = [...new Set(rows.map((row) => row.student.campus))];
+      const [{ flaggedTests, delivery }, issues] = await Promise.all([
+        fetchReportExtras(campusNames, cohort).catch(() => ({ flaggedTests: [], delivery: [] })),
+        // Campus issues still open, for the same campuses.
+        fetch('/api/issues?status=active')
+          .then((response) => (response.ok ? (response.json() as Promise<IssuesResponse>) : null))
+          .then((data) =>
+            (data?.issues ?? []).filter((issue) => campusNames.includes(issue.campus))
+          )
+          .catch(() => [] as Issue[]),
+      ]);
       await downloadCampusReport({
         origin: window.location.origin,
         title: search.campus ?? 'All Campuses',
@@ -256,6 +264,7 @@ export default function StudentsPage() {
         allCampuses: !search.campus,
         flaggedTests,
         delivery,
+        issues,
       });
       setReportState('idle');
     } catch (error) {

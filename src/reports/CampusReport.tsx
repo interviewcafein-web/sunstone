@@ -8,6 +8,8 @@ import type { PlatformId } from '@/lib/coding-profiles/types';
 import { BAND_COLORS, bandOf, dimensionById, type StudentInsight } from '@/lib/insights';
 import { ZONE_BASIS, ZONES, zoneById, type ZoneResult } from '@/lib/students/zones';
 import { DeliveryComparisonPage, DeliveryPage } from '@/reports/Delivery';
+import { OpenIssuesPage } from '@/reports/Issues';
+import type { Issue } from '@/lib/issues';
 import { HealthComparisonPage, InsightsPage } from '@/reports/Insights';
 import { UnusualScoresPage, type ReportFlaggedTest } from '@/reports/UnusualScores';
 import {
@@ -58,6 +60,8 @@ export interface CampusReportData {
   flaggedTests?: ReportFlaggedTest[];
   /** PRIME coding delivery and instructors, per campus of the report. */
   delivery?: ReportCampusDelivery[];
+  /** Campus issues still open, for the report's campuses. */
+  issues?: Issue[];
 }
 
 const SHORT: Record<PlatformId, string> = {
@@ -150,6 +154,7 @@ export function CampusReport({ data }: { data: CampusReportData }) {
         <CampusPages data={data} kind="Campus Progress Report" withHeader />
         <UnusualScoresPage tests={flagged} label={label} showCampus={false} />
         {entry && <DeliveryPage entry={entry} label={label} />}
+        <OpenIssuesPage issues={data.issues ?? []} label={label} showCampus={false} />
       </>
     );
   }
@@ -168,6 +173,7 @@ export function CampusReport({ data }: { data: CampusReportData }) {
       <HealthComparisonPage insights={data.rows.map((row) => row.insight)} label={label} />
       <UnusualScoresPage tests={flagged} label={label} showCampus />
       <DeliveryComparisonPage entries={delivery} label={label} />
+      <OpenIssuesPage issues={data.issues ?? []} label={label} showCampus />
       {campuses.map((campus) => {
         const entry = deliveryOf(campus);
         return (

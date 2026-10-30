@@ -1,5 +1,5 @@
 import { Link, Outlet, createRootRoute, useRouterState } from '@tanstack/react-router';
-import { Building2, Library, LogIn, Radar, Users } from 'lucide-react';
+import { Building2, Flag, Library, LogIn, Radar, Users } from 'lucide-react';
 
 import { AskVertex } from '@/components/ask/AskVertex';
 import { AppBanner } from '@/components/common/AppBanner';
@@ -8,6 +8,7 @@ import { NotificationBell } from '@/components/common/NotificationBell';
 import { ProfileMenu } from '@/components/common/ProfileMenu';
 import { VertexLogo } from '@/components/common/VertexLogo';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
+import { useIssues } from '@/lib/issuesApi';
 import { useLogOut, useSession } from '@/lib/session';
 
 export const Route = createRootRoute({
@@ -18,6 +19,7 @@ const NAV = [
   { to: '/', label: 'Students', icon: Users, exact: true },
   { to: '/campuses', label: 'Campuses', icon: Building2, exact: false },
   { to: '/insights', label: '360° View', icon: Radar, exact: false },
+  { to: '/issues', label: 'Issues', icon: Flag, exact: false },
   { to: '/resources', label: 'Resources', icon: Library, exact: false },
 ] as const;
 
@@ -32,6 +34,8 @@ function RootComponent() {
   const session = useSession();
   const logOut = useLogOut();
   const user = session.data;
+  // Open campus issues, as a count on the Issues tab.
+  const openIssues = useIssues('active', undefined, Boolean(user)).data?.openCount ?? 0;
   // The login page is the sign-in form itself; a "Staff Login" button there only repeats it.
   const onLoginPage = useRouterState({ select: (state) => state.location.pathname === '/login' });
   // The student form stands alone: no staff header, menu, banner or Ask button.
@@ -85,6 +89,11 @@ function RootComponent() {
                   >
                     <Icon className="size-4" aria-hidden />
                     {label}
+                    {to === '/issues' && openIssues > 0 && (
+                      <span className="rounded-full bg-red-500 px-1.5 text-[10px] leading-4 font-bold text-white">
+                        {openIssues > 99 ? '99+' : openIssues}
+                      </span>
+                    )}
                   </Link>
                 ))}
               </nav>

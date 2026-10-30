@@ -20,6 +20,7 @@ import { campus as campusDetail, metrics } from '../api/assessments';
 import { sendEmails, type Email } from '../api/_email';
 import { listStudents } from '../api/_roster';
 import { cohortLabel } from '../src/lib/cohorts';
+import { categoryLabel, priorityOf, statusOf } from '../src/lib/issues';
 import type { PlatformSummary } from '../src/lib/coding-profiles/summaries';
 import {
   DIMENSIONS,
@@ -97,6 +98,42 @@ interface FlaggedTest {
   integrity: Integrity;
 }
 const flaggedByCampus = new Map<number, FlaggedTest[]>();
+
+// Campus issues still open, per campus id: listed every week until resolved (api/issues.ts).
+interface OpenIssue {
+  id: number;
+  campus: string;
+  category: string;
+  priority: string;
+  status: string;
+  location: string | null;
+  days: number;
+  assignee: string;
+}
+const openIssuesByCampus = new Map<number, OpenIssue[]>();
+for (const row of await sql`
+  select i.id::int as id, i.campus_id::int as campus_id, c.name as campus, i.category, i.priority,
+         i.status, i.location, floor(extract(epoch from now() - i.created_at) / 86400)::int as days,
+         coalesce(a.name, i.assigned_to) as assignee
+  from issues i
+  left join (select campus_id, min(campus) as name from students
+             where campus_id is not null group by campus_id) c on c.campus_id = i.campus_id
+  left join staff a on a.email = i.assigned_to
+  where i.status <> 'resolved'
+  order by case i.priority when 'urgent' then 0 when 'high' then 1 else 2 end, i.created_at`) {
+  const list = openIssuesByCampus.get(Number(row.campus_id)) ?? [];
+  list.push({
+    id: Number(row.id),
+    campus: String(row.campus ?? `Campus ${row.campus_id}`),
+    category: String(row.category),
+    priority: String(row.priority),
+    status: String(row.status),
+    location: (row.location as string | null) ?? null,
+    days: Number(row.days),
+    assignee: String(row.assignee),
+  });
+  openIssuesByCampus.set(Number(row.campus_id), list);
+}
 // PRIME coding delivery and PRIME coding instructors, per campus id (from the same campus page).
 interface DeliveryEntry {
   campus: string;
@@ -177,8 +214,8 @@ function headline(scope: GroupStats, testsThisWeek: number) {
   return `<tr><td style="padding:22px 24px 0">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
       ${tile('Overall Health', scope.overall === null ? '—' : String(scope.overall), overallColor(scope.overall), `${scope.students.toLocaleString('en-IN')} students`)}
-      ${tile('At risk on 3+ fronts', atRisk.toLocaleString('en-IN'), atRisk ? BAND.risk : BAND.good, 'start here')}
-      ${tile('Attendance last week', weeks.length ? `${weeks[weeks.length - 1]}%` : '—', BAND[bandOf(DIMENSIONS[1], weeks.at(-1) ?? null)], change === null ? 'no trend yet' : `${change >= 0 ? '▲ +' : '▼ '}${Math.abs(change)} vs week before`)}
+      ${tile('At Risk on 3+ Fronts', atRisk.toLocaleString('en-IN'), atRisk ? BAND.risk : BAND.good, 'start here')}
+      ${tile('Attendance Last Week', weeks.length ? `${weeks[weeks.length - 1]}%` : '—', BAND[bandOf(DIMENSIONS[1], weeks.at(-1) ?? null)], change === null ? 'no trend yet' : `${change >= 0 ? '▲ +' : '▼ '}${Math.abs(change)} vs week before`)}
       ${tile('New Tests This Week', String(testsThisWeek), '#274f87', active === null ? 'released' : `${active}% coded last week`)}
     </tr></table>
   </td></tr>`;
@@ -369,11 +406,39 @@ function unusualScores(tests: FlaggedTest[], showCampus: boolean) {
           )}</div>`,
           `<span style="font-size:12px;color:#334155">${escape(test.integrity.reasons.join('; '))}</span>`,
           test.integrity.level === 'high'
-            ? pill('Possible copying', BAND.risk)
+            ? pill('Possible Copying', BAND.risk)
             : pill('Check', BAND.ok),
         ])
     ),
     `Taken in an open browser: a sign to look into, not proof.${tests.length > 8 ? ` ${tests.length} tests in all; see Vertex.` : ''}`
+  );
+}
+
+/** Campus issues still open: they stay in the email every week until resolved. */
+function openIssues(issues: OpenIssue[], showCampus: boolean) {
+  if (!issues.length) return '';
+  const shown = issues.slice(0, 12);
+  return section(
+    '🚩 Open Campus Issues',
+    table(
+      [
+        { label: 'Issue' },
+        { label: 'Priority', align: 'center' },
+        { label: 'Status', align: 'center' },
+        { label: 'Open For', align: 'right' },
+      ],
+      shown.map((issue) => [
+        `<a href="${SITE}/issues?id=${issue.id}" style="color:#0f172a;text-decoration:none"><b>${escape(categoryLabel(issue.category))}</b></a><div style="font-size:11px;color:#64748b">${escape(
+          [showCampus ? issue.campus : '', issue.location ?? '', `with ${issue.assignee}`]
+            .filter(Boolean)
+            .join(' · ')
+        )}</div>`,
+        pill(priorityOf(issue.priority).label, priorityOf(issue.priority).color),
+        pill(statusOf(issue.status).label, statusOf(issue.status).color),
+        issue.days < 1 ? 'Today' : `${issue.days} d`,
+      ])
+    ),
+    `${issues.length} open. Each stays here until it is resolved.${issues.length > shown.length ? ' See every one in Vertex.' : ''}`
   );
 }
 
@@ -542,6 +607,8 @@ function reportEmail(
     /** The campus's delivery (campus emails), or every campus's (HQ's email). */
     delivery?: DeliveryEntry;
     deliveryAll?: DeliveryEntry[];
+    /** Campus issues still open: the campus's, or every campus's (HQ's email). */
+    issues: OpenIssue[];
   }
 ) {
   const noun = options.campus ? 'Batch' : 'Campus';
@@ -559,6 +626,7 @@ function reportEmail(
     logo: options.logo,
     content:
       headline(scope, options.testsThisWeek) +
+      openIssues(options.issues, !options.campus) +
       pains(points) +
       fronts(scope, options.benchmark) +
       (groups.length > 1 ? comparison(groups, noun) : '') +
@@ -590,6 +658,18 @@ function reportEmail(
           `PRIME coding delivery: ${options.delivery.delivery.delivered} of ${options.delivery.delivery.allocated} h verified, ${options.delivery.delivery.pending} h awaiting verification`,
         ]
       : []),
+    ...(options.issues.length
+      ? [
+          '',
+          `Open campus issues: ${options.issues.length}`,
+          ...options.issues
+            .slice(0, 12)
+            .map(
+              (issue) =>
+                `- ${categoryLabel(issue.category)}${options.campus ? '' : ` (${issue.campus})`}: ${statusOf(issue.status).label}, ${issue.days} d`
+            ),
+        ]
+      : []),
     '',
     `Open: ${SITE}${link}`,
   ].join('\n');
@@ -612,6 +692,13 @@ const overall = reportEmail(all, insights, campusGroups, {
   testsThisWeek: totalNewTests,
   flagged: allFlagged,
   deliveryAll: [...deliveryByCampus.values()],
+  issues: [...openIssuesByCampus.values()]
+    .flat()
+    .sort(
+      (a, b) =>
+        ['urgent', 'high', 'normal'].indexOf(a.priority) -
+          ['urgent', 'high', 'normal'].indexOf(b.priority) || b.days - a.days
+    ),
 });
 
 const campusReports = campusGroups.map((group) => {
@@ -629,6 +716,7 @@ const campusReports = campusGroups.map((group) => {
       testsThisWeek: campus ? (newTests.get(Number(campus.id)) ?? 0) : 0,
       flagged: campus ? (flaggedByCampus.get(Number(campus.id)) ?? []) : [],
       delivery: campus ? deliveryByCampus.get(Number(campus.id)) : undefined,
+      issues: campus ? (openIssuesByCampus.get(Number(campus.id)) ?? []) : [],
     }),
   };
 });
@@ -688,7 +776,7 @@ if (saveTo) {
   for (const report of campusReports) {
     if (report.id === null) continue;
     const email = await addNotice(sql, directory, {
-      title: `Weekly report: ${report.name} (${week})`,
+      title: `Weekly Report: ${report.name} (${week})`,
       body:
         report.points
           .slice(0, 3)
