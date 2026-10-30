@@ -8,7 +8,8 @@
 //        -> { firstName, campus, handles, token }: the usernames saved now, and a token
 //           that allows saving for 30 minutes
 //   POST /api/student-form { action: 'save', email, token, handles: { leetcode: '…', … } }
-//        -> { ok: true, handles }: every username read and checked as the form does
+//        -> { ok: true, handles }: every username read and checked as the form does, and
+//           refused when the account does not exist on its platform
 //
 // Only the first name and campus are shown, never contact details. Codes last 10 minutes,
 // are stored only as an HMAC, allow 5 wrong tries, and are limited to one a minute and five
@@ -17,9 +18,10 @@
 // change can be undone). A save marks the form time, so an older Google Form answer synced
 // later does not overwrite it.
 
+import { fetchCodingProfile, setRelayOrigin } from '../src/lib/coding-profiles/adapters';
 import { readHandle } from '../src/lib/coding-profiles/handles';
 import { PLATFORMS } from '../src/lib/coding-profiles/platforms';
-import type { PlatformId } from '../src/lib/coding-profiles/types';
+import { ProfileError, type PlatformId } from '../src/lib/coding-profiles/types';
 import { digest, isEmail, json, newCode, normalizeEmail, sameText } from './_auth';
 import { db } from './_db';
 import { sendEmail, signInCodeEmail } from './_email';
@@ -96,6 +98,29 @@ async function validToken(email: string, token: unknown): Promise<boolean> {
   );
 }
 
+/**
+ * Usernames that do not exist on their platform, as the form checks them. A platform that
+ * cannot be asked just now (slow, rate limited) does not block the save.
+ */
+async function missingAccounts(origin: string, handles: Handles) {
+  setRelayOrigin(origin);
+  const errors: Partial<Record<PlatformId, string>> = {};
+  await Promise.all(
+    PLATFORMS.filter((platform) => handles[platform.id]).map(async (platform) => {
+      const username = handles[platform.id]!;
+      const missing = await Promise.race([
+        fetchCodingProfile(platform.id, username).then(
+          () => false,
+          (error) => error instanceof ProfileError && error.kind === 'not_found'
+        ),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 10_000)),
+      ]);
+      if (missing) errors[platform.id] = `No ${platform.name} account is called “${username}”.`;
+    })
+  );
+  return errors;
+}
+
 const NOT_FOUND = {
   error:
     'We could not find a student with this email. Use the email you gave Sunstone (your personal or Sunstone email).',
@@ -130,7 +155,8 @@ async function send(ip: string | null, email: string): Promise<Response> {
     [email, await codeHash(email, code), CODE_MINUTES]
   );
   try {
-    await sendEmail({ to: email, ...signInCodeEmail(code, CODE_MINUTES, 'studentForm') });
+    // Brevo first: students come in large numbers, and Resend stays free for staff sign-in.
+    await sendEmail({ to: email, ...signInCodeEmail(code, CODE_MINUTES, 'studentForm') }, 'Brevo');
   } catch (error) {
     console.error('[student-form] code email failed', error);
     await db().query(`delete from student_form_codes where email = $1 and expires_at > now()`, [
@@ -177,6 +203,7 @@ async function verify(ip: string | null, email: string, code: string): Promise<R
 }
 
 async function save(
+  origin: string,
   ip: string | null,
   email: string,
   token: unknown,
@@ -201,6 +228,10 @@ async function save(
     return json(400, { error: 'Fix the usernames marked in red.', errors });
   }
   if (IDS.every((id) => !handles[id])) return json(400, { error: 'Add at least one username.' });
+  const missing = await missingAccounts(origin, handles);
+  if (Object.keys(missing).length) {
+    return json(400, { error: 'Fix the usernames marked in red.', errors: missing });
+  }
 
   if (await overLimit('save', ip)) return json(429, TOO_MANY);
   const student = await findByEmail(email);
@@ -239,7 +270,13 @@ export default async function handler(request: Request): Promise<Response> {
   if (body.action === 'send') return send(ip, email);
   if (body.action === 'verify') return verify(ip, email, String(body.code ?? '').trim());
   if (body.action === 'save') {
-    return save(ip, email, body.token, (body.handles ?? {}) as Record<string, unknown>);
+    return save(
+      new URL(request.url).origin,
+      ip,
+      email,
+      body.token,
+      (body.handles ?? {}) as Record<string, unknown>
+    );
   }
   return json(400, { error: 'Unknown action.' });
 }

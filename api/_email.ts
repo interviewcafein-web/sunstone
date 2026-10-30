@@ -1,6 +1,10 @@
 // Sends email through a chain of providers, so running out of one free plan does not stop
-// sign-in codes: Resend first, then Brevo, then Mailjet, each used only when configured.
-// When a provider refuses (daily quota used up, rate limit, outage), the next one sends it.
+// sign-in codes: Resend first, then Brevo, then Mailjet, each used only when configured
+// (a caller may put another first: the student form uses Brevo first, keeping Resend for
+// staff). When a provider refuses (quota used up, rate limit, outage), the next one sends it.
+// A provider whose quota is used up is paused until it comes back (next day, or next month
+// for a monthly quota; table email_provider_pauses), so meanwhile emails go straight to the
+// next one, and back to it on their own afterwards.
 //
 //   EMAIL_FROM          the sender, e.g. "Sunstone PRIME Vertex <noreply@vertex.sunstone.in>"
 //                       (its domain must be verified with each provider)
@@ -14,6 +18,8 @@
 //
 // Locally, with no provider configured, the email is printed to the dev server's terminal
 // instead, so sign-in codes can be tried without sending anything.
+
+import { db } from './_db';
 
 const setting = (name: string) => process.env[name]?.trim() || undefined;
 
@@ -38,8 +44,10 @@ function sender(from: string) {
 
 const list = (to: string | string[]) => (Array.isArray(to) ? to : [to]);
 
+export type ProviderName = 'Resend' | 'Brevo' | 'Mailjet';
+
 interface Provider {
-  name: string;
+  name: ProviderName;
   /** The setting that overrides EMAIL_FROM for this provider. */
   from?: string;
   ready: () => boolean;
@@ -120,6 +128,55 @@ const PROVIDERS: Provider[] = [
 
 const ready = () => PROVIDERS.filter((provider) => provider.ready());
 
+/** Until when to skip a provider after this refusal; null when it is not a used-up quota. */
+function pauseAfter(status: number, body: string): Date | null {
+  const text = body.toLowerCase();
+  const now = new Date();
+  const quota = /quota|credit|limit (?:reached|exceeded)|daily limit|sending limit/.test(text);
+  if (quota && /month/.test(text)) {
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  }
+  if (quota || status === 402) {
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  }
+  // Too many at once: a short breather.
+  if (status === 429) return new Date(now.getTime() + 60_000);
+  return null;
+}
+
+/** Providers paused now. Without the database (or the table) nothing is paused. */
+async function paused(): Promise<Set<string>> {
+  try {
+    const rows = await db().query(`select provider from email_provider_pauses where until > now()`);
+    return new Set(rows.map((row) => String(row.provider)));
+  } catch {
+    return new Set();
+  }
+}
+
+async function pause(provider: ProviderName, until: Date, reason: string) {
+  console.warn(`[email] ${provider} paused until ${until.toISOString()}: ${reason}`);
+  try {
+    await db().query(
+      `insert into email_provider_pauses (provider, until, reason) values ($1, $2, $3)
+       on conflict (provider) do update set until = excluded.until, reason = excluded.reason, at = now()`,
+      [provider, until.toISOString(), reason.slice(0, 300)]
+    );
+  } catch {
+    // No database here: the next email simply tries this provider again.
+  }
+}
+
+/** The providers to try, in order: `prefer` first, paused ones last (tried only if all fail). */
+async function chain(prefer?: ProviderName): Promise<Provider[]> {
+  const configured = ready().sort((a, b) => Number(b.name === prefer) - Number(a.name === prefer));
+  const skip = await paused();
+  return [
+    ...configured.filter((provider) => !skip.has(provider.name)),
+    ...configured.filter((provider) => skip.has(provider.name)),
+  ];
+}
+
 export const canSendEmail = () =>
   Boolean(ready().length && setting('EMAIL_FROM')) || !process.env.VERCEL;
 
@@ -132,10 +189,13 @@ export interface Email {
   html: string;
 }
 
-/** Sends one email through the first provider that accepts it; returns that provider's name. */
-export async function sendEmail(email: Email): Promise<string> {
+/**
+ * Sends one email through the first provider that accepts it, `prefer` first when given;
+ * returns that provider's name.
+ */
+export async function sendEmail(email: Email, prefer?: ProviderName): Promise<string> {
   const from = setting('EMAIL_FROM');
-  const providers = ready();
+  const providers = await chain(prefer);
   if (!providers.length || !from) {
     if (process.env.VERCEL)
       throw new Error('Email is not configured (EMAIL_FROM and a provider key).');
@@ -151,9 +211,10 @@ export async function sendEmail(email: Email): Promise<string> {
         (provider.from && setting(provider.from)) || from
       );
       if (response.ok) return provider.name;
-      failures.push(
-        `${provider.name} ${response.status}: ${(await response.text()).slice(0, 200)}`
-      );
+      const body = (await response.text()).slice(0, 300);
+      const until = pauseAfter(response.status, body);
+      if (until) await pause(provider.name, until, `${response.status} ${body}`);
+      failures.push(`${provider.name} ${response.status}: ${body.slice(0, 200)}`);
     } catch (error) {
       failures.push(`${provider.name}: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -397,13 +458,14 @@ Sunstone PRIME Vertex`;
  */
 export async function sendEmails(emails: Email[]): Promise<number> {
   const from = setting('EMAIL_FROM');
-  const key = setting('RESEND_API_KEY');
   if (!ready().length || !from) {
     if (process.env.VERCEL)
       throw new Error('Email is not configured (EMAIL_FROM and a provider key).');
     for (const email of emails) console.log(`\n[email to ${email.to}] ${email.subject}\n`);
     return emails.length;
   }
+  // Resend's batch API while Resend is in use; otherwise one by one through the chain.
+  let key = (await paused()).has('Resend') ? undefined : setting('RESEND_API_KEY');
   let sent = 0;
   for (let start = 0; start < emails.length; start += 100) {
     const chunk = emails.slice(start, start + 100);
@@ -427,10 +489,12 @@ export async function sendEmails(emails: Email[]): Promise<number> {
       sent += chunk.length;
       continue;
     }
-    if (ready().length < 2 && key) {
-      throw new Error(
-        `Resend ${response?.status ?? 'unreachable'}: ${(await response?.text())?.slice(0, 300) ?? ''}`
-      );
+    if (response) {
+      const body = (await response.text()).slice(0, 300);
+      const until = pauseAfter(response.status, body);
+      if (until) await pause('Resend', until, `${response.status} ${body}`);
+      if (ready().length < 2) throw new Error(`Resend ${response.status}: ${body}`);
+      if (until) key = undefined;
     }
     for (const email of chunk) {
       await sendEmail(email);
