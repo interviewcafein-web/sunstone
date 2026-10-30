@@ -186,7 +186,7 @@ export default function InsightsPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-5">
-        <PainPoints points={pains} className="lg:col-span-3" />
+        <PainPoints points={pains} className="lg:col-span-3" scope={scopeName} />
         <ShapeRadar
           scope={scope}
           benchmark={search.campus ? overallStats : undefined}

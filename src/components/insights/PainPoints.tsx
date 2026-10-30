@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import type { LucideIcon } from 'lucide-react';
 import {
   AlertOctagon,
@@ -8,11 +9,14 @@ import {
   ClipboardCheck,
   Code2,
   Info,
+  Loader2,
   NotebookPen,
   Sparkles,
   Users,
 } from 'lucide-react';
 
+import { Markdown } from '@/components/ask/Markdown';
+import { AskError, suggestActions } from '@/lib/ask';
 import { DIMENSIONS, type DimensionId, type PainPoint } from '@/lib/insights';
 import { cn } from '@/lib/utils';
 
@@ -48,9 +52,70 @@ const SEVERITY = {
   },
 } as const;
 
+const AI_NOTES: Record<string, string> = {
+  daily_limit: "Today's free AI allowance is used up. Try again tomorrow.",
+  user_limit: "You've used today's AI questions. Try again tomorrow.",
+  busy: 'The AI is busy right now. Try again in a minute.',
+  not_configured: 'The AI is not set up yet.',
+};
+
+/** AI suggestions for the pain points shown, kept while they stay the same. */
+function SuggestedActions({ scope, points }: { scope: string; points: PainPoint[] }) {
+  const ask = useMutation({
+    mutationFn: () =>
+      suggestActions(
+        scope,
+        points.slice(0, 6).map(({ severity, title, detail }) => ({ severity, title, detail }))
+      ),
+  });
+  if (ask.isIdle) {
+    return (
+      <button
+        type="button"
+        onClick={() => ask.mutate()}
+        className="text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/30 mt-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold"
+      >
+        <Sparkles className="size-4 text-amber-500" aria-hidden />
+        Suggest actions
+      </button>
+    );
+  }
+  return (
+    <div className="mt-4 rounded-xl border border-amber-200/70 bg-gradient-to-br from-amber-50/80 to-white p-4 dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent">
+      <p className="flex items-center gap-1.5 text-sm font-bold">
+        <Sparkles className="size-4 text-amber-500" aria-hidden />
+        Suggested actions
+        <span className="ml-auto text-[11px] font-normal text-slate-500">
+          AI suggestions · check before acting
+        </span>
+      </p>
+      {ask.isPending && (
+        <p className="mt-3 flex items-center gap-2 text-sm text-slate-500">
+          <Loader2 className="size-4 animate-spin" aria-hidden />
+          Working out what to do…
+        </p>
+      )}
+      {ask.isError && (
+        <p className="mt-3 text-sm text-amber-800 dark:text-amber-300">
+          {(ask.error instanceof AskError && AI_NOTES[ask.error.kind]) || ask.error.message}{' '}
+          <button
+            type="button"
+            onClick={() => ask.mutate()}
+            className="font-semibold underline-offset-2 hover:underline"
+          >
+            Try again
+          </button>
+        </p>
+      )}
+      {ask.data && <Markdown text={ask.data.answer} className="mt-3" />}
+    </div>
+  );
+}
+
 /**
  * What needs attention, most pressing first. `columns` lays them out two across (for a wide
- * panel); `action` adds a link in the header, e.g. to the full 360° view.
+ * panel); `action` adds a link in the header, e.g. to the full 360° view; `scope` (what these
+ * pain points are for, e.g. "SAGE University · B.Tech 2025–29") offers AI suggested actions.
  */
 export function PainPoints({
   points,
@@ -58,12 +123,14 @@ export function PainPoints({
   limit = 6,
   columns = 1,
   action,
+  scope,
 }: {
   points: PainPoint[];
   className?: string;
   limit?: number;
   columns?: 1 | 2;
   action?: ReactNode;
+  scope?: string;
 }) {
   const [showAll, setShowAll] = useState(false);
   const shown = showAll ? points : points.slice(0, limit);
@@ -136,6 +203,7 @@ export function PainPoints({
           {showAll ? 'Show fewer' : `Show all ${points.length}`}
         </button>
       )}
+      {scope && points.length > 0 && <SuggestedActions key={scope} scope={scope} points={points} />}
     </section>
   );
 }

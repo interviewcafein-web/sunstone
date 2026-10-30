@@ -71,7 +71,7 @@ function statusOf(released: string | null, due: string | null, now: string): Tes
   return 'completed';
 }
 
-async function campuses(viewer: Viewer) {
+export async function campuses(viewer: Viewer) {
   const rowsQuery = db().query(
     `with roster as (
        select lms_user_id, campus_id, campus from students
@@ -981,7 +981,7 @@ async function test(campusId: number, batch: string | null, testIds: number[]) {
   return { test: info, students };
 }
 
-async function student(viewer: Viewer, username: string) {
+export async function student(viewer: Viewer, username: string) {
   const [person] = await db()`
     select lms_user_id, campus_id, name, username from students
     where on_platform and lower(username) = lower(${username})`;

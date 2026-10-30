@@ -1,6 +1,7 @@
 import { Link, Outlet, createRootRoute, useRouterState } from '@tanstack/react-router';
 import { Building2, Library, LogIn, Radar, Users } from 'lucide-react';
 
+import { AskVertex } from '@/components/ask/AskVertex';
 import { AppBanner } from '@/components/common/AppBanner';
 import { BrandLockup } from '@/components/common/BrandLockup';
 import { NotificationBell } from '@/components/common/NotificationBell';
@@ -124,6 +125,7 @@ function RootComponent() {
           </span>
         </div>
       </footer>
+      {user && !onLoginPage && <AskVertex />}
     </div>
   );
 }

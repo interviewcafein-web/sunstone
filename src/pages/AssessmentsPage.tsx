@@ -44,7 +44,7 @@ import { DeliverySection } from '@/components/assessments/DeliverySection';
 import { ExamsTab } from '@/components/assessments/ExamsSection';
 import { Avatar } from '@/components/common/Avatar';
 import { AnimatedRing } from '@/components/common/AnimatedRing';
-import { cohortLabel, cohortYears, parseBatch } from '@/lib/cohorts';
+import { batchLabel, cohortLabel, cohortYears, parseBatch } from '@/lib/cohorts';
 import { PeriodFilter, inPeriod, type PeriodChoice } from '@/components/assessments/PeriodFilter';
 import { CampusLogo } from '@/components/common/CampusLogo';
 import { PainPoints } from '@/components/insights/PainPoints';
@@ -700,6 +700,7 @@ function CampusPainPoints({
       points={points}
       columns={2}
       limit={4}
+      scope={batch ? `${campus} · ${batchLabel(batch)}` : campus}
       action={
         <Link
           to="/insights"
