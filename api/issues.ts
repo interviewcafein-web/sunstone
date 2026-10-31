@@ -85,12 +85,7 @@ const me = (viewer: Viewer) => normalizeEmail(viewer.user);
 const PHOTO_FOLDER = 'vertex/issues';
 
 function cloudinary() {
-  // Also when pasted with its name ("CLOUDINARY_URL=cloudinary://…") or in quotes.
-  const url = process.env.CLOUDINARY_URL?.trim()
-    .replace(/^["']|["']$/g, '')
-    .replace(/^CLOUDINARY_URL=/, '')
-    .replace(/^["']|["']$/g, '')
-    .match(/^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/);
+  const url = process.env.CLOUDINARY_URL?.trim().match(/^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/);
   const [apiKey, apiSecret, cloudName] = url
     ? [url[1], url[2], url[3]]
     : [
