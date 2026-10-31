@@ -128,6 +128,19 @@ const PROVIDERS: Provider[] = [
 
 const ready = () => PROVIDERS.filter((provider) => provider.ready());
 
+/**
+ * Whether Brevo is set up and sends from our own domain (BREVO_FROM, else EMAIL_FROM), not a
+ * free mailbox like Gmail, whose mail from Brevo is likelier to land in spam.
+ */
+export const brevoOnOwnDomain = () => {
+  const from = setting('BREVO_FROM') ?? setting('EMAIL_FROM') ?? '';
+  return (
+    Boolean(brevoKey()) &&
+    /@[^>]+/.test(from) &&
+    !/@(gmail|googlemail|yahoo|outlook|hotmail|live|icloud)\./i.test(from)
+  );
+};
+
 /** Until when to skip a provider after this refusal; null when it is not a used-up quota. */
 function pauseAfter(status: number, body: string): Date | null {
   const text = body.toLowerCase();

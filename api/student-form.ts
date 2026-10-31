@@ -24,7 +24,7 @@ import { PLATFORMS } from '../src/lib/coding-profiles/platforms';
 import { ProfileError, type PlatformId } from '../src/lib/coding-profiles/types';
 import { digest, isEmail, json, newCode, normalizeEmail, sameText } from './_auth';
 import { db } from './_db';
-import { sendEmail, signInCodeEmail, type ProviderName } from './_email';
+import { brevoOnOwnDomain, sendEmail, signInCodeEmail, type ProviderName } from './_email';
 
 export const config = { runtime: 'edge' };
 
@@ -34,12 +34,12 @@ const CODES_PER_HOUR = 5;
 const GAP_SECONDS = 60;
 const TOKEN_MINUTES = 30;
 /**
- * The provider codes go through first. Resend for now, as Brevo still sends from a Gmail
- * address (more likely to land in spam); once mail.vertex.sunstone.in is verified in Brevo,
- * 'Brevo', so students use its larger quota and Resend's stays free for staff sign-in.
- * Either way the other is the backup.
+ * The provider codes go through first: Brevo once it sends from our own domain
+ * (noreply@mail.vertex.sunstone.in), so students use its larger quota and Resend's stays free
+ * for staff sign-in; Resend while Brevo still sends from a Gmail address. Either way the other
+ * is the backup.
  */
-const CODES_FIRST_THROUGH: ProviderName | undefined = 'Resend';
+const codesFirstThrough = (): ProviderName => (brevoOnOwnDomain() ? 'Brevo' : 'Resend');
 const LIMITS = { send: 20, verify: 40, save: 10 } as const;
 type Kind = keyof typeof LIMITS;
 
@@ -164,7 +164,7 @@ async function send(ip: string | null, email: string): Promise<Response> {
   try {
     await sendEmail(
       { to: email, ...signInCodeEmail(code, CODE_MINUTES, 'studentForm') },
-      CODES_FIRST_THROUGH
+      codesFirstThrough()
     );
   } catch (error) {
     console.error('[student-form] code email failed', error);
