@@ -4,7 +4,8 @@
 //
 //   GET  /api/issues?status=active|resolved|all&campus=ID    the issues the viewer can see
 //   GET  /api/issues?id=N                                     one issue with its thread
-//   POST /api/issues { action: 'create', campusId, category, priority, location?, details }
+//   POST /api/issues { action: 'create', campusId, category, priority, location?, details,
+//                      problems? }   (problems: ticked from COMMON_PROBLEMS; details optional then)
 //   POST /api/issues { action: 'reply', id, body }
 //   POST /api/issues { action: 'status', id, status, note? }
 //   POST /api/issues { action: 'assign', id, assignee }
@@ -20,7 +21,10 @@
 // the person who raised it and the assignee.
 
 import {
+  COMMON_PROBLEMS,
   ISSUE_CATEGORIES,
+  MAX_PROBLEMS,
+  composeDetails,
   MAX_ISSUE_IMAGES,
   PRIORITIES,
   STATUSES,
@@ -267,7 +271,16 @@ async function create(viewer: Viewer, body: Record<string, unknown>) {
   const campusId = Number(body.campusId);
   const category = String(body.category ?? '');
   const priority = String(body.priority ?? 'normal');
-  const details = text(body.details, 2000);
+  // Ticked common problems for the category, then anything typed.
+  const ticked = Array.isArray(body.problems) ? (body.problems as unknown[]) : [];
+  const known = COMMON_PROBLEMS[category as keyof typeof COMMON_PROBLEMS] ?? [];
+  const problems = [
+    ...new Set(ticked.filter((item): item is string => known.includes(String(item)))),
+  ];
+  if (ticked.length > MAX_PROBLEMS || problems.length !== ticked.length) {
+    return json(400, { error: 'Tick problems from the list for this category.' });
+  }
+  const details = composeDetails(problems, text(body.details, 1600)).slice(0, 2000);
   const location = text(body.location, 120) || null;
   if (!Number.isInteger(campusId) || !seesCampus(viewer, campusId)) {
     return json(403, { error: 'You can raise issues only for your own campuses.' });
@@ -277,7 +290,7 @@ async function create(viewer: Viewer, body: Record<string, unknown>) {
   }
   if (!PRIORITIES.some((item) => item.id === priority))
     return json(400, { error: 'Choose a priority.' });
-  if (!details) return json(400, { error: 'Describe the issue.' });
+  if (!details) return json(400, { error: 'Tick what is wrong, or describe the issue.' });
   const images = readImages(body.images);
   if (!images) return json(400, { error: `Add up to ${MAX_ISSUE_IMAGES} photos, uploaded here.` });
 

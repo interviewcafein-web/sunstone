@@ -7,6 +7,7 @@ import {
   BookOpen,
   CalendarClock,
   CheckCircle2,
+  Circle,
   CircleDot,
   Fan,
   Flag,
@@ -30,6 +31,7 @@ import {
 } from 'lucide-react';
 
 import {
+  COMMON_PROBLEMS,
   ISSUE_CATEGORIES,
   MAX_ISSUE_IMAGES,
   PRIORITIES,
@@ -515,6 +517,8 @@ function RaiseDialog({
     data.campuses.length === 1 ? data.campuses[0].id : ''
   );
   const [category, setCategory] = useState('');
+  const [problems, setProblems] = useState<string[]>([]);
+  const common = category ? COMMON_PROBLEMS[category as IssueCategoryId] : [];
   const [priority, setPriority] = useState<IssuePriority>('normal');
   const [location, setLocation] = useState('');
   const [details, setDetails] = useState('');
@@ -526,7 +530,11 @@ function RaiseDialog({
     setError('');
     if (!campusId) return setError('Choose the campus.');
     if (!category) return setError('Choose what the issue is about.');
-    if (!details.trim()) return setError('Describe the issue.');
+    if (!problems.length && !details.trim()) {
+      return setError(
+        common.length ? 'Tick what is wrong, or describe it.' : 'Describe the issue.'
+      );
+    }
     if (photos.uploading) return setError('Wait for the photos to finish uploading.');
     raise.mutate(
       {
@@ -535,6 +543,7 @@ function RaiseDialog({
         priority,
         location: location.trim() || undefined,
         details: details.trim(),
+        problems,
         images: photos.images,
       },
       {
@@ -579,7 +588,10 @@ function RaiseDialog({
                   key={item.id}
                   type="button"
                   aria-pressed={chosen}
-                  onClick={() => setCategory(item.id)}
+                  onClick={() => {
+                    if (item.id !== category) setProblems([]);
+                    setCategory(item.id);
+                  }}
                   className={cn(
                     'flex items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-xs font-semibold transition',
                     chosen
@@ -597,6 +609,44 @@ function RaiseDialog({
             })}
           </div>
         </fieldset>
+
+        {common.length > 0 && (
+          <fieldset>
+            <legend className="mb-1.5 text-xs font-semibold text-slate-600">
+              What Is Wrong? (Tick All That Apply)
+            </legend>
+            <div className="flex flex-wrap gap-2">
+              {common.map((problem) => {
+                const ticked = problems.includes(problem);
+                return (
+                  <button
+                    key={problem}
+                    type="button"
+                    aria-pressed={ticked}
+                    onClick={() =>
+                      setProblems((list) =>
+                        ticked ? list.filter((item) => item !== problem) : [...list, problem]
+                      )
+                    }
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition',
+                      ticked
+                        ? 'border-emerald-600 bg-emerald-50 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200'
+                        : 'border-slate-300 text-slate-700 hover:border-slate-400'
+                    )}
+                  >
+                    {ticked ? (
+                      <CheckCircle2 className="size-3.5" aria-hidden />
+                    ) : (
+                      <Circle className="size-3.5 text-slate-400" aria-hidden />
+                    )}
+                    {problem}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+        )}
 
         <fieldset>
           <legend className="mb-1.5 text-xs font-semibold text-slate-600">How Urgent?</legend>
@@ -632,13 +682,23 @@ function RaiseDialog({
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-xs font-semibold text-slate-600">Details</span>
+          <span className="mb-1 block text-xs font-semibold text-slate-600">
+            {problems.length
+              ? 'Anything Else? (Optional)'
+              : common.length
+                ? 'Something Else? Describe It'
+                : 'Details'}
+          </span>
           <textarea
             value={details}
             onChange={(event) => setDetails(event.target.value)}
             maxLength={2000}
             rows={4}
-            placeholder="What is wrong, since when, and how it affects classes"
+            placeholder={
+              problems.length
+                ? 'e.g. since Monday, only in Lab 2'
+                : 'What is wrong, since when, and how it affects classes'
+            }
             className={field}
           />
         </label>

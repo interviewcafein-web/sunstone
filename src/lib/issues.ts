@@ -34,6 +34,93 @@ export const ISSUE_CATEGORIES: IssueCategory[] = [
   { id: 'other', label: 'Other' },
 ];
 
+/**
+ * The most likely problems in each category, to tick instead of typing; anything else goes in
+ * the details. Ticked ones open the issue's details ("No Wi-Fi at all · Very slow").
+ */
+export const COMMON_PROBLEMS: Record<IssueCategoryId, string[]> = {
+  internet: [
+    'No Wi-Fi at all',
+    'Very slow',
+    'Keeps disconnecting',
+    'Cannot log in to the Wi-Fi',
+    'Weak signal in some rooms',
+    'Sites or the LMS blocked',
+  ],
+  display: [
+    'Projector or TV not turning on',
+    'No picture from the laptop',
+    'Blurry or dim picture',
+    'Cable or adapter missing',
+    'Remote not working',
+    'Screen damaged',
+  ],
+  cooling: [
+    'AC not working',
+    'AC not cooling',
+    'Fan not working',
+    'Fan too slow or noisy',
+    'AC leaking water',
+  ],
+  power: [
+    'No power in the room',
+    'Sockets not working',
+    'Frequent power cuts',
+    'No power backup',
+    'Lights not working',
+  ],
+  tech: [
+    'Computers not starting',
+    'Computers too slow',
+    'Software missing',
+    'Keyboard or mouse not working',
+    'Not enough computers',
+    'No internet on the computers',
+  ],
+  room: [
+    'Room not clean',
+    'Not enough benches or chairs',
+    'Broken furniture',
+    'Whiteboard or markers missing',
+    'Room too noisy',
+  ],
+  trainer: [
+    'Trainer not deployed',
+    'Trainer absent',
+    'Trainer late',
+    'Session cut short',
+    'Trainer change needed',
+  ],
+  classes: [
+    'Class not scheduled',
+    'Timetable clash',
+    'Room not available',
+    'Class cancelled',
+    'Wrong timing on the timetable',
+  ],
+  lms: [
+    'Students cannot log in',
+    'Test not opening',
+    'Wrong marks or results',
+    'Content missing',
+    'Attendance not updated',
+  ],
+  students: [
+    'Low attendance',
+    'Discipline issue',
+    'Students need help',
+    'Students missing from the LMS',
+  ],
+  other: [],
+};
+
+/** At most this many ticked problems on one issue. */
+export const MAX_PROBLEMS = 6;
+
+/** The issue's details: the ticked problems, then anything typed. */
+export const composeDetails = (problems: string[], typed: string) =>
+  [problems.join(' · '), typed.trim()].filter(Boolean).join('\n\n');
+
 /** The category's id, or 'other' for one no longer on the list. */
 export const categoryOf = (id: string): IssueCategoryId =>
   ISSUE_CATEGORIES.find((category) => category.id === id)?.id ?? 'other';

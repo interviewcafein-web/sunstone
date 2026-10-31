@@ -20,6 +20,8 @@ export interface NewIssue {
   priority: IssuePriority;
   location?: string;
   details: string;
+  /** Ticked from COMMON_PROBLEMS for the category. */
+  problems?: string[];
   images?: IssueImage[];
 }
 
