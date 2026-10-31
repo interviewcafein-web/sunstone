@@ -8,6 +8,8 @@
 //   POST /api/issues { action: 'reply', id, body }
 //   POST /api/issues { action: 'status', id, status, note? }
 //   POST /api/issues { action: 'assign', id, assignee }
+//   GET  /api/issues?sign=1      a signature to upload one photo straight to Cloudinary
+//   (create and reply also take images: [{ url, width, height }], up to 4, our Cloudinary only)
 //
 // Who may do what: campus staff see and raise issues for their campuses; HQ and super admins
 // see every campus, and anyone sees the issues assigned to them. Replies are open to anyone
@@ -19,10 +21,12 @@
 
 import {
   ISSUE_CATEGORIES,
+  MAX_ISSUE_IMAGES,
   PRIORITIES,
   STATUSES,
   categoryLabel,
   statusOf,
+  type IssueImage,
   type IssueStatus,
 } from '../src/lib/issues';
 import { type Viewer, seesCampus, json, managesTeam, normalizeEmail, sessionViewer } from './_auth';
@@ -53,7 +57,8 @@ const ISSUE_FIELDS = `
   (extract(epoch from i.created_at) * 1000)::float8 as "createdAt",
   (extract(epoch from i.updated_at) * 1000)::float8 as "updatedAt",
   (extract(epoch from i.resolved_at) * 1000)::float8 as "resolvedAt",
-  (select count(*)::int from issue_updates u where u.issue_id = i.id and u.kind = 'comment') as replies`;
+  (select count(*)::int from issue_updates u where u.issue_id = i.id and u.kind = 'comment') as replies,
+  i.images`;
 
 // Campus names as the students list has them.
 const CAMPUSES = `(select campus_id, min(campus) as name from students
@@ -72,6 +77,68 @@ const visible = (campuses: string, me: string) =>
   `(${campuses}::int[] is null or i.campus_id = any(${campuses}::int[]) or i.assigned_to = ${me})`;
 
 const me = (viewer: Viewer) => normalizeEmail(viewer.user);
+
+// --- Photos (Cloudinary) ---------------------------------------------------------------------
+// Set CLOUDINARY_URL (cloudinary://key:secret@cloud) or CLOUDINARY_CLOUD_NAME,
+// CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET. Without them photos are simply not offered.
+
+const PHOTO_FOLDER = 'vertex/issues';
+
+function cloudinary() {
+  const url = process.env.CLOUDINARY_URL?.trim().match(/^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/);
+  const [apiKey, apiSecret, cloudName] = url
+    ? [url[1], url[2], url[3]]
+    : [
+        process.env.CLOUDINARY_API_KEY?.trim(),
+        process.env.CLOUDINARY_API_SECRET?.trim(),
+        process.env.CLOUDINARY_CLOUD_NAME?.trim(),
+      ];
+  return apiKey && apiSecret && cloudName ? { apiKey, apiSecret, cloudName } : null;
+}
+
+const sha1 = async (text: string) =>
+  [...new Uint8Array(await crypto.subtle.digest('SHA-1', new TextEncoder().encode(text)))]
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+
+/** Lets the browser upload one photo to our Cloudinary folder for the next hour. */
+async function uploadSignature() {
+  const config = cloudinary();
+  if (!config) return json(503, { error: 'Photos are not set up yet.' });
+  const timestamp = Math.floor(Date.now() / 1000);
+  const signature = await sha1(`folder=${PHOTO_FOLDER}&timestamp=${timestamp}${config.apiSecret}`);
+  return json(200, {
+    cloudName: config.cloudName,
+    apiKey: config.apiKey,
+    folder: PHOTO_FOLDER,
+    timestamp,
+    signature,
+  });
+}
+
+/** The photos sent with an issue or reply: only ours, uploaded to the issues folder. */
+function readImages(value: unknown): IssueImage[] | null {
+  if (value === undefined || value === null) return [];
+  const config = cloudinary();
+  if (!Array.isArray(value) || value.length > MAX_ISSUE_IMAGES || (value.length && !config)) {
+    return null;
+  }
+  const prefix = `https://res.cloudinary.com/${config?.cloudName}/image/upload/`;
+  const images: IssueImage[] = [];
+  for (const item of value as Record<string, unknown>[]) {
+    const url = typeof item?.url === 'string' ? item.url : '';
+    if (!url.startsWith(prefix) || !url.includes(`/${PHOTO_FOLDER}/`) || url.length > 400)
+      return null;
+    const size = (n: unknown) => (Number.isInteger(n) && (n as number) > 0 ? (n as number) : null);
+    images.push({ url, width: size(item.width), height: size(item.height) });
+  }
+  return images;
+}
+
+const photos = (images: IssueImage[]) =>
+  images.length
+    ? `\n\n📷 ${images.length} photo${images.length === 1 ? '' : 's'} attached: open the issue to see them.`
+    : '';
 
 async function list(viewer: Viewer, url: URL) {
   const status = url.searchParams.get('status') ?? 'active';
@@ -123,6 +190,7 @@ async function list(viewer: Viewer, url: URL) {
     campuses,
     team,
     manages: managesTeam(viewer),
+    uploads: cloudinary() !== null,
     me: me(viewer),
   };
 }
@@ -143,7 +211,7 @@ async function detail(viewer: Viewer, id: number) {
             u.kind, u.body, u.status,
             case when u.assignee is null then null
                  else json_build_object('email', u.assignee, 'name', n.name) end as assignee,
-            (extract(epoch from u.at) * 1000)::float8 as at
+            (extract(epoch from u.at) * 1000)::float8 as at, u.images
      from issue_updates u
      left join staff s on s.email = u.author
      left join staff n on n.email = u.assignee
@@ -210,13 +278,15 @@ async function create(viewer: Viewer, body: Record<string, unknown>) {
   if (!PRIORITIES.some((item) => item.id === priority))
     return json(400, { error: 'Choose a priority.' });
   if (!details) return json(400, { error: 'Describe the issue.' });
+  const images = readImages(body.images);
+  if (!images) return json(400, { error: `Add up to ${MAX_ISSUE_IMAGES} photos, uploaded here.` });
 
   const raisedBy = me(viewer);
   const assignedTo = await assignee();
   const [row] = await db().query(
-    `insert into issues (campus_id, category, priority, location, details, raised_by, assigned_to)
-     values ($1, $2, $3, $4, $5, $6, $7) returning id::int as id`,
-    [campusId, category, priority, location, details, raisedBy, assignedTo]
+    `insert into issues (campus_id, category, priority, location, details, raised_by, assigned_to, images)
+     values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb) returning id::int as id`,
+    [campusId, category, priority, location, details, raisedBy, assignedTo, JSON.stringify(images)]
   );
   const issue = await findIssue(viewer, row.id);
   await tell(
@@ -225,7 +295,7 @@ async function create(viewer: Viewer, body: Record<string, unknown>) {
     row.id,
     {
       title: `New issue at ${issue.campus}: ${categoryLabel(category)}`,
-      body: `${details}${location ? `\n\nWhere: ${location}` : ''}\n\nRaised by ${viewer.name ?? raisedBy}. Priority: ${priority}.`,
+      body: `${details}${location ? `\n\nWhere: ${location}` : ''}${photos(images)}\n\nRaised by ${viewer.name ?? raisedBy}. Priority: ${priority}.`,
       level: priority === 'urgent' ? 'urgent' : priority === 'high' ? 'important' : 'info',
     },
     viewer.name ?? raisedBy
@@ -236,13 +306,16 @@ async function create(viewer: Viewer, body: Record<string, unknown>) {
 async function reply(viewer: Viewer, body: Record<string, unknown>) {
   const id = Number(body.id);
   const message = text(body.body, 2000);
-  if (!message) return json(400, { error: 'Write a reply.' });
+  const images = readImages(body.images);
+  if (!images) return json(400, { error: `Add up to ${MAX_ISSUE_IMAGES} photos, uploaded here.` });
+  if (!message && !images.length) return json(400, { error: 'Write a reply or add a photo.' });
   const issue = Number.isInteger(id) ? await findIssue(viewer, id) : null;
   if (!issue) return json(404, { error: 'Issue not found.' });
   const author = me(viewer);
   await db().query(
-    `insert into issue_updates (issue_id, author, kind, body) values ($1, $2, 'comment', $3)`,
-    [id, author, message]
+    `insert into issue_updates (issue_id, author, kind, body, images)
+     values ($1, $2, 'comment', $3, $4::jsonb)`,
+    [id, author, message || null, JSON.stringify(images)]
   );
   await db().query(`update issues set updated_at = now() where id = $1`, [id]);
   await tell(
@@ -251,7 +324,7 @@ async function reply(viewer: Viewer, body: Record<string, unknown>) {
     id,
     {
       title: `Reply on ${issue.campus}: ${categoryLabel(issue.category)}`,
-      body: `${viewer.name ?? author}: ${message}`,
+      body: `${viewer.name ?? author}: ${message || 'added a photo.'}${photos(images)}`,
       level: 'info',
     },
     viewer.name ?? author
@@ -369,6 +442,7 @@ export default async function handler(request: Request): Promise<Response> {
   const url = new URL(request.url);
 
   if (request.method === 'GET') {
+    if (url.searchParams.get('sign') === '1') return uploadSignature();
     const id = Number(url.searchParams.get('id'));
     if (id) {
       const found = await detail(viewer, id);

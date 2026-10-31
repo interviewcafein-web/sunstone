@@ -11,6 +11,7 @@ import {
   Fan,
   Flag,
   HelpCircle,
+  ImagePlus,
   Laptop,
   Loader2,
   MapPin,
@@ -30,14 +31,17 @@ import {
 
 import {
   ISSUE_CATEGORIES,
+  MAX_ISSUE_IMAGES,
   PRIORITIES,
   ago,
   categoryLabel,
   categoryOf,
+  imageAt,
   priorityOf,
   statusOf,
   type Issue,
   type IssueCategoryId,
+  type IssueImage,
   type IssuePriority,
   type IssueUpdate,
   type IssuesResponse,
@@ -50,6 +54,7 @@ import {
   useRaiseIssue,
   useReply,
   useSetStatus,
+  uploadPhoto,
   type IssueFilter,
 } from '@/lib/issuesApi';
 import { cn } from '@/lib/utils';
@@ -245,6 +250,139 @@ export default function IssuesPage() {
   );
 }
 
+/** Photos on an issue or reply: small squares that open the full photo. */
+function Photos({ images, size = 'size-20' }: { images: IssueImage[]; size?: string }) {
+  if (!images?.length) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {images.map((image) => (
+        <a
+          key={image.url}
+          href={imageAt(image.url, 1800)}
+          target="_blank"
+          rel="noreferrer"
+          className={cn(
+            'block overflow-hidden rounded-xl border border-slate-200 bg-slate-100 transition hover:opacity-90',
+            size
+          )}
+        >
+          <img
+            src={imageAt(image.url, 320)}
+            alt="Photo of the issue"
+            loading="lazy"
+            className="size-full object-cover"
+          />
+        </a>
+      ))}
+    </div>
+  );
+}
+
+interface Upload {
+  key: string;
+  preview: string;
+  image?: IssueImage;
+  error?: string;
+}
+
+/** Photos being added to an issue or reply, each uploaded to Cloudinary as soon as it is picked. */
+function usePhotoUploads() {
+  const [uploads, setUploads] = useState<Upload[]>([]);
+  const add = (files: FileList | null) => {
+    if (!files) return;
+    const room = MAX_ISSUE_IMAGES - uploads.length;
+    for (const file of [...files].slice(0, Math.max(0, room))) {
+      const key = `${file.name}-${file.size}-${Math.random()}`;
+      setUploads((list) => [...list, { key, preview: URL.createObjectURL(file) }]);
+      uploadPhoto(file)
+        .then((image) =>
+          setUploads((list) => list.map((u) => (u.key === key ? { ...u, image } : u)))
+        )
+        .catch((problem: Error) =>
+          setUploads((list) =>
+            list.map((u) => (u.key === key ? { ...u, error: problem.message } : u))
+          )
+        );
+    }
+  };
+  const remove = (key: string) => setUploads((list) => list.filter((upload) => upload.key !== key));
+  return {
+    uploads,
+    add,
+    remove,
+    clear: () => setUploads([]),
+    images: uploads.flatMap((upload) => (upload.image ? [upload.image] : [])),
+    uploading: uploads.some((upload) => !upload.image && !upload.error),
+    failed: uploads.some((upload) => upload.error),
+  };
+}
+
+function PhotoPicker({
+  photos,
+  compact = false,
+}: {
+  photos: ReturnType<typeof usePhotoUploads>;
+  compact?: boolean;
+}) {
+  const full = photos.uploads.length >= MAX_ISSUE_IMAGES;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {photos.uploads.map((upload) => (
+        <div
+          key={upload.key}
+          className={cn(
+            'relative overflow-hidden rounded-xl border bg-slate-100',
+            compact ? 'size-14' : 'size-20',
+            upload.error ? 'border-red-400' : 'border-slate-200'
+          )}
+          title={upload.error}
+        >
+          <img src={upload.preview} alt="" className="size-full object-cover" />
+          {!upload.image && !upload.error && (
+            <span className="absolute inset-0 flex items-center justify-center bg-white/60">
+              <Loader2 className="text-brand-700 size-5 animate-spin" aria-label="Uploading" />
+            </span>
+          )}
+          {upload.error && (
+            <span className="absolute inset-x-0 bottom-0 bg-red-600 px-1 text-center text-[9px] font-bold text-white">
+              Failed
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => photos.remove(upload.key)}
+            aria-label="Remove photo"
+            className="absolute top-1 right-1 rounded-full bg-slate-900/70 p-0.5 text-white hover:bg-slate-900"
+          >
+            <X className="size-3" />
+          </button>
+        </div>
+      ))}
+      {!full && (
+        <label
+          className={cn(
+            'hover:border-brand-500 hover:text-brand-700 flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 text-xs font-semibold text-slate-500 transition',
+            compact ? 'h-14 px-3' : 'size-20 flex-col'
+          )}
+        >
+          <ImagePlus className="size-5" aria-hidden />
+          {compact ? 'Photo' : 'Add Photo'}
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="sr-only"
+            onChange={(event) => {
+              photos.add(event.target.files);
+              event.target.value = '';
+            }}
+          />
+        </label>
+      )}
+    </div>
+  );
+}
+
 function IssueCard({ issue, onOpen }: { issue: Issue; onOpen: () => void }) {
   const Icon = CATEGORY_ICONS[categoryOf(issue.category)];
   const priority = priorityOf(issue.priority);
@@ -285,6 +423,12 @@ function IssueCard({ issue, onOpen }: { issue: Issue; onOpen: () => void }) {
         <span>
           Assigned to <b className="text-slate-700">{personName(issue.assignedTo)}</b>
         </span>
+        {issue.images?.length > 0 && (
+          <span className="inline-flex items-center gap-1">
+            <ImagePlus className="size-3.5" aria-hidden />
+            {issue.images.length}
+          </span>
+        )}
         {issue.replies > 0 && (
           <span className="inline-flex items-center gap-1">
             <MessageSquare className="size-3.5" aria-hidden />
@@ -374,6 +518,7 @@ function RaiseDialog({
   const [priority, setPriority] = useState<IssuePriority>('normal');
   const [location, setLocation] = useState('');
   const [details, setDetails] = useState('');
+  const photos = usePhotoUploads();
   const [error, setError] = useState('');
 
   const submit = (event: FormEvent) => {
@@ -382,6 +527,7 @@ function RaiseDialog({
     if (!campusId) return setError('Choose the campus.');
     if (!category) return setError('Choose what the issue is about.');
     if (!details.trim()) return setError('Describe the issue.');
+    if (photos.uploading) return setError('Wait for the photos to finish uploading.');
     raise.mutate(
       {
         campusId,
@@ -389,6 +535,7 @@ function RaiseDialog({
         priority,
         location: location.trim() || undefined,
         details: details.trim(),
+        images: photos.images,
       },
       {
         onSuccess: (result) => onRaised((result.issue as Issue).id),
@@ -496,6 +643,20 @@ function RaiseDialog({
           />
         </label>
 
+        {data.uploads && (
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-slate-600">
+              Photos (Optional, Up to {MAX_ISSUE_IMAGES})
+            </span>
+            <PhotoPicker photos={photos} />
+            {photos.failed && (
+              <p className="mt-1 text-xs text-red-600">
+                A photo did not upload. Remove it and try again.
+              </p>
+            )}
+          </div>
+        )}
+
         {error && (
           <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
             {error}
@@ -505,7 +666,11 @@ function RaiseDialog({
           <button type="button" onClick={onClose} className={quietButton}>
             Cancel
           </button>
-          <button type="submit" disabled={raise.isPending} className={primaryButton}>
+          <button
+            type="submit"
+            disabled={raise.isPending || photos.uploading}
+            className={primaryButton}
+          >
             {raise.isPending ? (
               <Loader2 className="size-4 animate-spin" aria-hidden />
             ) : (
@@ -526,7 +691,14 @@ function UpdateLine({ update }: { update: IssueUpdate }) {
         <p className="text-xs text-slate-500">
           <b className="text-slate-700">{personName(update.author)}</b> · {ago(update.at)}
         </p>
-        <p className="mt-1 text-sm whitespace-pre-wrap text-slate-800">{update.body}</p>
+        {update.body && (
+          <p className="mt-1 text-sm whitespace-pre-wrap text-slate-800">{update.body}</p>
+        )}
+        {update.images?.length > 0 && (
+          <div className="mt-2">
+            <Photos images={update.images} size="size-16" />
+          </div>
+        )}
       </li>
     );
   }
@@ -569,6 +741,7 @@ function IssueDialog({
   const setStatus = useSetStatus();
   const assign = useAssign();
   const [message, setMessage] = useState('');
+  const replyPhotos = usePhotoUploads();
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const issue = found.data?.issue;
@@ -613,6 +786,7 @@ function IssueDialog({
             </span>
           </div>
           <p className="text-sm whitespace-pre-wrap text-slate-800">{issue.details}</p>
+          <Photos images={issue.images} />
           {issue.location && (
             <p className="flex items-center gap-1.5 text-xs text-slate-500">
               <MapPin className="size-3.5" aria-hidden />
@@ -752,17 +926,44 @@ function IssueDialog({
             )}
           </div>
 
+          {data.uploads && replyPhotos.uploads.length > 0 && (
+            <PhotoPicker photos={replyPhotos} compact />
+          )}
           <form
             className="flex items-end gap-2"
             onSubmit={(event) => {
               event.preventDefault();
-              if (!message.trim()) return;
+              if ((!message.trim() && !replyPhotos.images.length) || replyPhotos.uploading) return;
               reply.mutate(
-                { id, body: message.trim() },
-                { onSuccess: () => setMessage(''), onError: fail }
+                { id, body: message.trim(), images: replyPhotos.images },
+                {
+                  onSuccess: () => {
+                    setMessage('');
+                    replyPhotos.clear();
+                  },
+                  onError: fail,
+                }
               );
             }}
           >
+            {data.uploads && replyPhotos.uploads.length === 0 && (
+              <label
+                className="hover:border-brand-500 hover:text-brand-700 flex h-[62px] shrink-0 cursor-pointer items-center justify-center rounded-xl border border-dashed border-slate-300 px-3 text-slate-500"
+                title="Add a photo"
+              >
+                <ImagePlus className="size-5" aria-label="Add a photo" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="sr-only"
+                  onChange={(event) => {
+                    replyPhotos.add(event.target.files);
+                    event.target.value = '';
+                  }}
+                />
+              </label>
+            )}
             <textarea
               value={message}
               onChange={(event) => setMessage(event.target.value)}
@@ -771,7 +972,13 @@ function IssueDialog({
               placeholder="Write a reply"
               className={field}
             />
-            <button type="submit" disabled={busy || !message.trim()} className={primaryButton}>
+            <button
+              type="submit"
+              disabled={
+                busy || replyPhotos.uploading || (!message.trim() && !replyPhotos.images.length)
+              }
+              className={primaryButton}
+            >
               {reply.isPending ? (
                 <Loader2 className="size-4 animate-spin" aria-hidden />
               ) : (

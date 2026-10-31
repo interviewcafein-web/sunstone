@@ -3,7 +3,14 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { IssueDetail, IssuePriority, IssueStatus, IssuesResponse } from './issues';
+import {
+  MAX_IMAGE_BYTES,
+  type IssueDetail,
+  type IssueImage,
+  type IssuePriority,
+  type IssueStatus,
+  type IssuesResponse,
+} from './issues';
 
 export type IssueFilter = 'active' | 'resolved' | 'all';
 
@@ -13,6 +20,7 @@ export interface NewIssue {
   priority: IssuePriority;
   location?: string;
   details: string;
+  images?: IssueImage[];
 }
 
 async function call<T>(query = '', init?: RequestInit): Promise<T> {
@@ -63,8 +71,8 @@ export const useRaiseIssue = () =>
   );
 
 export const useReply = () =>
-  useIssueMutation(({ id, body }: { id: number; body: string }) =>
-    post<IssueDetail>({ action: 'reply', id, body })
+  useIssueMutation(({ id, body, images }: { id: number; body: string; images?: IssueImage[] }) =>
+    post<IssueDetail>({ action: 'reply', id, body, images })
   );
 
 export const useSetStatus = () =>
@@ -76,3 +84,61 @@ export const useAssign = () =>
   useIssueMutation(({ id, assignee }: { id: number; assignee: string }) =>
     post<IssueDetail>({ action: 'assign', id, assignee })
   );
+
+// --- Photos ----------------------------------------------------------------------------------
+
+/** Phone photos are large: anything over this is scaled down before it is uploaded. */
+const SHRINK_ABOVE = 1.5 * 1024 * 1024;
+const MAX_SIDE = 2000;
+
+/** A smaller JPEG of a large photo (longest side 2000 px); the photo itself when it is small. */
+async function shrink(file: File): Promise<Blob> {
+  if (file.size <= SHRINK_ABOVE || file.type === 'image/gif') return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/jpeg', 0.85)
+    );
+    return blob && blob.size < file.size ? blob : file;
+  } catch {
+    return file;
+  }
+}
+
+/**
+ * Uploads one photo straight to Cloudinary with a signature from /api/issues, and returns
+ * what to send with the issue or reply.
+ */
+export async function uploadPhoto(file: File): Promise<IssueImage> {
+  if (!file.type.startsWith('image/')) throw new Error(`${file.name} is not a photo.`);
+  if (file.size > MAX_IMAGE_BYTES) throw new Error(`${file.name} is over 10 MB.`);
+  const sign = await call<{
+    cloudName: string;
+    apiKey: string;
+    folder: string;
+    timestamp: number;
+    signature: string;
+  }>('?sign=1');
+  const form = new FormData();
+  form.append('file', await shrink(file));
+  form.append('api_key', sign.apiKey);
+  form.append('timestamp', String(sign.timestamp));
+  form.append('folder', sign.folder);
+  form.append('signature', sign.signature);
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${sign.cloudName}/image/upload`, {
+    method: 'POST',
+    body: form,
+  }).catch(() => null);
+  const data = response ? await response.json().catch(() => ({})) : {};
+  if (!response?.ok || !data.secure_url) {
+    throw new Error(
+      data.error?.message ? `Upload failed: ${data.error.message}` : 'Upload failed. Try again.'
+    );
+  }
+  return { url: data.secure_url, width: data.width ?? null, height: data.height ?? null };
+}

@@ -120,6 +120,7 @@ export default defineConfig(({ mode }) => {
     'EMAIL_',
     'STAFF_',
     'GROQ_',
+    'CLOUDINARY_',
   ]);
   Object.assign(process.env, env);
 

@@ -71,6 +71,25 @@ export interface TeamMember extends Person {
   campus: string | null;
 }
 
+/** A photo on an issue or a reply, stored on Cloudinary. */
+export interface IssueImage {
+  url: string;
+  width: number | null;
+  height: number | null;
+}
+
+/** At most this many photos when raising an issue or in one reply. */
+export const MAX_ISSUE_IMAGES = 4;
+/** Largest photo accepted, in bytes. */
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+/**
+ * A Cloudinary photo at a given width, in a light modern format: the original stays as it
+ * was uploaded, this asks Cloudinary for a resized copy.
+ */
+export const imageAt = (url: string, width: number) =>
+  url.replace('/image/upload/', `/image/upload/c_limit,w_${width},f_auto,q_auto/`);
+
 export interface Issue {
   id: number;
   campusId: number;
@@ -88,6 +107,8 @@ export interface Issue {
   resolvedAt: number | null;
   /** Replies, not counting status or assignee changes. */
   replies: number;
+  /** Photos added when it was raised. */
+  images: IssueImage[];
 }
 
 export interface IssueUpdate {
@@ -98,6 +119,7 @@ export interface IssueUpdate {
   status: IssueStatus | null;
   assignee: Person | null;
   at: number;
+  images: IssueImage[];
 }
 
 export interface IssuesResponse {
@@ -112,6 +134,8 @@ export interface IssuesResponse {
   team: TeamMember[];
   /** Whether the viewer can change status and assignee on any issue (HQ and super admins). */
   manages: boolean;
+  /** Whether photos can be added (Cloudinary is set up). */
+  uploads: boolean;
   me: string;
 }
 
