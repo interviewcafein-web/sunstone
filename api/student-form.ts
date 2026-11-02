@@ -40,7 +40,15 @@ const TOKEN_MINUTES = 30;
  * is the backup.
  */
 const codesFirstThrough = (): ProviderName => (brevoOnOwnDomain() ? 'Brevo' : 'Resend');
-const LIMITS = { send: 20, verify: 40, save: 10 } as const;
+/**
+ * Whether students prove their email with an emailed code. Off since 2 November 2026: the free
+ * email quota ran out with whole classes filling the form at once, and students got no code.
+ * With it off, the email alone finds the student (STUDENT_FORM_CODES=1 turns codes back on).
+ */
+const EMAIL_CODES = process.env.STUDENT_FORM_CODES?.trim() === '1';
+
+/** Per IP an hour; high, as a whole class fills the form from one college network. */
+const LIMITS = { send: 300, verify: 400, save: 300 } as const;
 type Kind = keyof typeof LIMITS;
 
 const IDS = PLATFORMS.map((platform) => platform.id);
@@ -134,11 +142,23 @@ const NOT_FOUND = {
 };
 const TOO_MANY = { error: 'Too many tries from this network. Please try again in an hour.' };
 
+/** Whose email it is, their usernames now, and a token that allows saving for 30 minutes. */
+async function found(student: NonNullable<Awaited<ReturnType<typeof findByEmail>>>, email: string) {
+  return {
+    firstName: student.name.split(' ')[0],
+    campus: student.campus,
+    handles: student.handles,
+    token: await tokenFor(email, Date.now() + TOKEN_MINUTES * 60_000),
+  };
+}
+
 async function send(ip: string | null, email: string): Promise<Response> {
   if (await overLimit('send', ip)) return json(429, TOO_MANY);
   const student = await findByEmail(email);
   await record('send', ip, email, student?.id ?? null);
   if (!student) return json(404, NOT_FOUND);
+  // Without codes, straight to the usernames (as a correct code would).
+  if (!EMAIL_CODES) return json(200, await found(student, email));
 
   const [recent] = await db().query(
     `select count(*)::int as last_hour,
@@ -203,12 +223,7 @@ async function verify(ip: string | null, email: string, code: string): Promise<R
   }
   await db().query(`delete from student_form_codes where email = $1`, [email]);
 
-  return json(200, {
-    firstName: student.name.split(' ')[0],
-    campus: student.campus,
-    handles: student.handles,
-    token: await tokenFor(email, Date.now() + TOKEN_MINUTES * 60_000),
-  });
+  return json(200, await found(student, email));
 }
 
 async function save(

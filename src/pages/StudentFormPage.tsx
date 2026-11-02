@@ -23,7 +23,7 @@ import { ProfileError, type PlatformId } from '@/lib/coding-profiles/types';
 import { cn } from '@/lib/utils';
 
 // The unlisted form students fill in themselves (/coding-usernames, shared as a link and
-// linked from nowhere): their email finds them, a code sent to it proves it is theirs, then
+// linked from nowhere): their email finds them (and, when codes are on, a code sent to it), then
 // they type a username or paste a profile link for each platform. Each one is checked as they type, first its form and then whether
 // the account exists, and nothing wrong can be saved. See api/student-form.ts.
 
@@ -158,7 +158,12 @@ export default function StudentFormPage() {
           ) : sent ? (
             <CodeStep email={email} onBack={() => setSent(false)} onFound={setFound} />
           ) : (
-            <EmailStep email={email} setEmail={setEmail} onSent={() => setSent(true)} />
+            <EmailStep
+              email={email}
+              setEmail={setEmail}
+              onSent={() => setSent(true)}
+              onFound={setFound}
+            />
           )}
         </div>
       </div>
@@ -174,10 +179,13 @@ function EmailStep({
   email,
   setEmail,
   onSent,
+  onFound,
 }: {
   email: string;
   setEmail: (email: string) => void;
   onSent: () => void;
+  /** When no code is needed, the student is found straight away. */
+  onFound: (found: Found) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -187,8 +195,9 @@ function EmailStep({
     setBusy(true);
     setError('');
     try {
-      await post({ action: 'send', email });
-      onSent();
+      const result = await post<Found | { ok: true }>({ action: 'send', email });
+      if ('token' in result) onFound(result);
+      else onSent();
     } catch (problem) {
       setError((problem as Error).message);
     } finally {
@@ -233,7 +242,7 @@ function EmailStep({
         ) : (
           <ArrowRight className="size-4" aria-hidden />
         )}
-        {busy ? 'Sending a Code…' : 'Email Me a Code'}
+        {busy ? 'Finding You…' : 'Continue'}
       </button>
     </form>
   );
