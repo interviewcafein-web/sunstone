@@ -28,6 +28,17 @@ export function setRelayOrigin(origin: string) {
   relayOrigin = origin.replace(/\/+$/, '');
 }
 
+// Jobs that run outside a browser (the nightly coding refresh, scripts/sync-coding.ts) have no
+// CORS to work around, so they call the platforms themselves with the same headers the relay
+// sends, instead of going through /api/relay (and Vercel) for every request.
+let callDirectly = false;
+export function fetchDirectly() {
+  callDirectly = true;
+}
+
+const BROWSER_UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+
 interface RequestOptions {
   direct?: boolean;
   init?: RequestInit;
@@ -37,18 +48,36 @@ interface RequestOptions {
 
 export async function request<T = any>(url: string, options: RequestOptions = {}): Promise<T> {
   const { direct = false, init, as = 'json', notFound = [404] } = options;
-  const target = direct ? url : `${relayOrigin}${RELAY_PATH}?url=${encodeURIComponent(url)}`;
+  const viaRelay = !direct && !callDirectly;
+  const target = viaRelay ? `${relayOrigin}${RELAY_PATH}?url=${encodeURIComponent(url)}` : url;
+  const asRelayWould: RequestInit | undefined =
+    !direct && callDirectly
+      ? {
+          ...init,
+          redirect: 'manual',
+          headers: {
+            'User-Agent': BROWSER_UA,
+            Accept: 'application/json, text/html;q=0.9, */*;q=0.8',
+            Referer: `${new URL(url).origin}/`,
+            ...(init?.headers as Record<string, string> | undefined),
+          },
+        }
+      : init;
 
   let response: Response;
   try {
-    response = await fetch(target, init);
+    response = await fetch(target, asRelayWould);
   } catch {
     throw new ProfileError('network', 'Network error while fetching.');
   }
 
   // Without the function deployed, a static host answers /api/relay with the SPA page.
-  if (!direct && !response.headers.has('x-relay')) {
+  if (viaRelay && !response.headers.has('x-relay')) {
     throw new ProfileError('relay', 'The relay function is not reachable on this host.');
+  }
+  // These sites redirect unknown users to a landing page (the relay reports that as 404).
+  if (!viaRelay && !direct && response.status >= 300 && response.status < 400) {
+    throw new ProfileError('not_found', 'User not found.');
   }
   if (notFound.includes(response.status)) throw new ProfileError('not_found', 'User not found.');
   if (response.status === 429) {

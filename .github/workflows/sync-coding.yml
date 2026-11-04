@@ -1,0 +1,46 @@
+# Nightly refresh of every student's coding numbers (LeetCode, GFG, HackerRank, Codeforces,
+# CodeChef, GitHub) into the database, after the LMS sync. Staff pages read these saved
+# numbers instead of each browser re-checking every username through Vercel.
+# Needs repository secret DATABASE_URL; skips until it exists. Run by hand from the Actions
+# tab ("Run workflow").
+
+name: Sync coding numbers
+
+on:
+  schedule:
+    - cron: '0 22 * * *' # 03:30 India time, after the LMS sync
+  workflow_dispatch:
+
+concurrency:
+  group: sync-coding
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - name: Check secrets
+        id: secrets
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "Secret DATABASE_URL is not set; skipping."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.ready == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        if: steps.secrets.outputs.ready == 'true'
+        run: npm ci
+      - name: Coding numbers from the platforms
+        if: steps.secrets.outputs.ready == 'true'
+        run: npx tsx scripts/sync-coding.ts

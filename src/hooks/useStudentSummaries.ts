@@ -1,10 +1,10 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import { PLATFORMS } from '@/lib/coding-profiles/platforms';
-import { fetchPlatformSummary, type PlatformSummary } from '@/lib/coding-profiles/summaries';
+import type { PlatformSummary } from '@/lib/coding-profiles/summaries';
 import { ProfileError, type PlatformId } from '@/lib/coding-profiles/types';
-import { loadSummaries, saveSummary, setSaving } from '@/lib/statsCache';
+import { loadSummaries } from '@/lib/statsCache';
 import type { Student } from '@/lib/students/types';
 
 export const SUMMARY_QUERY_KEY = 'platform-summary';
@@ -22,12 +22,13 @@ export const queryKeyFor = (platform: PlatformId, handle: string) => [
 /**
  * One query per (platform, handle) across the given students, keyed by `summaryKey`.
  *
- * The saved numbers from the database load first and show at once; anything older than
- * half an hour is then refreshed from the platform in the background, and the fresh
- * numbers are saved back for the next visitor. Staff pages only (saving needs a login).
+ * The numbers are the saved ones from the database, refreshed every night from the
+ * platforms by scripts/sync-coding.ts (GitHub Actions). Browsers no longer re-check every
+ * username: that ran through Vercel for thousands of requests a visit and used up its plan.
+ * A username without saved numbers yet shows as such until the next nightly refresh; one
+ * student's profile page still loads live (useCodingProfiles).
  */
 export function useStudentSummaries(students: Student[]) {
-  useEffect(() => setSaving(true), []);
   const saved = useQuery({
     queryKey: ['saved-summaries'],
     queryFn: ({ client }) => loadSummaries(client, queryKeyFor),
@@ -51,21 +52,15 @@ export function useStudentSummaries(students: Student[]) {
   const results = useQueries({
     queries: targets.map(({ platform, handle }) => ({
       queryKey: queryKeyFor(platform, handle),
-      queryFn: async () => {
-        const summary = await fetchPlatformSummary(platform, handle);
-        saveSummary(platform, handle, summary);
-        return summary;
-      },
+      // Saved numbers are already in the cache (loadSummaries) and stay; this only runs for
+      // a username with none saved yet.
+      queryFn: (): Promise<PlatformSummary> =>
+        Promise.reject(
+          new ProfileError('upstream', 'No numbers yet: they are refreshed every night.')
+        ),
       enabled: ready,
-      staleTime: 1000 * 60 * 30,
-      // A wrong handle or a missing relay will not fix itself on retry; rate limits do
-      // clear, so back off and try those a few more times.
-      retry: (failureCount: number, error: Error) => {
-        if (!(error instanceof ProfileError)) return false;
-        if (error.kind === 'rate_limited') return failureCount < 4;
-        return error.kind === 'network' && failureCount < 1;
-      },
-      retryDelay: (attempt: number) => Math.min(2000 * 2 ** attempt, 20000) + Math.random() * 1000,
+      staleTime: Infinity,
+      retry: false,
     })),
   });
 

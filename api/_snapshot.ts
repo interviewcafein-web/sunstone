@@ -15,9 +15,10 @@ export interface WaitUntil {
 
 /**
  * How long an answer counts as fresh. The data only changes at a sync, but tests go live and
- * close by the clock during the day, so answers are remade every quarter of an hour of use.
+ * close by the clock during the day, so answers are remade at most once an hour of use (each
+ * remake is server time on Vercel, whose plan limits it).
  */
-const FRESH_MS = 15 * 60_000;
+const FRESH_MS = 60 * 60_000;
 
 /** The data's version: when each sync last ran. A new sync makes every saved answer stale. */
 const VERSION = `(select coalesce(string_agg(name || '@' || ran_at::text, ',' order by name), '')
