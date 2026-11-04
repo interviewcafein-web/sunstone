@@ -12,10 +12,15 @@ import { pushTo } from '../api/_push';
 export const SYSTEM_SENDER = 'Vertex';
 
 /**
- * The founders: they get HQ-wide notices (one all-campus weekly report), not the copy of
- * every campus's, which would be a score of emails each Monday.
+ * The founders and Sarvesh: they get HQ-wide notices (one all-campus weekly report), not the
+ * copy of every campus's, which would be a score of emails each Monday.
  */
-const HQ_WIDE_ONLY = new Set(['ankur@sunstone.in', 'ashish@sunstone.in', 'piyush@sunstone.in']);
+const HQ_WIDE_ONLY = new Set([
+  'ankur@sunstone.in',
+  'ashish@sunstone.in',
+  'piyush@sunstone.in',
+  'sarvesh@sunstone.in',
+]);
 
 export interface Directory {
   /** Every HQ member and super admin: HQ-wide notices. */
@@ -52,7 +57,8 @@ export interface Notice {
   level: 'info' | 'important' | 'urgent';
   /** A campus notice, or null for HQ only. */
   campusId: number | null;
-  email: Pick<Email, 'subject' | 'text' | 'html'>;
+  /** The email to send with it; without one the notice is only the bell and a push. */
+  email?: Pick<Email, 'subject' | 'text' | 'html'>;
 }
 
 /** Puts the notice in the bell and returns the email to send (to campus staff, cc HQ). */
@@ -77,7 +83,7 @@ export async function addNotice(
     link: notice.link,
   }).catch((error) => console.error('[push]', error));
   const to = campusStaff.length ? campusStaff : hq;
-  if (!to.length) return null;
+  if (!notice.email || !to.length) return null;
   const cc = campusStaff.length ? hq.filter((email) => !campusStaff.includes(email)) : [];
   await sql`update notifications set emailed = ${to.length + cc.length} where id = ${row.id}`;
   return { to, cc, ...notice.email };

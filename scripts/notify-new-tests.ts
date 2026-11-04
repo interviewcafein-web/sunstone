@@ -1,6 +1,8 @@
 // Tells each campus about PRIME tests released to its students since the last run: a bell
-// notification and an email to the campus's staff, with HQ copied in. Runs after the
-// nightly assessment sync (.github/workflows/sync-lms.yml).
+// notification and a push to the app for the campus's staff and HQ. No email since November
+// 2026 (only the Monday weekly report is emailed); EMAIL_NEW_TESTS turns it back on. Runs
+// after the nightly assessment sync (.github/workflows/sync-lms.yml).
+
 //
 //   npx tsx --env-file=.env.local scripts/notify-new-tests.ts            send
 //   npx tsx --env-file=.env.local scripts/notify-new-tests.ts --dry-run  list only
@@ -14,6 +16,9 @@ import { neon } from '@neondatabase/serverless';
 import { sendEmails, type Email } from '../api/_email';
 import { BAND, SITE, escape, frame, section, table } from './_email-blocks';
 import { addNotice, staffDirectory } from './_notify';
+
+/** Whether new tests are also emailed (off: the bell and the app notification are enough). */
+const EMAIL_NEW_TESTS = false;
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error('DATABASE_URL is not set.');
@@ -137,7 +142,9 @@ for (const [campusId, tests] of byCampus) {
     link,
     level: 'info',
     campusId,
-    email: { subject: title, text: `${title}\n\n${body}\n\n${SITE}${link}`, html },
+    email: EMAIL_NEW_TESTS
+      ? { subject: title, text: `${title}\n\n${body}\n\n${SITE}${link}`, html }
+      : undefined,
   });
   if (email) emails.push(email);
 }

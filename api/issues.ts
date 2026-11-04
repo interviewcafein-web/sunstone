@@ -16,9 +16,9 @@
 // see every campus, and anyone sees the issues assigned to them. Replies are open to anyone
 // who can see the issue. The status changes by HQ, super admins or the assignee (the holder);
 // the person who raised it may reopen it. HQ, super admins and the holder hand it on, to
-// anyone on the team. Each new issue is emailed (and pushed to the app) to the assignee and to HQ
-// (Sarvesh and Tarun Sharma, see DEFAULT_NOTIFY); each reply and change to the others on it:
-// the person who raised it and the assignee.
+// anyone on the team. Each new issue is pushed to the app for the assignee and HQ (Sarvesh and
+// Tarun Sharma, see DEFAULT_NOTIFY); each reply and change for the others on it: the person who
+// raised it and the assignee. No emails (EMAIL_ISSUES): only the weekly report is emailed.
 
 import {
   COMMON_PROBLEMS,
@@ -241,7 +241,13 @@ interface Notice {
   level: 'info' | 'important' | 'urgent';
 }
 
-/** Emails and pushes `notice` about issue `id` to these people (never the one acting). */
+/**
+ * Whether issue updates are also emailed. Off since November 2026: only the Monday weekly
+ * report is emailed; issues reach people as app notifications and on the Issues page.
+ */
+const EMAIL_ISSUES = false;
+
+/** Pushes (and, if EMAIL_ISSUES, emails) `notice` about issue `id` to these people, never the one acting. */
 async function tell(
   people: string[],
   actor: string,
@@ -253,7 +259,7 @@ async function tell(
   if (!to.length) return;
   const email = notificationEmail({ ...notice, link: `${SITE}/issues?id=${id}`, sender });
   await Promise.all([
-    ...to.map((address) =>
+    ...(EMAIL_ISSUES ? to : []).map((address) =>
       sendEmail({ to: address, ...email }).catch((error) =>
         console.error('[issues] email failed', address, error)
       )
