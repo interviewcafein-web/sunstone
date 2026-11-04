@@ -30,18 +30,23 @@ export function seed<T>(client: QueryClient, key: QueryKey, data: T, updatedAt: 
   client.setQueryData(key, data, { updatedAt });
 }
 
-/** Every saved table summary, put into the query cache under `keyFor(platform, handle)`. */
+/**
+ * Every saved table summary, put into the query cache under `keyFor(platform, handle)`, and
+ * when the newest was saved (the last nightly refresh).
+ */
 export async function loadSummaries(
   client: QueryClient,
   keyFor: (platform: PlatformId, handle: string) => QueryKey
-): Promise<number> {
+): Promise<{ count: number; latest: number | null }> {
   const response = await fetch('/api/cache?kind=summaries');
-  if (!response.ok) return 0; // no database, or logged out: start from live data
+  if (!response.ok) return { count: 0, latest: null }; // no database, or logged out
   const { summaries } = (await response.json()) as { summaries: CachedRow<PlatformSummary>[] };
+  let latest: number | null = null;
   for (const row of summaries) {
     if (row.summary) seed(client, keyFor(row.platform, row.handle), row.summary, row.at);
+    if (row.at && (latest === null || row.at > latest)) latest = row.at;
   }
-  return summaries.length;
+  return { count: summaries.length, latest };
 }
 
 /** One student's saved profile pages, put into the query cache under `keyFor(...)`. */

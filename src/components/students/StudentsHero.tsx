@@ -1,6 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Activity, Check, CheckCircle2, Link2, RefreshCw, TrendingUp, Users } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { Activity, CheckCircle2, Clock, Link2, TrendingUp, Users } from 'lucide-react';
 
 import { CountUp } from '@/components/common/CountUp';
 import { cn } from '@/lib/utils';
@@ -17,9 +16,8 @@ interface StudentsHeroProps {
   checkedAt: number;
   /** Platform profiles loaded so far, out of `linked`. */
   settled: number;
-  /** Saved numbers on screen that are being refreshed from the platforms right now. */
-  refreshing: number;
-  onRefresh: () => void;
+  /** When the coding numbers were last refreshed (nightly), if known. */
+  updatedAt: number | null;
 }
 
 export function StudentsHero({
@@ -31,8 +29,7 @@ export function StudentsHero({
   activeThisWeek,
   checkedAt,
   settled,
-  refreshing,
-  onRefresh,
+  updatedAt,
 }: StudentsHeroProps) {
   const loading = settled < linked;
 
@@ -59,18 +56,12 @@ export function StudentsHero({
               <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75 motion-reduce:hidden" />
               <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
             </span>
-            {refreshing > 0
-              ? `Showing saved stats · syncing ${refreshing} profile${refreshing === 1 ? '' : 's'} in the background`
-              : `Up to date · checked ${new Date(checkedAt).toLocaleTimeString()}`}
+            {loading
+              ? 'Loading coding stats…'
+              : `Coding stats refreshed every night · list checked ${new Date(checkedAt).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}`}
           </p>
         </div>
-        <RefreshButton
-          onRefresh={onRefresh}
-          loading={loading}
-          settled={settled}
-          linked={linked}
-          refreshing={refreshing}
-        />
+        <UpdatedBadge updatedAt={updatedAt} loading={loading} />
       </div>
 
       <dl className="relative mt-6 grid grid-cols-2 gap-3 md:grid-cols-5">
@@ -133,138 +124,39 @@ function HeroStat({ icon: Icon, label, value, note, tone = 'default' }: HeroStat
   );
 }
 
-interface RefreshButtonProps {
-  onRefresh: () => void;
-  loading: boolean;
-  settled: number;
-  linked: number;
-  refreshing: number;
+/** "Today, 3:30 am", "Yesterday, 3:30 am" or "2 Nov, 3:30 am" (India time). */
+function when(ms: number) {
+  const day = (value: number) =>
+    new Date(value).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  const time = new Date(ms).toLocaleTimeString('en-IN', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'Asia/Kolkata',
+  });
+  const date =
+    day(ms) === day(Date.now())
+      ? 'Today'
+      : day(ms) === day(Date.now() - 86_400_000)
+        ? 'Yesterday'
+        : new Date(ms).toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            timeZone: 'Asia/Kolkata',
+          });
+  return `${date}, ${time}`;
 }
 
-/**
- * Idle: a white pill with a sheen on hover. Syncing: the pill fills up with striped progress and
- * a ring counts round the icon. Done: a green tick pops in for a moment.
- */
-function RefreshButton({ onRefresh, loading, settled, linked, refreshing }: RefreshButtonProps) {
-  const syncing = loading || refreshing > 0;
-
-  // Profiles with fresh numbers, out of all linked ones: one count across loading and refreshing.
-  const done = Math.max(0, settled - refreshing);
-  const total = linked;
-  const progress = total ? Math.min(1, done / total) : 0;
-
-  // Show "Up to date" briefly when a sync finishes.
-  const [justFinished, setJustFinished] = useState(false);
-  const wasSyncing = useRef(syncing);
-  useEffect(() => {
-    if (wasSyncing.current && !syncing) {
-      setJustFinished(true);
-      const timer = setTimeout(() => setJustFinished(false), 2200);
-      wasSyncing.current = syncing;
-      return () => clearTimeout(timer);
-    }
-    wasSyncing.current = syncing;
-  }, [syncing]);
-
-  const gradient = `refresh-${useId().replace(/:/g, '')}`;
-  const radius = 15;
-  const circumference = 2 * Math.PI * radius;
-  const pct = Math.round(progress * 100);
-
-  // Colours are fixed hex values: the button stays white in both themes, while the
-  // theme's amber and slate scales flip in dark mode.
+/** When the coding numbers were last refreshed; they are refreshed every night. */
+function UpdatedBadge({ updatedAt, loading }: { updatedAt: number | null; loading: boolean }) {
   return (
-    <button
-      type="button"
-      onClick={onRefresh}
-      aria-busy={syncing}
-      className={cn(
-        'group relative isolate inline-flex min-w-48 items-center gap-3 overflow-hidden rounded-xl py-1.5 pr-4 pl-1.5 text-sm font-semibold shadow-lg transition-all duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white',
-        justFinished && !syncing ? 'bg-[#10b981] text-white' : 'text-brand-800 bg-white',
-        !syncing &&
-          !justFinished &&
-          'sheen hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0'
-      )}
-    >
-      <span className="relative flex size-9 shrink-0 items-center justify-center">
-        {syncing ? (
-          <>
-            <svg viewBox="0 0 36 36" className="absolute inset-0 -rotate-90" aria-hidden>
-              <defs>
-                <linearGradient id={gradient} x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stopColor="#fbbf24" />
-                  <stop offset="100%" stopColor="#f97316" />
-                </linearGradient>
-              </defs>
-              <circle cx="18" cy="18" r={radius} fill="none" strokeWidth="3.5" stroke="#eef2f7" />
-              <circle
-                cx="18"
-                cy="18"
-                r={radius}
-                fill="none"
-                strokeWidth="3.5"
-                strokeLinecap="round"
-                stroke={`url(#${gradient})`}
-                className="transition-[stroke-dasharray] duration-500 ease-out"
-                strokeDasharray={`${Math.max(progress, 0.04) * circumference} ${circumference}`}
-              />
-            </svg>
-            <span className="text-brand-800 text-[10px] font-bold tabular-nums">{pct}%</span>
-          </>
-        ) : justFinished ? (
-          <span className="flex size-8 items-center justify-center rounded-full bg-white/20">
-            <Check className="animate-pop size-5" strokeWidth={3} aria-hidden />
-          </span>
-        ) : (
-          <span className="bg-brand-50 flex size-8 items-center justify-center rounded-lg">
-            <RefreshCw
-              className="size-4 transition-transform duration-500 group-hover:rotate-180"
-              aria-hidden
-            />
-          </span>
-        )}
+    <div className="text-brand-800 inline-flex min-w-48 items-center gap-3 rounded-xl bg-white py-1.5 pr-4 pl-1.5 text-sm font-semibold shadow-lg">
+      <span className="bg-brand-50 flex size-9 shrink-0 items-center justify-center rounded-lg">
+        <Clock className="size-4" aria-hidden />
       </span>
-
       <span className="flex flex-col items-start leading-tight">
-        {syncing ? (
-          <>
-            <span className="flex items-center gap-1.5">
-              Syncing stats
-              <span aria-hidden className="flex gap-0.5">
-                {[0, 1, 2].map((dot) => (
-                  <span
-                    key={dot}
-                    className="loader-dot size-1 rounded-full bg-[#f59e0b]"
-                    style={{ animationDelay: `${dot * 0.15}s` }}
-                  />
-                ))}
-              </span>
-            </span>
-            <span className="text-brand-500 text-[11px] font-medium tabular-nums">
-              {total
-                ? `${done.toLocaleString('en-IN')} of ${total.toLocaleString('en-IN')} profiles`
-                : 'Starting…'}
-            </span>
-          </>
-        ) : justFinished ? (
-          <span className="animate-rise">Up to date</span>
-        ) : (
-          <span>Refresh stats</span>
-        )}
+        <span>{loading || !updatedAt ? 'Loading Stats…' : `Updated ${when(updatedAt)}`}</span>
+        <span className="text-brand-500 text-[11px] font-medium">Refreshed every night</span>
       </span>
-
-      {syncing && (
-        <span aria-hidden className="absolute inset-x-0 bottom-0 h-[3px] bg-[#eef2f7]">
-          <span
-            className="animate-shimmer block h-full rounded-r-full bg-gradient-to-r from-[#fbbf24] via-[#fde68a] to-[#f97316] bg-[length:200%_100%] transition-[width] duration-500 ease-out"
-            style={{ width: `${Math.max(pct, 3)}%` }}
-          />
-        </span>
-      )}
-
-      <span className="sr-only" role="status">
-        {syncing ? `Syncing, ${pct} percent` : justFinished ? 'Stats up to date' : ''}
-      </span>
-    </button>
+    </div>
   );
 }

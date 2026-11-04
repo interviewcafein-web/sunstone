@@ -73,6 +73,8 @@ export function useStudentSummaries(students: Student[]) {
     byKey,
     total: results.length,
     settled: results.filter((result) => !result.isPending).length,
+    /** When the coding numbers were last refreshed (the newest saved one), if known. */
+    updatedAt: saved.data?.latest ?? null,
     /** Saved numbers being refreshed from the platforms right now. */
     refreshing: results.filter((result) => result.isFetching && !result.isPending).length,
   };

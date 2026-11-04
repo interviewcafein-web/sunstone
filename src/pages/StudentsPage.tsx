@@ -1,18 +1,12 @@
 import { useMemo, useState } from 'react';
 import { getRouteApi } from '@tanstack/react-router';
-import { useQueryClient } from '@tanstack/react-query';
 
 import { StudentFilters } from '@/components/students/StudentFilters';
 import { StudentsHero } from '@/components/students/StudentsHero';
 import { StudentsTable, type Cell, type StudentRow } from '@/components/students/StudentsTable';
 import { TopPerformers } from '@/components/students/TopPerformers';
 import { ZonePanel } from '@/components/students/ZonePanel';
-import {
-  SUMMARY_QUERY_KEY,
-  summaryKey,
-  useStudentSummaries,
-  type SummaryQuery,
-} from '@/hooks/useStudentSummaries';
+import { summaryKey, useStudentSummaries, type SummaryQuery } from '@/hooks/useStudentSummaries';
 import { useStudents } from '@/hooks/useStudents';
 import { PLATFORM_IDS, SOLVING_PLATFORM_IDS } from '@/lib/coding-profiles/platforms';
 import { ProfileError, type PlatformId } from '@/lib/coding-profiles/types';
@@ -165,7 +159,6 @@ function compareRows(sort: SortKey) {
 export default function StudentsPage() {
   const search = route.useSearch();
   const navigate = route.useNavigate();
-  const queryClient = useQueryClient();
   // Campus staff only ever get their own campuses from the API; name them in the header.
   const ownCampuses = useSession().data?.campuses;
   const sort = search.sort ?? 'total';
@@ -276,11 +269,6 @@ export default function StudentsPage() {
   const setSearch = (patch: Partial<StudentsSearch>) =>
     navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true });
 
-  const refresh = () => {
-    students.refetch();
-    queryClient.invalidateQueries({ queryKey: [SUMMARY_QUERY_KEY] });
-  };
-
   if (students.isPending) {
     return <PageLoader label="Loading the student list" />;
   }
@@ -326,8 +314,7 @@ export default function StudentsPage() {
         activeThisWeek={activeThisWeek}
         checkedAt={students.dataUpdatedAt}
         settled={summaries.settled}
-        refreshing={summaries.refreshing}
-        onRefresh={refresh}
+        updatedAt={summaries.updatedAt}
       />
 
       <div data-tour="filters">
