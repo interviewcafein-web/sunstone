@@ -3,6 +3,7 @@
 // no JavaScript, so this is the only way a shared link can preview the student's own card.
 
 import { cachedStats, describe, findStudent, headline } from './_card';
+import { forApp } from './_app';
 
 export const config = { runtime: 'edge' };
 
@@ -17,7 +18,7 @@ function setMeta(html: string, attribute: 'property' | 'name', key: string, valu
   return html.replace(pattern, `$1${escapeAttribute(value)}$2`);
 }
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const slug = url.searchParams.get('slug') ?? '';
   const isCard = url.searchParams.has('card');
@@ -73,3 +74,5 @@ export default async function handler(request: Request): Promise<Response> {
     },
   });
 }
+
+export default forApp(handler);

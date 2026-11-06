@@ -10,10 +10,11 @@ import type { Student } from '../src/lib/students/types';
 import { sessionViewer } from './_auth';
 import { findStudent, hasDatabase } from './_roster';
 import { sheetStudents } from './students';
+import { forApp } from './_app';
 
 export const config = { runtime: 'edge' };
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   const slug = new URL(request.url).searchParams.get('s') ?? '';
   const viewer = await sessionViewer(request);
 
@@ -47,3 +48,5 @@ export default async function handler(request: Request): Promise<Response> {
     },
   });
 }
+
+export default forApp(handler);

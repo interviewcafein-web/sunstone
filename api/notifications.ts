@@ -13,6 +13,7 @@ import { type Viewer, json, managesTeam, normalizeEmail, sessionViewer } from '.
 import { db } from './_db';
 import { notificationEmail, sendEmails } from './_email';
 import { pushTo } from './_push';
+import { forApp } from './_app';
 
 export const config = { runtime: 'edge' };
 
@@ -144,7 +145,7 @@ async function send(viewer: Viewer, body: Record<string, unknown>) {
   return json(200, { id: created.id, emailed });
 }
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   if (!process.env.DATABASE_URL) return json(404, { error: 'No database configured' });
   const viewer = await sessionViewer(request);
   if (!viewer) return json(401, { error: 'Login required' });
@@ -173,3 +174,5 @@ export default async function handler(request: Request): Promise<Response> {
     });
   }
 }
+
+export default forApp(handler);

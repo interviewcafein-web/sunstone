@@ -17,6 +17,7 @@ import { type Viewer, json, seesCampus, sessionViewer } from './_auth';
 import { db, together } from './_db';
 import { snapshot, type WaitUntil } from './_snapshot';
 import { integrityOf } from '../src/lib/integrity';
+import { forApp } from './_app';
 
 export const config = { runtime: 'edge' };
 
@@ -1188,7 +1189,7 @@ export async function metricsByCampus() {
 export const campusKey = (campusId: number, batch: string | null) =>
   `campus:${campusId}:${batch ?? ''}`;
 
-export default async function handler(request: Request, context?: WaitUntil): Promise<Response> {
+async function handler(request: Request, context?: WaitUntil): Promise<Response> {
   if (!process.env.DATABASE_URL) return json(404, { error: 'No database configured' });
   const viewer = await sessionViewer(request);
   if (!viewer) return json(401, { error: 'Login required' });
@@ -1256,3 +1257,5 @@ export default async function handler(request: Request, context?: WaitUntil): Pr
     return json(503, { error: 'Assessments could not be loaded. Try again shortly.' });
   }
 }
+
+export default forApp(handler);

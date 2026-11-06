@@ -2,13 +2,16 @@
 // offers those.
 
 import { emailCodesConfigured, googleSignInConfigured, json, passwordLoginEnabled } from '../_auth';
+import { forApp } from '../_app';
 
 export const config = { runtime: 'edge' };
 
-export default async function handler(): Promise<Response> {
+async function handler(): Promise<Response> {
   return json(200, {
     google: googleSignInConfigured(),
     email: emailCodesConfigured(),
     password: await passwordLoginEnabled(),
   });
 }
+
+export default forApp(handler);

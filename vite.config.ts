@@ -112,6 +112,7 @@ export default defineConfig(({ mode }) => {
     'SITE_',
     'AUTH_',
     'DATABASE_',
+    'CONVERGE_',
     'CRON_',
     'GOOGLE_',
     'RESEND_',

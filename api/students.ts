@@ -10,6 +10,7 @@ import type { Student, StudentsResponse } from '../src/lib/students/types';
 import { sessionViewer } from './_auth';
 import { hasDatabase, listStudents } from './_roster';
 import { readSheet } from './_sheet';
+import { forApp } from './_app';
 
 export const config = { runtime: 'edge' };
 
@@ -36,7 +37,7 @@ export async function sheetStudents(): Promise<Student[] | Response> {
   }));
 }
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   const viewer = await sessionViewer(request);
   if (!viewer) return reply(401, { error: 'Login required' });
 
@@ -60,3 +61,5 @@ export default async function handler(request: Request): Promise<Response> {
   const body: StudentsResponse = { students, fetchedAt: new Date().toISOString() };
   return reply(200, body);
 }
+
+export default forApp(handler);

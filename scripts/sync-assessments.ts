@@ -10,10 +10,10 @@ import { neon } from '@neondatabase/serverless';
 import { batchInserts } from './_insert';
 import { titleText } from './_names';
 import { redash } from './_redash';
+import { PRIME_SUBJECTS } from './_school';
 
-/** The PRIME domain subjects for tech students, by their (hand-typed) LMS names. */
-const PRIME_DOMAIN = `lower(trim(c.course_name)) in
-  ('prime domain coding', 'competitive coding (sunstone prime tech domain)')`;
+/** The PRIME subjects of the school (scripts/_school.ts), by their hand-typed LMS names. */
+const PRIME_DOMAIN = PRIME_SUBJECTS;
 
 /** What kind of test this is, from its name. */
 function category(name: string): string {

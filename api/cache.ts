@@ -14,6 +14,7 @@ import type { PlatformId } from '../src/lib/coding-profiles/types';
 import { json, sessionViewer } from './_auth';
 import { db } from './_db';
 import { findStudent, hasDatabase } from './_roster';
+import { forApp } from './_app';
 
 export const config = { runtime: 'edge' };
 
@@ -138,7 +139,7 @@ async function write(request: Request): Promise<Response> {
   return json(200, { saved });
 }
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   if (!hasDatabase()) return json(404, { error: 'No database configured' });
   try {
     if (request.method === 'GET') return await read(request);
@@ -149,3 +150,5 @@ export default async function handler(request: Request): Promise<Response> {
     return json(503, { error: 'The stats cache is unavailable.' });
   }
 }
+
+export default forApp(handler);

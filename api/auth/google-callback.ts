@@ -24,6 +24,7 @@ import {
   unsign,
 } from '../_auth';
 import { db } from '../_db';
+import { forApp } from '../_app';
 
 export const config = { runtime: 'edge' };
 
@@ -48,7 +49,7 @@ function decodeIdToken(token: string): IdToken | null {
   }
 }
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const clearState = oauthCookie(request, '', 0);
   const state = await unsign<OAuthState>(readCookie(request, OAUTH_COOKIE));
@@ -113,3 +114,5 @@ export default async function handler(request: Request): Promise<Response> {
   if (state!.a) return appReturn(state!.a, { token: session }, [clearState]);
   return redirect(next, [clearState, sessionCookie(request, session, SESSION_DAYS * 86_400)]);
 }
+
+export default forApp(handler);

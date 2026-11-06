@@ -3,10 +3,11 @@
 // served stale for a day while it refreshes (five minutes if a platform failed to load).
 
 import { cacheFor, cardStats, findStudent, notFound } from './_card';
+import { forApp } from './_app';
 
 export const config = { runtime: 'edge' };
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const slug = url.searchParams.get('s') ?? '';
   const student = slug ? await findStudent(url.origin, slug) : undefined;
@@ -20,3 +21,5 @@ export default async function handler(request: Request): Promise<Response> {
     },
   });
 }
+
+export default forApp(handler);

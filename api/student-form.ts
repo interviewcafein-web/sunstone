@@ -25,6 +25,7 @@ import { ProfileError, type PlatformId } from '../src/lib/coding-profiles/types'
 import { digest, isEmail, json, newCode, normalizeEmail, sameText } from './_auth';
 import { db } from './_db';
 import { brevoOnOwnDomain, sendEmail, signInCodeEmail, type ProviderName } from './_email';
+import { forApp } from './_app';
 
 export const config = { runtime: 'edge' };
 
@@ -271,7 +272,7 @@ async function save(
   return json(200, { ok: true, handles });
 }
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') return json(405, { error: 'Use POST.' });
 
   let body: {
@@ -304,3 +305,5 @@ export default async function handler(request: Request): Promise<Response> {
   }
   return json(400, { error: 'Unknown action.' });
 }
+
+export default forApp(handler);

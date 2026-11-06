@@ -37,6 +37,7 @@ import { type Viewer, seesCampus, json, managesTeam, normalizeEmail, sessionView
 import { db } from './_db';
 import { SITE, notificationEmail, sendEmail } from './_email';
 import { pushTo } from './_push';
+import { forApp } from './_app';
 
 export const config = { runtime: 'edge' };
 
@@ -455,7 +456,7 @@ async function assign(viewer: Viewer, body: Record<string, unknown>) {
   return json(200, (await detail(viewer, id)) ?? { ok: true });
 }
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   const viewer = await sessionViewer(request);
   if (!viewer) return json(401, { error: 'Sign in to see campus issues.' });
   const url = new URL(request.url);
@@ -479,3 +480,5 @@ export default async function handler(request: Request): Promise<Response> {
   if (body.action === 'assign') return assign(viewer, body);
   return json(400, { error: 'Unknown action.' });
 }
+
+export default forApp(handler);

@@ -4,6 +4,7 @@
 
 import { json, managesTeam, normalizeEmail, sessionViewer, forgetStaff } from './_auth';
 import { db } from './_db';
+import { forApp } from './_app';
 
 export const config = { runtime: 'edge' };
 
@@ -12,7 +13,7 @@ const text = (value: unknown, max: number) =>
     ? value.trim().replace(/\s+/g, ' ').slice(0, max)
     : null;
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   const viewer = await sessionViewer(request);
   if (!viewer) return json(401, { error: 'Not logged in' });
   const email = normalizeEmail(viewer.user);
@@ -67,3 +68,5 @@ export default async function handler(request: Request): Promise<Response> {
     managesTeam: managesTeam(viewer),
   });
 }
+
+export default forApp(handler);

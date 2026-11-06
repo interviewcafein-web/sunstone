@@ -3,10 +3,11 @@
 
 import { json, sessionUser } from './_auth';
 import { db } from './_db';
+import { forApp } from './_app';
 
 export const config = { runtime: 'edge' };
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   if (!(await sessionUser(request))) return json(401, { error: 'Not logged in' });
 
   const started = Date.now();
@@ -25,3 +26,5 @@ export default async function handler(request: Request): Promise<Response> {
     });
   }
 }
+
+export default forApp(handler);

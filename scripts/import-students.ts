@@ -1,6 +1,7 @@
-// Fills the students table: every PRIME, active, tech (SST), FLAGSHIP student in the Sunstone
-// LMS (read through Redash). Their coding usernames then come from the Google Form sheet,
-// matched by email (api/_sheet-sync.ts, also run daily on its own).
+// Fills the students table: every PRIME, active, FLAGSHIP student of the school in the Sunstone
+// LMS (read through Redash): tech (SST) for Vertex, management (SSM) for Converge with
+// SCHOOL=SSM (scripts/_school.ts). Tech students' coding usernames then come from the Google
+// Form sheet, matched by email (api/_sheet-sync.ts, also run daily on its own).
 // Safe to re-run: rows are updated in place, usernames never change once given, and
 // students who stop matching the rules are hidden (on_platform = false), not deleted.
 //
@@ -12,13 +13,13 @@ import { neon } from '@neondatabase/serverless';
 import { syncSheet } from '../api/_sheet-sync';
 import { personName } from './_names';
 import { redash } from './_redash';
+import { PROGRAM_NAMES, SCHOOL } from './_school';
 
 const DRY_RUN = process.argv.includes('--dry');
 const PRIME_POLICY_ID = 20; // policies.type = 'PRIME_OPT_IN'
 const INACTIVE_FLAG_ID = 1; // flag_master.name = 'is_student_inactive'
 
-const PROGRAM_NAMES: Record<string, string> = { BTECH: 'B.Tech', BE: 'BE', BCA: 'BCA', MCA: 'MCA' };
-// PRIME + active student + tech school (SST). FLAGSHIP is checked below: a student's
+// PRIME + active student + the school (SST tech, SSM management). FLAGSHIP is checked below: a student's
 // offering comes from their own section, else from their campus/program/batch.
 const LMS_QUERY = `
 select u.id, trim(u.name) name, lower(trim(u.email)) email, lower(trim(u.sunstone_email)) sunstone_email,
@@ -47,7 +48,7 @@ from users u
 join (select distinct user_id from user_policy_mapping where policy_id = ${PRIME_POLICY_ID}) m on m.user_id = u.id
 join programs pr on pr.id = u.program
 left join campus c on c.id = u.campus_id
-where u.role = 'student' and u.status = '1' and pr.course_type = 'SST' and u.admission_year <> '2050'`;
+where u.role = 'student' and u.status = '1' and pr.course_type = '${SCHOOL}' and u.admission_year <> '2050'`;
 
 interface LmsStudent {
   id: number;
@@ -96,7 +97,9 @@ function usernameBase(name: string): string {
 console.log('Reading the LMS through Redash…');
 const all = await redash<LmsStudent>(LMS_QUERY);
 const lms = all.filter((student) => (student.offering ?? '').includes('FLAGSHIP'));
-console.log(`  ${all.length} PRIME tech students, ${lms.length} FLAGSHIP.`);
+console.log(
+  `  ${all.length} PRIME ${SCHOOL === 'SSM' ? 'management' : 'tech'} students, ${lms.length} FLAGSHIP.`
+);
 
 // --- 2. Usernames: keep existing ones, give new students first.last (+ a number) ---------
 
@@ -182,8 +185,10 @@ console.log(
 );
 
 if (DRY_RUN) {
-  const sheet = await syncSheet({ dryRun: true });
-  console.log(`Sheet entries matched by email: ${sheet.matched} of ${sheet.sheetEntries}`);
+  if (SCHOOL === 'SST') {
+    const sheet = await syncSheet({ dryRun: true });
+    console.log(`Sheet entries matched by email: ${sheet.matched} of ${sheet.sheetEntries}`);
+  }
   console.log('\nDry run: nothing written.');
   process.exit(0);
 }
@@ -230,10 +235,12 @@ console.log(
   `\nWrote ${rows.length} students; ${results.at(-1)!.length} no longer eligible were hidden.`
 );
 
-// --- 5. Coding usernames from the form sheet, by email --------------------------------------
+// --- 5. Coding usernames from the form sheet, by email (tech students only) ---------------
 
-const sheet = await syncSheet();
-console.log(
-  `Sheet: ${sheet.matched} of ${sheet.sheetEntries} entries matched a student by email; ` +
-    `${sheet.updated} updated, ${sheet.unmatched.length} with no matching student.`
-);
+if (SCHOOL === 'SST') {
+  const sheet = await syncSheet();
+  console.log(
+    `Sheet: ${sheet.matched} of ${sheet.sheetEntries} entries matched a student by email; ` +
+      `${sheet.updated} updated, ${sheet.unmatched.length} with no matching student.`
+  );
+}

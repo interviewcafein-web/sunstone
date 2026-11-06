@@ -14,10 +14,11 @@ import {
   safeAppReturn,
   safeNext,
 } from './_google';
+import { forApp } from '../_app';
 
 export const config = { runtime: 'edge' };
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   const params = new URL(request.url).searchParams;
   const next = safeNext(params.get('next'));
   const app = safeAppReturn(params.get('app'));
@@ -43,3 +44,5 @@ export default async function handler(request: Request): Promise<Response> {
 
   return redirect(url.toString(), [oauthCookie(request, await sign(state), OAUTH_MINUTES * 60)]);
 }
+
+export default forApp(handler);

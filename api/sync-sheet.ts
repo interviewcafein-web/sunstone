@@ -5,10 +5,11 @@
 import { json, managesTeam, sessionViewer } from './_auth';
 import { hasDatabase } from './_roster';
 import { syncSheet } from './_sheet-sync';
+import { forApp } from './_app';
 
 export const config = { runtime: 'edge' };
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   const secret = process.env.CRON_SECRET;
   const fromCron = Boolean(secret) && request.headers.get('authorization') === `Bearer ${secret}`;
   const staff = request.method === 'POST' && managesTeam(await sessionViewer(request));
@@ -28,3 +29,5 @@ export default async function handler(request: Request): Promise<Response> {
     return json(502, { error: error instanceof Error ? error.message : 'Sync failed' });
   }
 }
+
+export default forApp(handler);

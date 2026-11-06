@@ -3,13 +3,14 @@
 
 import { json, normalizeEmail, sessionViewer } from './_auth';
 import { db } from './_db';
+import { forApp } from './_app';
 
 export const config = { runtime: 'edge' };
 
 const isExpoToken = (value: unknown): value is string =>
   typeof value === 'string' && /^Expo(nent)?PushToken\[[\w-]{10,}\]$/.test(value);
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   const viewer = await sessionViewer(request);
   if (!viewer) return json(401, { error: 'Login required' });
   const body = (await request.json().catch(() => ({}))) as { token?: unknown; platform?: unknown };
@@ -34,3 +35,5 @@ export default async function handler(request: Request): Promise<Response> {
     return json(503, { error: 'Could not save this device.' });
   }
 }
+
+export default forApp(handler);

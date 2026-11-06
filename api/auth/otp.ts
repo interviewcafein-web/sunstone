@@ -24,6 +24,7 @@ import {
 } from '../_auth';
 import { db } from '../_db';
 import { sendEmail, signInCodeEmail } from '../_email';
+import { forApp } from '../_app';
 
 export const config = { runtime: 'edge' };
 
@@ -123,7 +124,7 @@ async function verify(
   });
 }
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   if (request.method !== 'POST') return json(405, { error: 'Method not allowed' });
   if (!emailCodesConfigured()) {
     return json(503, { error: 'Sign-in by email is not set up yet.' });
@@ -154,3 +155,5 @@ export default async function handler(request: Request): Promise<Response> {
     return json(503, { error: 'Could not complete sign-in. Try again in a minute.' });
   }
 }
+
+export default forApp(handler);

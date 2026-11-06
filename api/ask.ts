@@ -26,6 +26,7 @@ import { type Viewer, json, sessionViewer } from './_auth';
 import { db } from './_db';
 import { DIMENSIONS } from '../src/lib/insights';
 import { ZONES } from '../src/lib/students/zones';
+import { forApp } from './_app';
 
 export const config = { runtime: 'edge' };
 
@@ -209,7 +210,7 @@ async function actions(viewer: Viewer, scope: string, points: unknown[]) {
   }
 }
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   if (!process.env.DATABASE_URL) return json(404, { error: 'No database configured' });
   const viewer = await sessionViewer(request);
   if (!viewer) return json(401, { error: 'Login required' });
@@ -254,3 +255,5 @@ export default async function handler(request: Request): Promise<Response> {
   }
   return json(400, { error: 'Unknown mode' });
 }
+
+export default forApp(handler);

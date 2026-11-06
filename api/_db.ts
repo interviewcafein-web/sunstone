@@ -5,14 +5,22 @@
 
 import { neon, type NeonQueryFunction, type NeonQueryPromise } from '@neondatabase/serverless';
 
-let client: NeonQueryFunction<false, false> | undefined;
+import { currentApp } from './_app';
 
-/** Tagged-template SQL: sql`select * from students where id = ${id}` (values are parameters). */
+const clients = new Map<string, NeonQueryFunction<false, false>>();
+
+/**
+ * Tagged-template SQL: sql`select * from students where id = ${id}` (values are parameters).
+ * The database is the site's (api/_app.ts): Converge's for a converge.sunstone.in request.
+ */
 export function db(): NeonQueryFunction<false, false> {
+  const name = currentApp() === 'converge' ? 'CONVERGE_DATABASE_URL' : 'DATABASE_URL';
+  const url = process.env[name];
+  if (!url) throw new Error(`${name} is not configured.`);
+  let client = clients.get(url);
   if (!client) {
-    const url = process.env.DATABASE_URL;
-    if (!url) throw new Error('DATABASE_URL is not configured.');
     client = neon(url);
+    clients.set(url, client);
   }
   return client;
 }

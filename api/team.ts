@@ -22,6 +22,7 @@ import {
 import { db } from './_db';
 import { sendEmail, welcomeEmail } from './_email';
 import { ROLE_LABELS } from '../src/lib/roles';
+import { forApp } from './_app';
 
 export const config = { runtime: 'edge' };
 
@@ -175,7 +176,7 @@ async function remove(viewer: Viewer, body: Record<string, unknown>): Promise<Re
   return json(200, { ok: true });
 }
 
-export default async function handler(request: Request): Promise<Response> {
+async function handler(request: Request): Promise<Response> {
   if (!process.env.DATABASE_URL) return json(404, { error: 'No database configured' });
   const viewer = await sessionViewer(request);
   if (!viewer) return json(401, { error: 'Login required' });
@@ -194,3 +195,5 @@ export default async function handler(request: Request): Promise<Response> {
     return json(503, { error: 'Could not update the team. Try again in a minute.' });
   }
 }
+
+export default forApp(handler);
