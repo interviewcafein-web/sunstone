@@ -19,6 +19,7 @@
 // Locally, with no provider configured, the email is printed to the dev server's terminal
 // instead, so sign-in codes can be tried without sending anything.
 
+import { currentApp } from './_app';
 import { db } from './_db';
 
 const setting = (name: string) => process.env[name]?.trim() || undefined;
@@ -221,7 +222,7 @@ export async function sendEmail(email: Email, prefer?: ProviderName): Promise<st
     try {
       const response = await provider.send(
         email,
-        (provider.from && setting(provider.from)) || from
+        sentAs((provider.from && setting(provider.from)) || from)
       );
       if (response.ok) return provider.name;
       const body = (await response.text()).slice(0, 300);
@@ -238,7 +239,7 @@ export async function sendEmail(email: Email, prefer?: ProviderName): Promise<st
 /** What a code email is for: staff sign-in (the default) or the student form. */
 const CODE_PURPOSES = {
   signIn: {
-    subject: 'your Sunstone PRIME Vertex sign-in code',
+    subject: 'your sign-in code',
     lead: 'Your sign-in code is',
     ignore: 'If you did not try to sign in, you can ignore this email.',
   },
@@ -257,16 +258,18 @@ export function signInCodeEmail(
   purpose: keyof typeof CODE_PURPOSES = 'signIn'
 ) {
   const { subject: about, lead, ignore } = CODE_PURPOSES[purpose];
-  const subject = `${code} is ${about}`;
+  const site = brand();
+  const subject =
+    purpose === 'signIn' ? `${code} is your ${site.full} sign-in code` : `${code} is ${about}`;
   const text = `${lead} ${code}
 
 It expires in ${minutes} minutes. ${ignore}
 
-Sunstone PRIME Vertex`;
+${site.full}`;
   const html = `<!doctype html><html><body style="margin:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;color:#0f172a">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 12px"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:440px;background:#ffffff;border-radius:14px;overflow:hidden">
-<tr><td style="background:#1a3e70;padding:20px 28px;color:#ffffff;font-size:16px;font-weight:bold">Sunstone PRIME <span style="color:#f59e0b">Vertex</span></td></tr>
+<tr><td style="background:#1a3e70;padding:20px 28px;color:#ffffff;font-size:16px;font-weight:bold">${site.header}</td></tr>
 <tr><td style="padding:28px">
 <p style="margin:0 0 12px;font-size:15px">${lead}</p>
 <p style="margin:0 0 20px;font-size:34px;font-weight:bold;letter-spacing:8px;color:#1a3e70">${code}</p>
@@ -276,6 +279,41 @@ Sunstone PRIME Vertex`;
 }
 
 export const SITE = 'https://vertex.sunstone.in';
+
+/**
+ * How emails look and where they link, for the site they are sent from (api/_app.ts):
+ * Vertex, or Converge 2026 (management students). CONVERGE_SITE_URL overrides Converge's
+ * address (e.g. a vercel.app address until converge.sunstone.in is set up).
+ */
+export function brand() {
+  if (currentApp() === 'converge') {
+    return {
+      name: 'Converge 2026',
+      full: 'Converge 2026 · Sunstone PRIME',
+      header:
+        'Converge <span style="color:#d4a24c">2026</span> <span style="color:#b5cae6;font-weight:normal;font-size:13px">· Sunstone PRIME</span>',
+      site: (process.env.CONVERGE_SITE_URL?.trim() || 'https://converge.sunstone.in').replace(
+        /\/+$/,
+        ''
+      ),
+      logoWhite: 'converge-logo-white.png',
+    };
+  }
+  return {
+    name: 'Vertex',
+    full: 'Sunstone PRIME Vertex',
+    header: 'Sunstone PRIME <span style="color:#f59e0b">Vertex</span>',
+    site: SITE,
+    logoWhite: 'vertex-logo-white.png',
+  };
+}
+
+/** The sender with the site's name: "Converge 2026 · Sunstone PRIME <noreply@…>" for Converge. */
+function sentAs(from: string) {
+  if (currentApp() !== 'converge') return from;
+  const address = from.match(/<([^>]+)>/)?.[1] ?? from.trim();
+  return `${brand().full} <${address}>`;
+}
 
 export const escape = (value: string) =>
   value.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
@@ -488,7 +526,7 @@ export async function sendEmails(emails: Email[]): Promise<number> {
           headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
           body: JSON.stringify(
             chunk.map(({ to, cc, subject, text, html }) => ({
-              from,
+              from: sentAs(from),
               to: list(to),
               ...(cc?.length ? { cc } : {}),
               subject,
@@ -539,14 +577,15 @@ export function notificationEmail({
   sender?: string | null;
 }) {
   const style = LEVEL_STYLE[level];
-  const url = link ? (link.startsWith('/') ? `${SITE}${link}` : link) : `${SITE}/`;
+  const site = brand();
+  const url = link ? (link.startsWith('/') ? `${site.site}${link}` : link) : `${site.site}/`;
   const subject = level === 'info' ? title : `${style.label}: ${title}`;
   const text = `${style.label.toUpperCase()}: ${title}
 
 ${body}
 
 Open: ${url}
-${sender ? `\nSent by ${sender} on Sunstone PRIME Vertex.` : ''}`;
+${sender ? `\nSent by ${sender} on ${site.full}.` : ''}`;
 
   const paragraphs = escape(body)
     .split(/\n{2,}/)
@@ -566,7 +605,7 @@ ${sender ? `\nSent by ${sender} on Sunstone PRIME Vertex.` : ''}`;
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 10px 40px rgba(16,38,70,0.12)">
   <tr><td bgcolor="#102646" style="background:#102646;background-image:linear-gradient(135deg,#1a3e70 0%,#15325b 55%,#102646 100%);padding:24px 32px;text-align:left">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-      <td><img src="${SITE}/vertex-logo-white.png" width="120" alt="Vertex" style="display:block;width:120px;height:auto;border:0"></td>
+      <td><img src="${site.site}/${site.logoWhite}" width="120" alt="${site.name}" style="display:block;width:120px;height:auto;border:0"></td>
       <td align="right" style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#b5cae6">🔔 Notification</td>
     </tr></table>
   </td></tr>
@@ -578,12 +617,12 @@ ${sender ? `\nSent by ${sender} on Sunstone PRIME Vertex.` : ''}`;
   <tr><td style="padding:12px 32px 30px">
     <table role="presentation" cellpadding="0" cellspacing="0"><tr>
       <td bgcolor="#1a3e70" style="border-radius:12px;background:#1a3e70;background-image:linear-gradient(135deg,#274f87,#102646)">
-        <a href="${escape(url)}" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:12px">${link ? 'Open in Vertex' : 'Open Vertex'} &nbsp;&rarr;</a>
+        <a href="${escape(url)}" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:12px">${link ? `Open in ${site.name}` : `Open ${site.name}`} &nbsp;&rarr;</a>
       </td>
     </tr></table>
   </td></tr>
   <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:18px 32px;text-align:center;font-size:12px;line-height:18px;color:#64748b">
-    ${sender ? `Sent by ${escape(sender)} · ` : ''}Also in the 🔔 bell on <a href="${SITE}" style="color:#274f87">vertex.sunstone.in</a>
+    ${sender ? `Sent by ${escape(sender)} · ` : ''}Also in the 🔔 bell on <a href="${site.site}" style="color:#274f87">${site.site.replace(/^https?:\/\//, '')}</a>
   </td></tr>
 </table>
 </td></tr></table>
