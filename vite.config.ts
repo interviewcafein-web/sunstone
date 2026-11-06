@@ -106,7 +106,7 @@ function siteUrlPlugin(siteUrl: string): Plugin {
 }
 
 /**
- * Converge 2026 pages for converge.* addresses (converge.localhost in development), as
+ * Converge pages for converge.* addresses (converge.localhost in development), as
  * vercel.json does in production: page requests get converge.html instead of index.html.
  */
 function convergePagePlugin(): Plugin {
@@ -171,7 +171,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       rollupOptions: {
-        // Two sites: Vertex (index.html) and Converge 2026 (converge.html), see api/_app.ts.
+        // Two sites: Vertex (index.html) and Converge (converge.html), see api/_app.ts.
         // Converge joins the build once its pages exist (src/converge/main.tsx).
         input: {
           main: path.resolve(__dirname, 'index.html'),

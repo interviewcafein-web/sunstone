@@ -1,4 +1,4 @@
-// Converge 2026's pages, as code-based TanStack Router routes. Vertex has its own file-based
+// Converge's pages, as code-based TanStack Router routes. Vertex has its own file-based
 // route tree (src/routes, src/routeTree.gen.ts); Converge does not use it. The pages are
 // attached in router.tsx, so the pages can import these routes without an import cycle.
 

@@ -1,4 +1,4 @@
-// Two sites on one deployment: Vertex (vertex.sunstone.in, tech students) and Converge 2026
+// Two sites on one deployment: Vertex (vertex.sunstone.in, tech students) and Converge
 // (converge.sunstone.in, or any address with "converge" in it, management students). They
 // share this server code; each has its own database (DATABASE_URL and CONVERGE_DATABASE_URL),
 // chosen per request by the address it came to. Every endpoint is wrapped in forApp, so db()

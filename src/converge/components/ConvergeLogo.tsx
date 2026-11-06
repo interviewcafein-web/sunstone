@@ -15,8 +15,8 @@ export function ConvergeLogo({
   if (onDark) {
     return (
       <img
-        src="/converge-logo-white.png"
-        alt="Converge 2026"
+        src="/converge-wordmark-white.png"
+        alt="Converge"
         width={808}
         height={181}
         className={size}
@@ -26,15 +26,15 @@ export function ConvergeLogo({
   return (
     <>
       <img
-        src="/converge-logo-ink.png"
-        alt="Converge 2026"
+        src="/converge-wordmark-ink.png"
+        alt="Converge"
         width={808}
         height={181}
         className={cn(size, 'dark:hidden')}
       />
       <img
-        src="/converge-logo-white.png"
-        alt="Converge 2026"
+        src="/converge-wordmark-white.png"
+        alt="Converge"
         width={808}
         height={181}
         className={cn(size, 'hidden dark:block')}

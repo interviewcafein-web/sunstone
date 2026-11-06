@@ -41,11 +41,7 @@ export function Layout() {
         />
         <div className="border-b border-slate-200/80 shadow-[0_8px_24px_-18px_rgb(15_23_42/0.35)]">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2.5">
-            <Link
-              to="/"
-              className="flex shrink-0 items-center gap-3"
-              aria-label="Converge 2026 home"
-            >
+            <Link to="/" className="flex shrink-0 items-center gap-3" aria-label="Converge home">
               <ConvergeLogo className="h-7 sm:h-9" />
               <span className="hidden items-center self-stretch border-l border-slate-300 pl-3 sm:flex">
                 <BrandLockup logoClassName="h-3.5" primeClassName="text-[7px]" />
@@ -100,7 +96,7 @@ export function Layout() {
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 text-xs text-slate-500">
           <span className="flex items-center gap-3">
             <ConvergeLogo className="h-5 opacity-90" />
-            <span>Converge 2026 · Sunstone PRIME</span>
+            <span>Converge · Sunstone PRIME</span>
           </span>
           <span>
             PRIME domain, communication and aptitude, AMCAT, exams and attendance, from the LMS

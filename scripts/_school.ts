@@ -1,5 +1,5 @@
 // Which school the sync scripts work for: tech (SST, Vertex: B.Tech, BCA, MCA...) or management
-// (SSM, Converge 2026: BBA, MBA). Set SCHOOL=SSM, with DATABASE_URL pointing at the Converge
+// (SSM, Converge: BBA, MBA). Set SCHOOL=SSM, with DATABASE_URL pointing at the Converge
 // database, to sync Converge; the default is Vertex. Each has its own database, so the same
 // tables and scripts serve both without mixing their students.
 

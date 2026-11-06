@@ -75,7 +75,7 @@ jobs:
         if: steps.secrets.outputs.ready == 'true'
         run: npx tsx scripts/notify-new-tests.ts
 
-  # Converge 2026 (converge.sunstone.in): the same steps for PRIME management students (BBA,
+  # Converge (converge.sunstone.in): the same steps for PRIME management students (BBA,
   # MBA) into Converge's own database. Skips until secret CONVERGE_DATABASE_URL exists.
   converge:
     runs-on: ubuntu-latest

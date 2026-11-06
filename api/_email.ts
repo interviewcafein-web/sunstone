@@ -282,21 +282,21 @@ export const SITE = 'https://vertex.sunstone.in';
 
 /**
  * How emails look and where they link, for the site they are sent from (api/_app.ts):
- * Vertex, or Converge 2026 (management students). CONVERGE_SITE_URL overrides Converge's
+ * Vertex, or Converge (management students). CONVERGE_SITE_URL overrides Converge's
  * address (e.g. a vercel.app address until converge.sunstone.in is set up).
  */
 export function brand() {
   if (currentApp() === 'converge') {
     return {
-      name: 'Converge 2026',
-      full: 'Converge 2026 · Sunstone PRIME',
+      name: 'Converge',
+      full: 'Converge · Sunstone PRIME',
       header:
-        'Converge <span style="color:#d4a24c">2026</span> <span style="color:#b5cae6;font-weight:normal;font-size:13px">· Sunstone PRIME</span>',
+        'Converge <span style="color:#d4a24c">·</span> <span style="color:#b5cae6;font-weight:normal;font-size:13px">Sunstone PRIME</span>',
       site: (process.env.CONVERGE_SITE_URL?.trim() || 'https://converge.sunstone.in').replace(
         /\/+$/,
         ''
       ),
-      logoWhite: 'converge-logo-white.png',
+      logoWhite: 'converge-wordmark-white.png',
     };
   }
   return {
@@ -308,7 +308,7 @@ export function brand() {
   };
 }
 
-/** The sender with the site's name: "Converge 2026 · Sunstone PRIME <noreply@…>" for Converge. */
+/** The sender with the site's name: "Converge · Sunstone PRIME <noreply@…>" for Converge. */
 function sentAs(from: string) {
   if (currentApp() !== 'converge') return from;
   const address = from.match(/<([^>]+)>/)?.[1] ?? from.trim();

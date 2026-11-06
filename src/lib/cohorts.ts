@@ -7,7 +7,7 @@ const LENGTH: Record<string, number> = {
   'B.Tech': 4,
   BE: 4,
   Diploma: 3,
-  // Converge 2026 (management students).
+  // Converge (management students).
   BBA: 3,
   MBA: 2,
 };

@@ -128,7 +128,7 @@ function BrandPanel() {
       </div>
 
       <p className="text-brand-200 hidden text-xs md:block">
-        Sunstone PRIME · BBA and MBA · Converge 2026
+        Sunstone PRIME · BBA and MBA · Converge
       </p>
     </div>
   );

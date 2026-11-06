@@ -1,4 +1,4 @@
-// Converge 2026 (converge.sunstone.in): Sunstone PRIME's management students (BBA, MBA).
+// Converge (converge.sunstone.in): Sunstone PRIME's management students (BBA, MBA).
 // A second site on the same deployment as Vertex: converge.html loads this file, and the
 // shared api/ answers from the Converge database for converge.* addresses (api/_app.ts).
 
