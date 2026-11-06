@@ -17,7 +17,9 @@ const PLATFORMS: PlatformId[] = [
 
 const COLUMNS = `id, username, campus_id, name, campus, program, admission_year, invalid_handles,
   leetcode, geeksforgeeks, hackerrank, codeforces, codechef, github,
-  is_debarred, debarred_reason, debarred_until::text as debarred_until, is_inactive, inactive_reason`;
+  is_debarred, debarred_reason, debarred_until::text as debarred_until, is_inactive, inactive_reason,
+  (select coalesce(array_agg(c.cohort order by c.cohort_id), '{}') from student_cohorts c
+    where c.lms_user_id = students.lms_user_id) as cohorts`;
 
 type Row = Record<string, unknown>;
 
@@ -38,6 +40,10 @@ function toStudent(row: Row, staff: boolean): Student {
     handles,
     invalid: (row.invalid_handles as PlatformId[]) ?? [],
   };
+  // LMS opportunity cohorts (Super 100 and others): staff only.
+  if (staff && Array.isArray(row.cohorts) && row.cohorts.length) {
+    student.cohorts = row.cohorts.map(String);
+  }
   if (staff && (row.is_debarred || row.is_inactive)) {
     student.status = {};
     if (row.is_debarred) {

@@ -104,6 +104,30 @@ function siteUrlPlugin(siteUrl: string): Plugin {
   };
 }
 
+/**
+ * Converge 2026 pages for converge.* addresses (converge.localhost in development), as
+ * vercel.json does in production: page requests get converge.html instead of index.html.
+ */
+function convergePagePlugin(): Plugin {
+  return {
+    name: 'converge-page',
+    configureServer: (server) => {
+      server.middlewares.use((req, _res, next) => {
+        const host = req.headers.host ?? '';
+        const page = (req.headers.accept ?? '').includes('text/html');
+        if (
+          /converge/i.test(host) &&
+          page &&
+          !/^\/(api|src|@|node_modules)\//.test(req.url ?? '')
+        ) {
+          req.url = '/converge.html';
+        }
+        next();
+      });
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   // The api/ handlers read process.env, as they do on Vercel; feed them .env.local in dev.
@@ -131,7 +155,14 @@ export default defineConfig(({ mode }) => {
   ).replace(/\/+$/, '');
 
   return {
-    plugins: [TanStackRouterVite(), react(), tailwindcss(), apiPlugin(), siteUrlPlugin(siteUrl)],
+    plugins: [
+      TanStackRouterVite(),
+      react(),
+      tailwindcss(),
+      apiPlugin(),
+      siteUrlPlugin(siteUrl),
+      convergePagePlugin(),
+    ],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
@@ -139,6 +170,11 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       rollupOptions: {
+        // Two sites: Vertex (index.html) and Converge 2026 (converge.html), see api/_app.ts.
+        input: {
+          main: path.resolve(__dirname, 'index.html'),
+          converge: path.resolve(__dirname, 'converge.html'),
+        },
         output: {
           manualChunks: {
             'tanstack-vendor': ['@tanstack/react-router', '@tanstack/react-query'],

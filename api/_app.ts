@@ -1,8 +1,9 @@
 // Two sites on one deployment: Vertex (vertex.sunstone.in, tech students) and Converge 2026
-// (converge.sunstone.in, management students). They share this server code; each has its own
-// database (DATABASE_URL and CONVERGE_DATABASE_URL), chosen per request by the address it came
-// to. Every endpoint is wrapped in forApp, so db() (api/_db.ts) picks the right database for
-// whatever it does. Scripts run outside a request and use DATABASE_URL.
+// (converge.sunstone.in, or any address with "converge" in it, management students). They
+// share this server code; each has its own database (DATABASE_URL and CONVERGE_DATABASE_URL),
+// chosen per request by the address it came to. Every endpoint is wrapped in forApp, so db()
+// (api/_db.ts) picks the right database for whatever it does. Scripts run outside a request
+// and use DATABASE_URL.
 //
 // Locally, open converge.localhost (browsers send it to this machine) to try Converge.
 
@@ -18,7 +19,7 @@ export function appFor(request: Request): App {
     request.headers.get('x-forwarded-host') ??
     request.headers.get('host') ??
     new URL(request.url).host;
-  return /^converge\./i.test(host) ? 'converge' : 'vertex';
+  return /converge/i.test(host) ? 'converge' : 'vertex';
 }
 
 /** The site of the request being handled; Vertex outside one (scripts). */

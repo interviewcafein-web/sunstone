@@ -23,6 +23,8 @@ export interface Student {
   invalid: PlatformId[];
   /** Staff only. */
   status?: StudentStatus;
+  /** LMS opportunity cohorts, e.g. "Cohort E - Super-100". Staff only. */
+  cohorts?: string[];
 }
 
 export interface StudentsResponse {

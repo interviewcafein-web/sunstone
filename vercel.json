@@ -19,6 +19,16 @@
   ],
   "rewrites": [
     {
+      "source": "/((?!api/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "(?<host>.*converge.*)"
+        }
+      ],
+      "destination": "/converge.html"
+    },
+    {
       "source": "/s/:slug/card",
       "destination": "/api/share?slug=:slug&card=1"
     },
@@ -38,8 +48,13 @@
     }
   ],
   "images": {
-    "sizes": [64, 128],
-    "formats": ["image/webp"],
+    "sizes": [
+      64,
+      128
+    ],
+    "formats": [
+      "image/webp"
+    ],
     "minimumCacheTTL": 604800,
     "remotePatterns": [
       {
