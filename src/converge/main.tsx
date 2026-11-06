@@ -12,6 +12,9 @@ import { THEME_KEY, setTheme, useTheme } from '@/lib/theme';
 import { reloadForNewBuild, router } from './router';
 import '../globals.css';
 
+// Converge's own colours (src/globals.css), also when this page is opened as converge.html.
+document.documentElement.classList.add('converge');
+
 // The saved theme (shared with Vertex's toggle), before the first paint.
 try {
   if (localStorage.getItem(THEME_KEY) === 'dark') setTheme('dark');

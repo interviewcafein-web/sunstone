@@ -50,6 +50,14 @@
 
     <!-- Saved theme (see src/lib/theme.ts), applied before the first paint so it never flashes. -->
     <script>
+      // Converge 2026 (any address with "converge" in it) shares this page: no Vertex intro,
+      // and its own name, icon and colours before anything paints (src/main.tsx loads its app).
+      if (/converge/i.test(location.hostname)) {
+        document.documentElement.classList.add('converge', 'splash-seen');
+        document.title = 'Converge 2026 · Sunstone PRIME';
+        document.querySelector('link[rel="icon"]').setAttribute('href', '/converge-mark.png');
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0f5148');
+      }
       try {
         if (localStorage.getItem('sunstone:theme') === 'dark') {
           document.documentElement.classList.add('dark');

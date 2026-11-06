@@ -332,7 +332,7 @@ function TrackSection({
           hint={
             upcoming.length ? `${upcoming.length} live or upcoming` : `${subjects.length} subjects`
           }
-          accent="#1a3e70"
+          accent="#0f5951"
         />
         <Kpi
           icon={ClipboardCheck}
@@ -640,7 +640,7 @@ function ResultsTable({ tests, showRank = false }: { tests: StudentTest[]; showR
 
 // --- AMCAT -------------------------------------------------------------------------------
 
-const AMCAT_COLORS = ['#1a3e70', '#c8913a', '#10b981', '#8b5cf6', '#ef4444', '#0ea5e9', '#64748b'];
+const AMCAT_COLORS = ['#0f5951', '#c8913a', '#10b981', '#8b5cf6', '#ef4444', '#0ea5e9', '#64748b'];
 
 function AmcatSection({ amcat }: { amcat: AmcatSitting[] }) {
   const colors = chartColors(useTheme());

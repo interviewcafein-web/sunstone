@@ -643,3 +643,22 @@ html.splash-gone .rise-stagger > * {
     animation: none;
   }
 }
+
+/*
+ * Converge 2026 (management students): its own colours, a deep teal with the gold of its
+ * logo, so it never looks like Vertex. index.html (and src/converge/main.tsx) put the
+ * `converge` class on <html> for Converge's addresses; every brand-* utility follows.
+ */
+html.converge {
+  --color-brand-50: #eaf7f4;
+  --color-brand-100: #cdeee6;
+  --color-brand-200: #9edccf;
+  --color-brand-300: #67c2b1;
+  --color-brand-400: #35a592;
+  --color-brand-500: #1b8777;
+  --color-brand-600: #136d61;
+  --color-brand-700: #0f5951;
+  --color-brand-800: #0d4842;
+  --color-brand-900: #0a3833;
+  --shadow-card: 0 1px 2px rgb(10 56 51 / 0.05), 0 8px 24px -12px rgb(10 56 51 / 0.2);
+}
