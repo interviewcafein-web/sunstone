@@ -22,8 +22,16 @@ export function appFor(request: Request): App {
   return /converge/i.test(host) ? 'converge' : 'vertex';
 }
 
-/** The site of the request being handled; Vertex outside one (scripts). */
-export const currentApp = (): App => current.getStore() ?? 'vertex';
+/** The site of the request being handled, if this is a request (not a script). */
+export const requestApp = (): App | undefined => current.getStore();
+
+/**
+ * The site being worked for: the request's, or for a script its school (SCHOOL=SSM is
+ * Converge, scripts/_school.ts), so the nightly Converge job builds Converge's pages.
+ */
+export const currentApp = (): App =>
+  current.getStore() ??
+  (process.env.SCHOOL?.trim().toUpperCase() === 'SSM' ? 'converge' : 'vertex');
 
 /** Runs an endpoint for the site its request came to. */
 export function forApp<Rest extends unknown[]>(

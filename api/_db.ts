@@ -5,7 +5,7 @@
 
 import { neon, type NeonQueryFunction, type NeonQueryPromise } from '@neondatabase/serverless';
 
-import { currentApp } from './_app';
+import { requestApp } from './_app';
 
 const clients = new Map<string, NeonQueryFunction<false, false>>();
 
@@ -14,7 +14,9 @@ const clients = new Map<string, NeonQueryFunction<false, false>>();
  * The database is the site's (api/_app.ts): Converge's for a converge.sunstone.in request.
  */
 export function db(): NeonQueryFunction<false, false> {
-  const name = currentApp() === 'converge' ? 'CONVERGE_DATABASE_URL' : 'DATABASE_URL';
+  // A Converge request uses Converge's database; scripts always use DATABASE_URL (the
+  // Converge job points it at Converge's).
+  const name = requestApp() === 'converge' ? 'CONVERGE_DATABASE_URL' : 'DATABASE_URL';
   const url = process.env[name];
   if (!url) throw new Error(`${name} is not configured.`);
   let client = clients.get(url);

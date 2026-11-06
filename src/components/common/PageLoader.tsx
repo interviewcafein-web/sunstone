@@ -1,4 +1,9 @@
+import { createContext, useContext } from 'react';
+
 import { cn } from '@/lib/utils';
+
+/** The mark breathing in the loading pill: Vertex's unless a site provides its own. */
+export const LoaderMark = createContext('/vertex-mark.png');
 
 /** A grey block with a light sweeping across it, standing in for content that is loading. */
 export function Skeleton({ className }: { className?: string }) {
@@ -7,6 +12,7 @@ export function Skeleton({ className }: { className?: string }) {
 
 /** The status pill: the Vertex mark breathing, the message, and three bouncing dots. */
 function LoadingPill({ label }: { label: string }) {
+  const mark = useContext(LoaderMark);
   return (
     <div
       role="status"
@@ -16,7 +22,7 @@ function LoadingPill({ label }: { label: string }) {
       <span className="relative flex size-9 items-center justify-center">
         <span className="bg-brand-200/60 absolute inset-0 animate-ping rounded-full motion-reduce:hidden" />
         <span className="bg-surface relative flex size-9 items-center justify-center rounded-full ring-1 ring-slate-200">
-          <img src="/vertex-mark.png" alt="" className="loader-breathe size-6" />
+          <img src={mark} alt="" className="loader-breathe size-6" />
         </span>
       </span>
       <span className="text-sm font-medium text-slate-700">{label}</span>

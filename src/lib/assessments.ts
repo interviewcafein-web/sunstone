@@ -586,6 +586,14 @@ export interface StudentMetrics {
   test_trend: number[] | null;
   /** Average % in internal exams (Midterms, End-term). */
   exam_avg: number | null;
+  // Converge only (management students): PRIME tests split into the PRIME domain subjects
+  // and communication and aptitude (ELQ). Absent on Vertex.
+  domain_avg?: number | null;
+  domain_submitted?: number | null;
+  domain_released?: number | null;
+  elq_avg?: number | null;
+  elq_submitted?: number | null;
+  elq_released?: number | null;
 }
 
 export const useStudentMetrics = (enabled = true) =>

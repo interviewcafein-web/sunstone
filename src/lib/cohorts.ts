@@ -1,7 +1,16 @@
 // Cohorts: a program and its admission year, named with the years it runs, e.g. "BCA 2025–28"
 // (BCA admitted in 2025, finishing in 2028). Course lengths in years by program.
 
-const LENGTH: Record<string, number> = { MCA: 2, BCA: 3, 'B.Tech': 4, BE: 4, Diploma: 3 };
+const LENGTH: Record<string, number> = {
+  MCA: 2,
+  BCA: 3,
+  'B.Tech': 4,
+  BE: 4,
+  Diploma: 3,
+  // Converge 2026 (management students).
+  BBA: 3,
+  MBA: 2,
+};
 
 /** "B.Tech", 2025 → "B.Tech 2025–29". */
 export function cohortLabel(

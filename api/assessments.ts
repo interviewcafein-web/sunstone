@@ -17,7 +17,7 @@ import { type Viewer, json, seesCampus, sessionViewer } from './_auth';
 import { db, together } from './_db';
 import { snapshot, type WaitUntil } from './_snapshot';
 import { integrityOf } from '../src/lib/integrity';
-import { forApp } from './_app';
+import { currentApp, forApp } from './_app';
 
 export const config = { runtime: 'edge' };
 
@@ -684,6 +684,10 @@ const PRIME_SUBJECT = `subject ~* '(^|[^a-z])prime([^a-z]|$)|competitive coding'
 // Domain"…), not PRIME aptitude or communication.
 const PRIME_CODING = `(subject ~* '(^|[^a-z])pri[mne]{2}([^a-z]|$)' and subject ~* 'domain|coding|tech'
   and subject !~* 'apti|comm') or subject ~* 'competitive coding'`;
+// Converge: PRIME communication and aptitude subjects ("Prime Aptitude", "Prime Communication",
+// spelling variants, "ELQ Test"), as opposed to the PRIME domains. Kept in step with
+// src/converge/lib/subjects.ts.
+const ELQ_SUBJECT = `(^|[^a-z])apt|com+u|elq`;
 
 interface LmsDay {
   name: string;
@@ -1092,6 +1096,37 @@ export async function student(viewer: Viewer, username: string) {
  * counts, and the internal exam average (Midterms and End-term; not Mock PI / GD).
  */
 export async function metrics(viewer: Viewer) {
+  // Converge (management students) splits PRIME tests into the domain subjects ("IT Prime
+  // Domain", "HR Prime Domain"…) and communication and aptitude ("Prime Aptitude", "Prime
+  // Communication", "ELQ Test"). Vertex's query and answer stay exactly as they were.
+  const split = currentApp() === 'converge';
+  const splitCtes = split
+    ? `,
+     elq as (
+       select p.test_id, bool_or(c.name ~* '${ELQ_SUBJECT}') as elq
+       from lms_test_placements p join lms_courses c on c.id = p.course_id
+       group by p.test_id),
+     part as (
+       select e.lms_user_id,
+              count(*) filter (where not coalesce(q.elq, false))::int as domain_released,
+              count(*) filter (where not coalesce(q.elq, false) and tr.submitted)::int as domain_submitted,
+              round(avg(tr.marks / nullif(coalesce(tr.max_marks, t.max_marks), 0) * 100)
+                    filter (where tr.submitted and not coalesce(q.elq, false)))::int as domain_avg,
+              count(*) filter (where q.elq)::int as elq_released,
+              count(*) filter (where q.elq and tr.submitted)::int as elq_submitted,
+              round(avg(tr.marks / nullif(coalesce(tr.max_marks, t.max_marks), 0) * 100)
+                    filter (where tr.submitted and q.elq))::int as elq_avg
+       from eligible e join lms_tests t on t.id = e.test_id
+       left join elq q on q.test_id = e.test_id
+       left join lms_test_results tr on tr.test_id = e.test_id and tr.lms_user_id = e.lms_user_id
+       group by e.lms_user_id)`
+    : '';
+  const splitColumns = split
+    ? `,
+            part.domain_avg, part.domain_submitted, part.domain_released,
+            part.elq_avg, part.elq_submitted, part.elq_released`
+    : '';
+  const splitJoin = split ? ' left join part using (lms_user_id)' : '';
   const rows = await db().query(
     `with roster as (
        select lms_user_id, username from students
@@ -1145,15 +1180,15 @@ export async function metrics(viewer: Viewer) {
                     filter (where tr.submitted))::int as avg
        from eligible e join lms_tests t on t.id = e.test_id
        left join lms_test_results tr on tr.test_id = e.test_id and tr.lms_user_id = e.lms_user_id
-       group by e.lms_user_id)
+       group by e.lms_user_id)${splitCtes}
      select r.username,
             round(100.0 * att.p / nullif(att.s, 0))::int as attendance,
             round(100.0 * att.pp / nullif(att.ps, 0))::int as prime_attendance,
             am.list as amcat, tst.avg as test_avg, tst.submitted, tst.released,
-            aw.list as attendance_weeks, tt.list as test_trend, ex.avg as exam_avg
+            aw.list as attendance_weeks, tt.list as test_trend, ex.avg as exam_avg${splitColumns}
      from roster r
      left join att using (lms_user_id) left join am using (lms_user_id) left join tst using (lms_user_id)
-     left join aw using (lms_user_id) left join tt using (lms_user_id) left join ex using (lms_user_id)
+     left join aw using (lms_user_id) left join tt using (lms_user_id) left join ex using (lms_user_id)${splitJoin}
      where att.lms_user_id is not null or am.lms_user_id is not null or tst.lms_user_id is not null
        or ex.lms_user_id is not null`,
     [viewer.campusIds]

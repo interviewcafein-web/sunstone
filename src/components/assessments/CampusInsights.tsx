@@ -91,7 +91,14 @@ function Bar({ pct, fill }: { pct: number | null; fill: string }) {
 
 const SUBJECTS_SHOWN = 12;
 
-export function AttendanceTab({ data }: { data: CampusAttendance }) {
+export function AttendanceTab({
+  data,
+  instructorNote = 'PRIME coding domain instructors, with attendance in their PRIME coding classes.',
+}: {
+  data: CampusAttendance;
+  /** What the instructor list covers (Converge: PRIME domain instructors). */
+  instructorNote?: string;
+}) {
   const colors = chartColors(useTheme());
   const [allSubjects, setAllSubjects] = useState(false);
   const subjects = allSubjects ? data.subjects : data.subjects.slice(0, SUBJECTS_SHOWN);
@@ -214,9 +221,7 @@ export function AttendanceTab({ data }: { data: CampusAttendance }) {
         <section className={cn(panel, 'overflow-hidden')}>
           <div className="px-5 pt-5">
             <h2 className="text-lg font-bold">By Instructor</h2>
-            <p className="text-sm text-slate-500">
-              PRIME coding domain instructors, with attendance in their PRIME coding classes.
-            </p>
+            <p className="text-sm text-slate-500">{instructorNote}</p>
           </div>
           <div className="mt-3 max-h-[28rem] overflow-y-auto">
             <table className="w-full text-sm">
