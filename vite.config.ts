@@ -2,6 +2,7 @@ import { defineConfig, loadEnv, type Connect, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite';
+import fs from 'node:fs';
 import path from 'path';
 
 import login from './api/login';
@@ -171,9 +172,12 @@ export default defineConfig(({ mode }) => {
     build: {
       rollupOptions: {
         // Two sites: Vertex (index.html) and Converge 2026 (converge.html), see api/_app.ts.
+        // Converge joins the build once its pages exist (src/converge/main.tsx).
         input: {
           main: path.resolve(__dirname, 'index.html'),
-          converge: path.resolve(__dirname, 'converge.html'),
+          ...(fs.existsSync(path.resolve(__dirname, 'src/converge/main.tsx'))
+            ? { converge: path.resolve(__dirname, 'converge.html') }
+            : {}),
         },
         output: {
           manualChunks: {
