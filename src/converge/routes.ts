@@ -4,6 +4,8 @@
 
 import { createRootRoute, createRoute } from '@tanstack/react-router';
 
+import { validateIssuesSearch } from '@/lib/issuesSearch';
+
 import type { SortKey } from './lib/rows';
 
 const text = (value: unknown) =>
@@ -150,6 +152,12 @@ export const superRoute = createRoute({
   }),
 });
 
+export const issuesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/issues',
+  validateSearch: validateIssuesSearch,
+});
+
 export const routeTree = rootRoute.addChildren([
   loginRoute,
   studentsRoute,
@@ -157,4 +165,5 @@ export const routeTree = rootRoute.addChildren([
   campusesRoute,
   campusRoute,
   superRoute,
+  issuesRoute,
 ]);

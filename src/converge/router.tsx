@@ -15,6 +15,7 @@ import {
   studentRoute,
   studentsRoute,
   superRoute,
+  issuesRoute,
 } from './routes';
 
 // The pages with charts load on first visit, so the students list does not wait for them.
@@ -22,6 +23,7 @@ const StudentPage = lazy(() => import('./pages/StudentPage'));
 const CampusesPage = lazy(() => import('./pages/CampusesPage'));
 const CampusPage = lazy(() => import('./pages/CampusPage'));
 const Super100Page = lazy(() => import('./pages/Super100Page'));
+const IssuesPage = lazy(() => import('./pages/IssuesPage'));
 
 rootRoute.update({ component: Layout });
 loginRoute.update({ component: LoginPage });
@@ -30,6 +32,7 @@ studentRoute.update({ component: StudentPage });
 campusesRoute.update({ component: CampusesPage });
 campusRoute.update({ component: CampusPage });
 superRoute.update({ component: Super100Page });
+issuesRoute.update({ component: IssuesPage });
 
 // After a deploy, a tab opened earlier asks for page files whose names have changed. Reload
 // once to pick up the new version instead of showing an error (as Vertex does).

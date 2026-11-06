@@ -1,35 +1,27 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { RequireLogin } from '@/components/common/RequireLogin';
+import { validateIssuesSearch, type IssuesSearch } from '@/lib/issuesSearch';
 import IssuesPage from '@/pages/IssuesPage';
 
-export interface IssuesSearch {
-  /** The open issue (also the link in issue emails: /issues?id=12). */
-  id?: number;
-  status?: 'resolved' | 'all';
-  campus?: number;
-  /** The Raise an Issue form is open. */
-  raise?: boolean;
-  /** Only the issues assigned to the viewer. */
-  mine?: boolean;
-}
-
-const number = (value: unknown) => {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
-};
+export type { IssuesSearch };
 
 export const Route = createFileRoute('/issues')({
-  validateSearch: (search: Record<string, unknown>): IssuesSearch => ({
-    id: number(search.id),
-    status: search.status === 'resolved' || search.status === 'all' ? search.status : undefined,
-    campus: number(search.campus),
-    raise: search.raise === true || search.raise === 'true' ? true : undefined,
-    mine: search.mine === true || search.mine === 'true' ? true : undefined,
-  }),
-  component: () => (
-    <RequireLogin>
-      <IssuesPage />
-    </RequireLogin>
-  ),
+  validateSearch: validateIssuesSearch,
+  component: VertexIssues,
 });
+
+function VertexIssues() {
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  return (
+    <RequireLogin>
+      <IssuesPage
+        search={search}
+        setSearch={(patch) =>
+          navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true })
+        }
+      />
+    </RequireLogin>
+  );
+}

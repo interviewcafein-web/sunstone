@@ -19,7 +19,8 @@ export type ConvergePath =
   | '/s/$slug'
   | '/campuses'
   | '/campuses/$id'
-  | '/super-100';
+  | '/super-100'
+  | '/issues';
 
 type Search = Record<string, unknown>;
 

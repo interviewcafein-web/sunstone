@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { getRouteApi } from '@tanstack/react-router';
 import {
   ArrowRightLeft,
   Armchair,
@@ -59,9 +58,8 @@ import {
   uploadPhoto,
   type IssueFilter,
 } from '@/lib/issuesApi';
+import type { IssuesSearch } from '@/lib/issuesSearch';
 import { cn } from '@/lib/utils';
-
-const route = getRouteApi('/issues');
 
 const CATEGORY_ICONS: Record<IssueCategoryId, LucideIcon> = {
   internet: Wifi,
@@ -98,11 +96,18 @@ function Badge({ label, color }: { label: string; color: string }) {
 }
 
 /** Campus issues: raise, follow and resolve the operational problems at each campus. */
-export default function IssuesPage() {
-  const { id, status = 'active', campus, raise, mine } = route.useSearch();
-  const navigate = route.useNavigate();
-  const setSearch = (patch: Record<string, unknown>) =>
-    navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true });
+/**
+ * The page reads its settings from the address and changes them through `setSearch`, so
+ * Vertex and Converge (each with its own router) can both show it.
+ */
+export default function IssuesPage({
+  search,
+  setSearch,
+}: {
+  search: IssuesSearch;
+  setSearch: (patch: Partial<IssuesSearch>) => void;
+}) {
+  const { id, status = 'active', campus, raise, mine } = search;
 
   const issues = useIssues(status as IssueFilter, campus, true, mine);
   const data = issues.data;
