@@ -20,9 +20,9 @@ import {
   sessionViewer,
 } from './_auth';
 import { db } from './_db';
-import { sendEmail, welcomeEmail } from './_email';
+import { notificationEmail, sendEmail, welcomeEmail } from './_email';
 import { ROLE_LABELS } from '../src/lib/roles';
-import { forApp } from './_app';
+import { currentApp, forApp } from './_app';
 
 export const config = { runtime: 'edge' };
 
@@ -148,15 +148,17 @@ async function save(viewer: Viewer, body: Record<string, unknown>): Promise<Resp
   if (isNew) {
     const names = new Map((await campuses()).map((campus) => [campus.id, campus.name]));
     const [row] = await db()`select name from staff where email = ${email}`;
+    const details = {
+      name: (row?.name as string | null) ?? name,
+      email,
+      roleLabel: ROLE_LABELS[role],
+      campuses: campusIds.map((id) => names.get(id) ?? `Campus ${id}`),
+      addedBy: viewer.name ?? normalizeEmail(viewer.user),
+    };
     await sendEmail({
       to: email,
-      ...welcomeEmail({
-        name: (row?.name as string | null) ?? name,
-        email,
-        roleLabel: ROLE_LABELS[role],
-        campuses: campusIds.map((id) => names.get(id) ?? `Campus ${id}`),
-        addedBy: viewer.name ?? normalizeEmail(viewer.user),
-      }),
+      // Converge's own welcome (its branding and address); Vertex's is about Vertex.
+      ...(currentApp() === 'converge' ? convergeWelcome(details) : welcomeEmail(details)),
     })
       .then(() => (welcomed = true))
       .catch((error) => console.error('[team] welcome email', error));
@@ -194,6 +196,29 @@ async function handler(request: Request): Promise<Response> {
     console.error('[team]', error);
     return json(503, { error: 'Could not update the team. Try again in a minute.' });
   }
+}
+
+/** Welcome to Converge: who added them, what they can see, and where to sign in. */
+function convergeWelcome({
+  name,
+  roleLabel,
+  campuses,
+  addedBy,
+}: {
+  name?: string | null;
+  roleLabel: string;
+  campuses: string[];
+  addedBy?: string | null;
+}) {
+  const first = name?.trim().split(/\s+/)[0];
+  const scope = campuses.length ? campuses.join(', ') : 'every campus';
+  return notificationEmail({
+    title: 'Welcome to Converge',
+    body: `${first ? `Hi ${first},` : 'Hi there,'}\n\n${addedBy ? `${addedBy} gave you` : 'You now have'} access to Converge, where every Sunstone PRIME BBA and MBA student's PRIME domain and communication and aptitude tests, AMCAT, internal exams, attendance and Super 100 come together in one place.\n\nYour access: ${roleLabel}, ${scope}.\n\nSign in with this email address: you will get a 6-digit code by email, no password needed.`,
+    link: '/login',
+    level: 'info',
+    sender: addedBy ?? null,
+  });
 }
 
 export default forApp(handler);

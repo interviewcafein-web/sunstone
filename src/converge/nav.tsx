@@ -20,7 +20,8 @@ export type ConvergePath =
   | '/campuses'
   | '/campuses/$id'
   | '/super-100'
-  | '/issues';
+  | '/issues'
+  | '/team';
 
 type Search = Record<string, unknown>;
 

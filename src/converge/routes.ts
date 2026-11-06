@@ -158,6 +158,11 @@ export const issuesRoute = createRoute({
   validateSearch: validateIssuesSearch,
 });
 
+export const teamRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/team',
+});
+
 export const routeTree = rootRoute.addChildren([
   loginRoute,
   studentsRoute,
@@ -166,4 +171,5 @@ export const routeTree = rootRoute.addChildren([
   campusRoute,
   superRoute,
   issuesRoute,
+  teamRoute,
 ]);

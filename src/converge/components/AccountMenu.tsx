@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Building2, ChevronDown, LogOut, ShieldCheck } from 'lucide-react';
+import { Building2, ChevronDown, LogOut, ShieldCheck, Users } from 'lucide-react';
 
 import { Avatar } from '@/components/common/Avatar';
 import { ROLE_LABELS } from '@/lib/roles';
 import type { SessionInfo } from '@/lib/session';
 import { cn } from '@/lib/utils';
+
+import { Link } from '../nav';
 
 /** Their photo (staff who also use Google on Vertex) or initials. */
 function Photo({ user, className }: { user: SessionInfo; className?: string }) {
@@ -119,6 +121,17 @@ export function AccountMenu({ user, onLogOut }: { user: SessionInfo; onLogOut: (
           )}
 
           <div className="p-1.5">
+            {user.managesTeam && (
+              <Link
+                to="/team"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/5"
+              >
+                <Users className="size-4 text-slate-500" aria-hidden />
+                Manage Team
+              </Link>
+            )}
             <button
               type="button"
               role="menuitem"
