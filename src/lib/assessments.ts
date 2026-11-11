@@ -1,5 +1,6 @@
 // PRIME domain assessments and AMCAT results (api/assessments.ts), for staff pages.
 
+import type { StudentPlacement } from './placements';
 import { useQuery } from '@tanstack/react-query';
 
 import type { Integrity } from './integrity';
@@ -452,6 +453,8 @@ export interface StudentAssessmentsData {
     }[];
     weeks: { week: string; sessions: number; present: number; pct: number | null }[];
   };
+  /** Job offers and internships (scripts/sync-placements.ts). */
+  placements?: StudentPlacement[];
   now: string;
   syncedAt: string | null;
 }

@@ -48,6 +48,7 @@ import {
 import { cohortLabel } from '@/lib/cohorts';
 import { chartColors, useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
+import { PlacementCard } from '@/components/students/PlacementCard';
 
 import { CategoryChip, StatusChip, tidy } from '../components/chips';
 import {
@@ -231,6 +232,8 @@ export default function StudentPage() {
           <HeroStat icon={NotebookPen} label="Internal Exams" value={examAvg} suffix="%" />
         </dl>
       </Hero>
+
+      <PlacementCard placements={data?.placements} />
 
       <Tabs
         tabs={TABS.map((tab) => ({

@@ -33,6 +33,7 @@ import { useCodingProfiles } from '@/hooks/useCodingProfiles';
 import { useTour } from '@/hooks/useTour';
 import { useStudents } from '@/hooks/useStudents';
 import { useStudentAssessments, useStudentMetrics } from '@/lib/assessments';
+import { PlacementCard } from '@/components/students/PlacementCard';
 import { buildInsights } from '@/lib/insights';
 import { useSession } from '@/lib/session';
 import {
@@ -293,6 +294,8 @@ export function ProfileView({ name, handles, student, onSubmit, view, onView }: 
           })}
         </nav>
       )}
+
+      {showCategories && <PlacementCard placements={assessments.data?.placements} />}
 
       {category === 'coding' && (
         <div key="coding" className="animate-rise space-y-6">
