@@ -8,6 +8,7 @@ import { neon } from '@neondatabase/serverless';
 
 import { EVERYONE, campus, campusKey, campuses, metricsByCampus } from '../api/assessments';
 import { dataVersion, remake } from '../api/_snapshot';
+import { placementRows } from '../api/_placements';
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error('DATABASE_URL is not set (add it to .env.local).');
@@ -17,6 +18,7 @@ const started = Date.now();
 const version = await dataVersion();
 await remake('campuses', () => campuses(EVERYONE), version);
 await remake('metrics', metricsByCampus, version);
+await remake('placements', placementRows, version);
 
 // Each campus with all batches, each program ("B.Tech:") and each batch ("B.Tech:2025"), the
 // choices the campus page offers.
@@ -49,5 +51,5 @@ await Promise.all(
   })
 );
 console.log(
-  `Saved answers: campus list, 360° numbers and ${jobs.size - failed} of ${jobs.size} campus pages in ${Math.round((Date.now() - started) / 1000)} s.`
+  `Saved answers: campus list, 360° numbers, placements and ${jobs.size - failed} of ${jobs.size} campus pages in ${Math.round((Date.now() - started) / 1000)} s.`
 );

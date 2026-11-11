@@ -1,5 +1,6 @@
 # Nightly copy of LMS data into the database: the PRIME students (and their status, e.g.
-# debarred), their form usernames, PRIME domain assessments + AMCAT results, attendance and internal exams.
+# debarred), their form usernames, PRIME domain assessments + AMCAT results, attendance, internal exams
+# and placements (job offers and internships).
 # Needs repository secrets DATABASE_URL, REDASH_KEY and SHEET_ID; skips until they exist.
 # Run it by hand from the Actions tab ("Run workflow") after adding them.
 
@@ -65,6 +66,9 @@ jobs:
       - name: Opportunity cohorts (Super 100 and others)
         if: steps.secrets.outputs.ready == 'true'
         run: npx tsx scripts/sync-cohorts.ts
+      - name: Placements (job offers and internships)
+        if: steps.secrets.outputs.ready == 'true'
+        run: npx tsx scripts/sync-placements.ts
       - name: PRIME delivery (classes taught against allocated hours)
         if: steps.secrets.outputs.ready == 'true' && env.DELIVERY_DATABASE_URL != ''
         run: npx tsx scripts/sync-delivery.ts
@@ -122,6 +126,9 @@ jobs:
       - name: Opportunity cohorts (Super 100 and others)
         if: steps.secrets.outputs.ready == 'true'
         run: npx tsx scripts/sync-cohorts.ts
+      - name: Placements (job offers and internships)
+        if: steps.secrets.outputs.ready == 'true'
+        run: npx tsx scripts/sync-placements.ts
       - name: Ready-made pages
         if: steps.secrets.outputs.ready == 'true'
         run: npx tsx scripts/warm-snapshots.ts

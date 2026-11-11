@@ -18,6 +18,7 @@ import { db, together } from './_db';
 import { snapshot, type WaitUntil } from './_snapshot';
 import { integrityOf } from '../src/lib/integrity';
 import { currentApp, forApp } from './_app';
+import { JOINING } from '../src/lib/placements';
 
 export const config = { runtime: 'edge' };
 
@@ -1063,7 +1064,18 @@ export async function student(viewer: Viewer, username: string) {
     left join exm_examinations x on x.id = e.examination_id
     where m.lms_user_id = ${person.lms_user_id}
     order by e.exam_date desc nulls last, subject`;
-  const [[{ now }], rows, amcat, attendanceSubjects, attendanceWeeks, exams, synced] =
+  // Job offers and internships (scripts/sync-placements.ts). Campus staff see the offer, not
+  // the pay.
+  const showPay = viewer.role !== 'campus';
+  const placementsQuery = db()`
+    select company, designation, category, full_time, role_type,
+           case when ${showPay} then total_lpa end as total_lpa,
+           case when ${showPay} then stipend end as stipend, months,
+           selected_on::text as selected_on, joining_status, joining_on::text as joining_on,
+           withdrawn, withdrawn_reason
+    from placements where lms_user_id = ${person.lms_user_id}
+    order by selected_on desc nulls last`;
+  const [[{ now }], rows, amcat, attendanceSubjects, attendanceWeeks, exams, synced, placements] =
     await together([
       nowQuery,
       rowsQuery,
@@ -1072,6 +1084,7 @@ export async function student(viewer: Viewer, username: string) {
       attendanceWeeksQuery,
       examsQuery,
       lastSyncQuery(),
+      placementsQuery,
     ]);
   const syncedAt = syncedAtOf(synced);
   const tests = rows.map((row) => ({
@@ -1085,6 +1098,15 @@ export async function student(viewer: Viewer, username: string) {
     amcat,
     exams,
     attendance: { subjects: attendanceSubjects, weeks: attendanceWeeks },
+    placements: placements.map((row) => ({
+      ...row,
+      total_lpa: row.total_lpa == null ? null : Number(row.total_lpa),
+      joining: row.withdrawn
+        ? `Withdrawn${row.withdrawn_reason ? `: ${row.withdrawn_reason}` : ''}`
+        : row.joining_status
+          ? (JOINING[Number(row.joining_status)] ?? null)
+          : null,
+    })),
     now,
     syncedAt,
   };
