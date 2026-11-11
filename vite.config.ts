@@ -41,6 +41,7 @@ const API_ROUTES: Record<string, Handler> = {
   '/api/assessments': lazy(() => import('./api/assessments')),
   '/api/notifications': lazy(() => import('./api/notifications')),
   '/api/issues': lazy(() => import('./api/issues')),
+  '/api/placements': lazy(() => import('./api/placements')),
   '/api/push': lazy(() => import('./api/push')),
   '/api/ask': lazy(() => import('./api/ask')),
   '/api/student-form': lazy(() => import('./api/student-form')),

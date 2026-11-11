@@ -358,7 +358,7 @@ function Prep({
               <div className="mt-3 space-y-2 text-xs">
                 <div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500 capitalize">{word}</span>
+                    <span className="text-slate-500 first-letter:uppercase">{word}</span>
                     <span className="font-bold tabular-nums">{value(measure, row.placedAvg)}</span>
                   </div>
                   <Bar pct={((row.placedAvg ?? 0) / scale) * 100} className="mt-1" />
@@ -443,7 +443,7 @@ function Campuses({
         title="By Campus"
         description="Share of in-season students with an offer."
       />
-      <ul className="space-y-2.5">
+      <ul className="max-h-[30rem] space-y-2.5 overflow-y-auto pr-1">
         {data.byCampus.map((row) => (
           <li key={row.id ?? row.name}>
             <button

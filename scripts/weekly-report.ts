@@ -1,6 +1,6 @@
 // The weekly report: the 360° view (coding, attendance, PRIME Mock Tests, AMCAT, exams), pain
-// points, PRIME coding delivery (the campus page's Syllabus vs Delivery), top performers and who
-// needs attention, by email and in the bell.
+// points, PRIME coding delivery (the campus page's Syllabus vs Delivery), placements, top
+// performers and who needs attention, by email and in the bell.
 //   HQ gets the all-campus report; each campus's staff get their campus's report, with every
 //   HQ member and super admin copied in.
 // It uses the same model as the 360° page (src/lib/insights.ts), so the numbers match.
@@ -17,6 +17,8 @@ import { neon } from '@neondatabase/serverless';
 
 import type { Viewer } from '../api/_auth';
 import { campus as campusDetail, metrics } from '../api/assessments';
+import { placementReport, placementRows } from '../api/_placements';
+import { formatPay } from '../src/lib/placements';
 import { sendEmails, type Email } from '../api/_email';
 import { listStudents } from '../api/_roster';
 import { cohortLabel } from '../src/lib/cohorts';
@@ -442,6 +444,66 @@ function openIssues(issues: OpenIssue[], showCampus: boolean) {
   );
 }
 
+// --- Placements (job offers and internships from the LMS) -----------------------------------
+
+const placementData = await placementRows();
+/** The Placements page's numbers for every campus, or for one. */
+const placementsFor = (campusId: number | null, kind: 'full-time' | 'internship') =>
+  placementReport(placementData.students, everyone, { kind, campusId, showPay: true });
+const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+
+function placementsSection(campusId: number | null) {
+  const reports = (['full-time', 'internship'] as const)
+    .map((kind) => ({ kind, report: placementsFor(campusId, kind) }))
+    .filter(({ report }) => report.totals.offers > 0);
+  if (!reports.length) return '';
+  const lines = reports.map(({ kind, report }) => {
+    const fullTime = kind === 'full-time';
+    const fresh = report.offers.filter((offer) => (offer.selectedOn ?? '') >= weekAgo).length;
+    const { totals } = report;
+    return `<p style="margin:0 0 6px;font-size:14px"><b>${fullTime ? 'Full-time jobs' : 'Internships'}:</b> ${totals.placed} of ${totals.students} students (${totals.rate ?? 0}%), ${totals.offers} offer${totals.offers === 1 ? '' : 's'} from ${totals.companies} compan${totals.companies === 1 ? 'y' : 'ies'}${totals.medianPay != null ? `, median ${escape(formatPay(totals.medianPay, fullTime))}` : ''}${fresh ? `, <b style="color:${BAND.good}">${fresh} new this week</b>` : ''}.</p>`;
+  });
+  // How the students with jobs prepared, against those still waiting (full-time if any).
+  const main = reports[0];
+  const measureLabel = Object.fromEntries(main.report.measures.map((m) => [m.key, m]));
+  const prep = table(
+    [
+      { label: 'Measure' },
+      { label: main.kind === 'full-time' ? 'Placed' : 'With Internship', align: 'right' },
+      { label: 'Still Waiting', align: 'right' },
+      { label: 'Top vs Bottom Quarter', align: 'right' },
+    ],
+    main.report.prep
+      .filter((row) => row.placedAvg != null || row.othersAvg != null)
+      .map((row) => {
+        const m = measureLabel[row.key];
+        const show = (v: number | null) =>
+          v == null ? '—' : `${Number(v.toFixed(1))}${m?.unit ?? ''}`;
+        const bands = row.bands;
+        return [
+          escape(m?.label ?? row.key),
+          `<b>${show(row.placedAvg)}</b>`,
+          show(row.othersAvg),
+          bands.length === 4 ? `${bands[3].rate ?? 0}% vs ${bands[0].rate ?? 0}%` : '—',
+        ];
+      })
+  );
+  const ready = main.report.ready.slice(0, 5);
+  const readyList = ready.length
+    ? `<p style="margin:12px 0 4px;font-size:13px"><b>Ready, no ${main.kind === 'full-time' ? 'offer' : 'internship'} yet:</b> ${ready
+        .map(
+          (row) =>
+            `<a href="${SITE}/s/${encodeURIComponent(row.slug)}" style="color:#0f172a">${escape(row.name)}</a> (${row.readiness})`
+        )
+        .join(', ')}</p>`
+    : '';
+  return section(
+    '💼 Placements',
+    lines.join('') + prep + readyList,
+    'From the LMS. "Top vs bottom quarter" is the offer rate among the best- and least-prepared quarter of the batch on that measure.'
+  );
+}
+
 // --- PRIME coding delivery -------------------------------------------------------------------
 
 const share = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
@@ -609,6 +671,8 @@ function reportEmail(
     deliveryAll?: DeliveryEntry[];
     /** Campus issues still open: the campus's, or every campus's (HQ's email). */
     issues: OpenIssue[];
+    /** The campus, for its placements; none for HQ's email (every campus). */
+    campusId?: number | null;
   }
 ) {
   const noun = options.campus ? 'Batch' : 'Campus';
@@ -634,6 +698,7 @@ function reportEmail(
         ? deliveryComparison(options.deliveryAll)
         : deliverySection(options.delivery)) +
       unusualScores(options.flagged, !options.campus) +
+      placementsSection(options.campusId ?? null) +
       people(rows, !options.campus),
     cta: { label: 'Open the 360° View', href: `${SITE}${link}` },
     footer: options.campus
@@ -717,6 +782,7 @@ const campusReports = campusGroups.map((group) => {
       flagged: campus ? (flaggedByCampus.get(Number(campus.id)) ?? []) : [],
       delivery: campus ? deliveryByCampus.get(Number(campus.id)) : undefined,
       issues: campus ? (openIssuesByCampus.get(Number(campus.id)) ?? []) : [],
+      campusId: campus ? Number(campus.id) : -1,
     }),
   };
 });
