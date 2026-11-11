@@ -16,6 +16,7 @@ import {
   studentsRoute,
   superRoute,
   issuesRoute,
+  placementsRoute,
   teamRoute,
 } from './routes';
 
@@ -25,6 +26,7 @@ const CampusesPage = lazy(() => import('./pages/CampusesPage'));
 const CampusPage = lazy(() => import('./pages/CampusPage'));
 const Super100Page = lazy(() => import('./pages/Super100Page'));
 const IssuesPage = lazy(() => import('./pages/IssuesPage'));
+const PlacementsPage = lazy(() => import('./pages/PlacementsPage'));
 // Staff and their access: the same page as Vertex's, on Converge's own staff list.
 const TeamPage = lazy(() => import('@/pages/TeamPage'));
 
@@ -36,6 +38,7 @@ campusesRoute.update({ component: CampusesPage });
 campusRoute.update({ component: CampusPage });
 superRoute.update({ component: Super100Page });
 issuesRoute.update({ component: IssuesPage });
+placementsRoute.update({ component: PlacementsPage });
 teamRoute.update({ component: TeamPage });
 
 // After a deploy, a tab opened earlier asks for page files whose names have changed. Reload

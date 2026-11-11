@@ -1,5 +1,5 @@
 import { Outlet, useRouterState } from '@tanstack/react-router';
-import { Building2, Crown, Flag, Users } from 'lucide-react';
+import { BriefcaseBusiness, Building2, Crown, Flag, Users } from 'lucide-react';
 
 import { BrandLockup } from '@/components/common/BrandLockup';
 import { NotificationBell } from '@/components/common/NotificationBell';
@@ -15,6 +15,7 @@ const NAV: { to: ConvergePath; label: string; icon: typeof Users; exact: boolean
   { to: '/', label: 'Students', icon: Users, exact: true },
   { to: '/campuses', label: 'Campuses', icon: Building2, exact: false },
   { to: '/super-100', label: 'Super 100', icon: Crown, exact: false },
+  { to: '/placements', label: 'Placements', icon: BriefcaseBusiness, exact: false },
   { to: '/issues', label: 'Issues', icon: Flag, exact: false },
 ];
 

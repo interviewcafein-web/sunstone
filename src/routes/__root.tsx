@@ -1,5 +1,5 @@
 import { Link, Outlet, createRootRoute, useRouterState } from '@tanstack/react-router';
-import { Building2, Flag, Library, LogIn, Radar, Users } from 'lucide-react';
+import { BriefcaseBusiness, Building2, Flag, Library, LogIn, Radar, Users } from 'lucide-react';
 
 import { AskVertex } from '@/components/ask/AskVertex';
 import { AppBanner } from '@/components/common/AppBanner';
@@ -19,6 +19,7 @@ const NAV = [
   { to: '/', label: 'Students', icon: Users, exact: true },
   { to: '/campuses', label: 'Campuses', icon: Building2, exact: false },
   { to: '/insights', label: '360° View', icon: Radar, exact: false },
+  { to: '/placements', label: 'Placements', icon: BriefcaseBusiness, exact: false },
   { to: '/issues', label: 'Issues', icon: Flag, exact: false },
   { to: '/resources', label: 'Resources', icon: Library, exact: false },
 ] as const;

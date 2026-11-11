@@ -326,8 +326,12 @@ export function placementReport(
   };
 
   const readinessKeys = measures.filter((m) => m.readiness).map((m) => m.key);
-  const readiness = (row: StudentRow) =>
-    mean(present(readinessKeys.map((key) => row.measures[key])));
+  // The average of a student's percentage measures; two at least, so one exam alone does not
+  // make a student look ready.
+  const readiness = (row: StudentRow) => {
+    const values = present(readinessKeys.map((key) => row.measures[key]));
+    return values.length >= 2 ? mean(values) : null;
+  };
 
   // How placed students prepared, against those without an offer yet, and the placement rate
   // in each quarter of the batch on each measure.

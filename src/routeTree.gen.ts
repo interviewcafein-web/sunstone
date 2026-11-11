@@ -19,6 +19,7 @@ import { Route as CampusesRouteImport } from './routes/campuses'
 import { Route as InsightsRouteImport } from './routes/insights'
 import { Route as IssuesRouteImport } from './routes/issues'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as PlacementsRouteImport } from './routes/placements'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ResourcesRouteImport } from './routes/resources'
@@ -75,6 +76,11 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlacementsRoute = PlacementsRouteImport.update({
+  id: '/placements',
+  path: '/placements',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/placements.lazy').then((d) => d.Route))
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
@@ -115,6 +121,7 @@ export interface FileRoutesByFullPath {
   '/insights': typeof InsightsRoute
   '/issues': typeof IssuesRoute
   '/login': typeof LoginRoute
+  '/placements': typeof PlacementsRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
@@ -132,6 +139,7 @@ export interface FileRoutesByTo {
   '/insights': typeof InsightsRoute
   '/issues': typeof IssuesRoute
   '/login': typeof LoginRoute
+  '/placements': typeof PlacementsRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
@@ -150,6 +158,7 @@ export interface FileRoutesById {
   '/insights': typeof InsightsRoute
   '/issues': typeof IssuesRoute
   '/login': typeof LoginRoute
+  '/placements': typeof PlacementsRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
@@ -169,6 +178,7 @@ export interface FileRouteTypes {
     | '/insights'
     | '/issues'
     | '/login'
+    | '/placements'
     | '/privacy'
     | '/profile'
     | '/resources'
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/insights'
     | '/issues'
     | '/login'
+    | '/placements'
     | '/privacy'
     | '/profile'
     | '/resources'
@@ -203,6 +214,7 @@ export interface FileRouteTypes {
     | '/insights'
     | '/issues'
     | '/login'
+    | '/placements'
     | '/privacy'
     | '/profile'
     | '/resources'
@@ -221,6 +233,7 @@ export interface RootRouteChildren {
   InsightsRoute: typeof InsightsRoute
   IssuesRoute: typeof IssuesRoute
   LoginRoute: typeof LoginRoute
+  PlacementsRoute: typeof PlacementsRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   ResourcesRoute: typeof ResourcesRoute
@@ -295,6 +308,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/placements': {
+      id: '/placements'
+      path: '/placements'
+      fullPath: '/placements'
+      preLoaderRoute: typeof PlacementsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/privacy': {
       id: '/privacy'
       path: '/privacy'
@@ -349,6 +369,7 @@ const rootRouteChildren: RootRouteChildren = {
   InsightsRoute: InsightsRoute,
   IssuesRoute: IssuesRoute,
   LoginRoute: LoginRoute,
+  PlacementsRoute: PlacementsRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   ResourcesRoute: ResourcesRoute,
