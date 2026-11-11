@@ -10,6 +10,8 @@ import { ZONE_BASIS, ZONES, zoneById, type ZoneResult } from '@/lib/students/zon
 import { DeliveryComparisonPage, DeliveryPage } from '@/reports/Delivery';
 import { OpenIssuesPage } from '@/reports/Issues';
 import type { Issue } from '@/lib/issues';
+import type { PlacementsResponse } from '@/lib/placements';
+import { PlacementsPages } from '@/reports/Placements';
 import { HealthComparisonPage, InsightsPage } from '@/reports/Insights';
 import { UnusualScoresPage, type ReportFlaggedTest } from '@/reports/UnusualScores';
 import {
@@ -62,6 +64,8 @@ export interface CampusReportData {
   delivery?: ReportCampusDelivery[];
   /** Campus issues still open, for the report's campuses. */
   issues?: Issue[];
+  /** Placements (full-time jobs, internships) for the report's campuses. */
+  placements?: PlacementsResponse[];
 }
 
 const SHORT: Record<PlatformId, string> = {
@@ -155,6 +159,7 @@ export function CampusReport({ data }: { data: CampusReportData }) {
         <UnusualScoresPage tests={flagged} label={label} showCampus={false} />
         {entry && <DeliveryPage entry={entry} label={label} />}
         <OpenIssuesPage issues={data.issues ?? []} label={label} showCampus={false} />
+        <PlacementsPages reports={data.placements ?? []} label={label} allCampuses={false} />
       </>
     );
   }
@@ -174,6 +179,7 @@ export function CampusReport({ data }: { data: CampusReportData }) {
       <UnusualScoresPage tests={flagged} label={label} showCampus />
       <DeliveryComparisonPage entries={delivery} label={label} />
       <OpenIssuesPage issues={data.issues ?? []} label={label} showCampus />
+      <PlacementsPages reports={data.placements ?? []} label={label} allCampuses />
       {campuses.map((campus) => {
         const entry = deliveryOf(campus);
         return (

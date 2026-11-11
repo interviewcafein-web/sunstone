@@ -1,4 +1,4 @@
-// The LMS half of the student report: PRIME tests, AMCAT, internal exams and attendance,
+// The LMS half of the student report: placements, PRIME tests, AMCAT, internal exams and attendance,
 // laid out like the student's Assessments and Attendance tabs on the website.
 
 import { Page, Text, View } from '@react-pdf/renderer';
@@ -16,10 +16,12 @@ import {
   type StudentTest,
 } from '@/lib/assessments';
 import { BAND_COLORS, bandOf, dimensionById, type DimensionId } from '@/lib/insights';
+import { formatPay, type StudentPlacement } from '@/lib/placements';
 import {
   INK,
   LINE,
   MUTED,
+  NAVY,
   ReportFooter,
   SOFT,
   StatTile,
@@ -82,11 +84,61 @@ export function AssessmentSections({
         PRIME Mock Tests, AMCAT, internal exams and class attendance from the LMS
         {syncedAt ? `, as of ${lmsDate(syncedAt, true)}` : ''}.
       </Text>
+      <PlacementsSection placements={assessments.placements ?? []} />
       <TestsSection tests={assessments.tests} />
       <AmcatSection sittings={assessments.amcat} />
       <ExamsSection exams={assessments.exams} average={metrics?.exam_avg ?? null} />
       <AttendanceSection attendance={assessments.attendance} />
     </>
+  );
+}
+
+/** The student's job offers and internships from the LMS; nothing when there are none. */
+function PlacementsSection({ placements }: { placements: StudentPlacement[] }) {
+  if (!placements.length) return null;
+  return (
+    <View>
+      <SectionTitle title="Placements" aside={`${placements.length} from the LMS`} color={NAVY} />
+      {placements.map((offer, index) => {
+        const pay = offer.full_time ? offer.total_lpa : offer.stipend;
+        return (
+          <View
+            key={index}
+            wrap={false}
+            style={{
+              flexDirection: 'row',
+              paddingVertical: 3,
+              borderBottomWidth: 0.5,
+              borderBottomColor: LINE,
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 8.5, fontWeight: 700 }}>
+                {offer.company ?? 'Company not given'}
+              </Text>
+              <Text style={{ fontSize: 7, color: MUTED }}>
+                {[
+                  offer.full_time
+                    ? 'Full-time'
+                    : `Internship${offer.months ? `, ${offer.months} months` : ''}`,
+                  offer.designation,
+                  offer.category,
+                  offer.selected_on && `selected ${lmsDate(offer.selected_on)}`,
+                  offer.joining,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </Text>
+            </View>
+            {pay != null && (
+              <Text style={{ fontSize: 9, fontWeight: 800, color: NAVY }}>
+                {formatPay(pay, offer.full_time)}
+              </Text>
+            )}
+          </View>
+        );
+      })}
+    </View>
   );
 }
 

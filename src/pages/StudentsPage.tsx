@@ -12,6 +12,7 @@ import { PLATFORM_IDS, SOLVING_PLATFORM_IDS } from '@/lib/coding-profiles/platfo
 import { ProfileError, type PlatformId } from '@/lib/coding-profiles/types';
 import { useTour } from '@/hooks/useTour';
 import { fetchReportExtras, useStudentMetrics, type StudentMetrics } from '@/lib/assessments';
+import { fetchReportPlacements } from '@/lib/placementsApi';
 import type { Issue, IssuesResponse } from '@/lib/issues';
 import { buildInsights, type StudentInsight } from '@/lib/insights';
 import { useSession } from '@/lib/session';
@@ -236,7 +237,7 @@ export default function StudentsPage() {
             ? `${search.course}:`
             : search.batch || undefined;
       const campusNames = [...new Set(rows.map((row) => row.student.campus))];
-      const [{ flaggedTests, delivery }, issues] = await Promise.all([
+      const [{ flaggedTests, delivery }, issues, placements] = await Promise.all([
         fetchReportExtras(campusNames, cohort).catch(() => ({ flaggedTests: [], delivery: [] })),
         // Campus issues still open, for the same campuses.
         fetch('/api/issues?status=active')
@@ -245,6 +246,8 @@ export default function StudentsPage() {
             (data?.issues ?? []).filter((issue) => campusNames.includes(issue.campus))
           )
           .catch(() => [] as Issue[]),
+        // Placements for the same campuses (all of them, or the one chosen).
+        fetchReportPlacements(search.campus).catch(() => []),
       ]);
       await downloadCampusReport({
         origin: window.location.origin,
@@ -258,6 +261,7 @@ export default function StudentsPage() {
         flaggedTests,
         delivery,
         issues,
+        placements,
       });
       setReportState('idle');
     } catch (error) {
