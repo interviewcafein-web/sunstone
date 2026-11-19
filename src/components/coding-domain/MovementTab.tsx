@@ -38,7 +38,7 @@ import {
   type CodingStudent,
   type Movement,
 } from '@/lib/codingDomain';
-import { cohortLabel } from '@/lib/cohorts';
+import { cohortLabel, compareProgram } from '@/lib/cohorts';
 import type { ExportColumn } from '@/lib/exportTable';
 import { cn } from '@/lib/utils';
 
@@ -279,7 +279,7 @@ function Summary({
 
 function ByProgram({ moves, scope }: { moves: Moves; scope: string }) {
   const programs = useMemo(
-    () => [...new Set(moves.filter((m) => m.move).map((m) => m.row.program))].sort(),
+    () => [...new Set(moves.filter((m) => m.move).map((m) => m.row.program))].sort(compareProgram),
     [moves]
   );
   const count = (move: Movement | null, program: string | null) =>
@@ -373,6 +373,8 @@ function ByBatch({ moves, scope }: { moves: Moves; scope: string }) {
         const n = (move: Movement) => list.filter((item) => item.move === move).length;
         return {
           campus: list[0].row.campus,
+          program: list[0].row.program,
+          year: list[0].row.year ?? 0,
           batch: batchOf(list[0].row),
           compared: list.length,
           up: n('up'),
@@ -382,7 +384,12 @@ function ByBatch({ moves, scope }: { moves: Moves; scope: string }) {
           net: n('up') - n('down'),
         };
       })
-      .sort((a, b) => a.campus.localeCompare(b.campus) || a.batch.localeCompare(b.batch));
+      .sort(
+        (a, b) =>
+          a.campus.localeCompare(b.campus) ||
+          compareProgram(a.program, b.program) ||
+          a.year - b.year
+      );
   }, [moves]);
   type Row = (typeof rows)[number];
   const columns: ExportColumn<Row>[] = [

@@ -11,6 +11,7 @@
 // The AI never queries the database itself: it asks for a lookup by name, and the lookup runs
 // here with the person's own access (api/_ask-tools.ts).
 
+import { compareProgram } from '../src/lib/cohorts';
 import {
   AiUnavailable,
   type ChatMessage,
@@ -227,7 +228,9 @@ async function handler(request: Request): Promise<Response> {
         id: item.id,
         name: item.name,
         code: item.code,
-        batches: item.batches.sort((a, b) => b.year - a.year || a.program.localeCompare(b.program)),
+        batches: item.batches.sort(
+          (a, b) => compareProgram(a.program, b.program) || b.year - a.year
+        ),
       })),
     });
   }

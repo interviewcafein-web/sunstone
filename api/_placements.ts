@@ -13,6 +13,7 @@ import { db, together } from './_db';
 import { metricsByCampus } from './assessments';
 import { snapshot, type WaitUntil } from './_snapshot';
 import { JOINING } from '../src/lib/placements';
+import { compareProgram } from '../src/lib/cohorts';
 
 export type Kind = 'full-time' | 'internship';
 
@@ -351,7 +352,7 @@ export function placementReport(
       const [program, year] = key.split(':');
       return { key, program, year: Number(year), students };
     })
-    .sort((a, b) => a.program.localeCompare(b.program) || a.year - b.year);
+    .sort((a, b) => compareProgram(a.program, b.program) || a.year - b.year);
   const population = batch ? inCampus.filter((row) => batchKey(row) === batch) : inCampus;
   const placed = population.filter((row) => offersOf(row).length);
   const placedSet = new Set(placed);
@@ -504,7 +505,7 @@ export function placementReport(
     .sort((a, b) => (b.rate ?? 0) - (a.rate ?? 0) || b.placed - a.placed);
   const batches = [...groupBy(population, (row) => `${row.program}:${row.year}`)]
     .map(([, rows]) => ({ program: rows[0].program, year: rows[0].year, ...groupStats(rows) }))
-    .sort((a, b) => a.program.localeCompare(b.program) || (a.year ?? 0) - (b.year ?? 0));
+    .sort((a, b) => compareProgram(a.program, b.program) || (a.year ?? 0) - (b.year ?? 0));
 
   // LMS cohorts (Super 100 and others) against everyone else.
   const cohortNames = [...new Set(population.flatMap((row) => row.cohorts))].sort();

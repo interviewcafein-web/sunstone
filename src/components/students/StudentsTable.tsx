@@ -670,7 +670,7 @@ function TestsCell({ metrics }: { metrics?: StudentMetrics }) {
   return (
     <span
       className="inline-flex flex-col items-end"
-      title="Prime Domain Coding tests: average score, tests taken out of released; the line is the score on each test"
+      title="PRIME mock tests (AMCAT mock tests in Prime Domain Coding): average score, mock tests taken out of those released; the line is the score on each"
     >
       <span className="inline-flex items-center gap-1">
         <span className={cn('text-base font-bold tabular-nums', scoreTone(metrics.test_avg))}>

@@ -265,20 +265,27 @@ export const bandOf = (score: number | null) =>
 /**
  * The placement funnel, from the LMS: every student in view, eligible for at least one
  * opportunity (or applied to one), applied, shortlisted in a round, reached an interview round,
- * and got an offer.
+ * and got an offer. Each stage includes everyone who got further, so it only narrows.
  */
 export const FUNNEL = [
   { key: 'registered', label: 'Registered', test: () => true },
   {
     key: 'eligible',
     label: 'Eligible',
-    test: (row: CodingStudent) => row.pipeline.eligible > 0 || row.pipeline.applied > 0,
+    test: (row: CodingStudent) =>
+      row.pipeline.eligible > 0 || row.pipeline.applied > 0 || row.placed !== null,
   },
-  { key: 'applied', label: 'Applied', test: (row: CodingStudent) => row.pipeline.applied > 0 },
+  {
+    key: 'applied',
+    label: 'Applied',
+    test: (row: CodingStudent) => row.pipeline.applied > 0 || row.placed !== null,
+  },
   {
     key: 'shortlisted',
     label: 'Shortlisted',
-    test: (row: CodingStudent) => row.pipeline.shortlisted > 0 || row.placed !== null,
+    // Reaching an interview round or an offer means they were shortlisted on the way.
+    test: (row: CodingStudent) =>
+      row.pipeline.shortlisted > 0 || row.pipeline.interviews > 0 || row.placed !== null,
   },
   {
     key: 'interviewed',

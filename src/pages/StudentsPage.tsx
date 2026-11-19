@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { getRouteApi } from '@tanstack/react-router';
 
+import { compareProgram } from '@/lib/cohorts';
+
 import { StudentFilters } from '@/components/students/StudentFilters';
 import { StudentsHero } from '@/components/students/StudentsHero';
 import { StudentsTable, type Cell, type StudentRow } from '@/components/students/StudentsTable';
@@ -186,7 +188,7 @@ export default function StudentsPage() {
   const options = useMemo(
     () => ({
       campus: unique(all.map((student) => student.campus)),
-      course: unique(all.map((student) => student.course)),
+      course: unique(all.map((student) => student.course)).sort(compareProgram),
       batch: unique(all.map((student) => student.batch)),
       placed: all.some((student) => student.placement)
         ? ['placed', 'full-time', 'internship', 'none']

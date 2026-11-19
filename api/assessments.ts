@@ -14,7 +14,7 @@
 // LMS times are India time without a zone, so "now" is compared in India time too.
 
 import { type Viewer, json, seesCampus, sessionViewer } from './_auth';
-import { db, together } from './_db';
+import { PROGRAM_RANK, db, together } from './_db';
 import { snapshot, type WaitUntil } from './_snapshot';
 import { integrityOf } from '../src/lib/integrity';
 import { currentApp, forApp } from './_app';
@@ -269,7 +269,8 @@ export async function campus(campusId: number, batch: string | null) {
       where on_platform and campus_id = ${campusId} and admission_year is not null
         and program is not null
       group by program, admission_year
-      order by admission_year desc, program`;
+      order by coalesce(array_position(array['B.Tech', 'BE', 'BCA', 'MCA', 'Diploma'], program), 99),
+        admission_year desc`;
   const nowQuery = db().query(`select ${NOW}::text as now`);
 
   // Every test placed in the campus's subjects, section copies merged, with release dates
@@ -609,7 +610,7 @@ async function delivery(campusId: number, batch: string | null) {
             coalesce(d.delivered, 0) as delivered, coalesce(d.pending, 0) as pending,
             coalesce(d.classes, 0) as classes, d.last_class
      from t full join d using (program, batch_year, section)
-     order by batch_year desc, program, section`,
+     order by ${PROGRAM_RANK('program')}, batch_year desc, section`,
     params
   );
   const trainersQuery = db().query(
@@ -734,6 +735,7 @@ const PRIME_CODING = `(subject ~* '(^|[^a-z])pri[mne]{2}([^a-z]|$)' and subject 
 // Converge: PRIME aptitude ("Prime Aptitude", "Prime_Aptitude", "Aptitude (Prime)"…) and
 // PRIME communication ("Prime Communication", spelling variants, "ELQ Test") subjects, as
 // opposed to the PRIME domains. Kept in step with src/converge/lib/subjects.ts.
+const MOCK_TEST = `(t.category = 'amcat_mock' or t.name ~* '(^|[^a-z])mock')`;
 const APT_SUBJECT = `(^|[^a-z])apt`;
 const COMM_SUBJECT = `com+u|elq`;
 
@@ -1199,6 +1201,9 @@ export async function metrics(viewer: Viewer) {
             part.apt_avg, part.apt_submitted, part.apt_released`
     : '';
   const splitJoin = split ? ' left join part using (lms_user_id)' : '';
+  // Vertex's "PRIME Mock Tests" are the mock tests only (the LMS category "AMCAT mock", and
+  // tests named "Mock Test…"), not the assignments, MCQs and practice tests released alongside.
+  const mockOnly = split ? '' : ` and ${MOCK_TEST}`;
   const rows = await db().query(
     `with roster as (
        select lms_user_id, username from students
@@ -1235,7 +1240,7 @@ export async function metrics(viewer: Viewer) {
        from done d join lms_section_students ss using (section_id)
        join lms_tests t on t.id = d.test_id
        join lms_test_results tr on tr.test_id = d.test_id and tr.lms_user_id = ss.lms_user_id and tr.submitted
-       where ss.lms_user_id in (select lms_user_id from roster)
+       where ss.lms_user_id in (select lms_user_id from roster)${mockOnly}
        group by ss.lms_user_id, d.test_id),
      tt as (
        select lms_user_id, json_agg(pct order by released) as list from scored group by lms_user_id),
@@ -1252,6 +1257,7 @@ export async function metrics(viewer: Viewer) {
                     filter (where tr.submitted))::int as avg
        from eligible e join lms_tests t on t.id = e.test_id
        left join lms_test_results tr on tr.test_id = e.test_id and tr.lms_user_id = e.lms_user_id
+       where true${mockOnly}
        group by e.lms_user_id)${splitCtes}
      select r.username,
             round(100.0 * att.p / nullif(att.s, 0))::int as attendance,

@@ -8,7 +8,7 @@
 // (dlv_*, read-only, synced by scripts/sync-delivery.ts) and is small enough to read each time.
 
 import { type Viewer } from './_auth';
-import { db, together } from './_db';
+import { PROGRAM_RANK, db, together } from './_db';
 import { scorePct } from './assessments';
 import { snapshot, type WaitUntil } from './_snapshot';
 
@@ -255,7 +255,7 @@ export async function deliveryReport(campusIds: number[] | null) {
               coalesce(d.pending_hours, 0) as pending_hours, coalesce(d.rejected_hours, 0) as rejected_hours,
               d.class_minutes, d.attendance, d.last_class, d.trainers
        from t full join d using (campus_code, program, batch_year, section)
-       order by 1, 2, 3, 4`,
+       order by 1, ${PROGRAM_RANK('coalesce(t.program, d.program)')}, 3, 4`,
       [codes]
     ),
     db().query(

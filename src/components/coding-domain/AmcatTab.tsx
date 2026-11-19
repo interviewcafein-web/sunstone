@@ -26,7 +26,7 @@ import {
   type CodingStudent,
   type Cycle,
 } from '@/lib/codingDomain';
-import { cohortLabel } from '@/lib/cohorts';
+import { cohortLabel, compareProgram } from '@/lib/cohorts';
 import type { ExportColumn } from '@/lib/exportTable';
 import { cn } from '@/lib/utils';
 
@@ -92,7 +92,7 @@ function Schedule({ data, students, scope }: TabProps) {
           data.cycles.map((cycle) => [cycle.key, list.filter((row) => row.amcat[cycle.key]).length])
         ),
       }))
-      .sort((a, b) => a.program.localeCompare(b.program) || (a.year ?? 0) - (b.year ?? 0));
+      .sort((a, b) => compareProgram(a.program, b.program) || (a.year ?? 0) - (b.year ?? 0));
   }, [data.cycles, students]);
   type Row = (typeof rows)[number];
   const columns: ExportColumn<Row>[] = [

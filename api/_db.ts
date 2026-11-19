@@ -39,3 +39,7 @@ export function together(queries: NeonQueryPromise<false, false>[]): Promise<Row
   if (!queries.length) return Promise.resolve([]);
   return db().transaction(queries, { readOnly: true }) as Promise<Rows[]>;
 }
+
+/** SQL to order rows by program as HQ lists them (B.Tech, BE, BCA, MCA…); see src/lib/cohorts.ts. */
+export const PROGRAM_RANK = (column: string) =>
+  `coalesce(array_position(array['B.Tech', 'BE', 'BCA', 'MCA', 'Diploma', 'BBA', 'MBA'], ${column}), 99)`;

@@ -22,7 +22,7 @@ import DeliveryTab from '@/components/coding-domain/DeliveryTab';
 import MovementTab from '@/components/coding-domain/MovementTab';
 import ReadinessTab from '@/components/coding-domain/ReadinessTab';
 import type { TabProps } from '@/components/coding-domain/types';
-import { cohortLabel } from '@/lib/cohorts';
+import { cohortLabel, compareProgram } from '@/lib/cohorts';
 import {
   DEFAULT_PASS,
   cyclesWithData,
@@ -91,7 +91,7 @@ export default function CodingDomainPage({
   const cycle =
     cycles.find((item) => item.key === search.cycle) ?? cycles[cycles.length - 1] ?? null;
   // Options from every student at the chosen campus (not narrowed by the other filters).
-  const programs = [...new Set(data.students.map((row) => row.program))].sort();
+  const programs = [...new Set(data.students.map((row) => row.program))].sort(compareProgram);
   const batches = [
     ...new Set(
       data.students

@@ -5,7 +5,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { BriefcaseBusiness, Filter, Layers, Search, Target, Users } from 'lucide-react';
 
 import { ExportButtons } from '@/components/common/ExportButtons';
-import { cohortLabel } from '@/lib/cohorts';
+import { academicYearEnd, cohortLabel, compareProgram, isFinalYear } from '@/lib/cohorts';
 import {
   FUNNEL,
   employable,
@@ -68,16 +68,21 @@ const batchOf = (row: CodingStudent) => cohortLabel(row.program, row.year);
 export default function ReadinessTab(props: TabProps) {
   const { students, data, search, pass, cycle, scope } = props;
   const ready = (row: CodingStudent) => (cycle ? employable(row.amcat[cycle.key], pass) : null);
+  // The funnel is about the placement batches: those in their final year.
+  const finalYear = useMemo(
+    () => students.filter((row) => isFinalYear(row.program, row.year)),
+    [students]
+  );
   return (
     <>
       <FunnelCard
-        students={students}
+        students={finalYear}
         ready={ready}
         scope={scope}
         cycleLabel={cycle?.label}
         pass={pass}
       />
-      <BatchFunnel students={students} allCampuses={!search.campus} scope={scope} />
+      <BatchFunnel students={finalYear} allCampuses={!search.campus} scope={scope} />
       <DomainReadiness
         students={students}
         modules={data.skills.domain}
@@ -106,25 +111,65 @@ function FunnelCard({
   cycleLabel?: string;
   pass: number;
 }) {
-  const stages = FUNNEL.map((stage) => ({
-    key: stage.key,
-    label: stage.label,
-    count: students.filter((row) => stage.test(row)).length,
-  }));
+  // Each placement batch (program and admission year), in HQ's program order.
+  const batches = [
+    ...students.reduce(
+      (map, row) => map.set(`${row.program}|${row.year}`, { program: row.program, year: row.year }),
+      new Map<string, { program: string; year: number | null }>()
+    ),
+  ]
+    .map(([key, batch]) => ({
+      key,
+      ...batch,
+      label: cohortLabel(batch.program, batch.year),
+      size: students.filter((row) => `${row.program}|${row.year}` === key).length,
+    }))
+    .sort((a, b) => compareProgram(a.program, b.program) || (a.year ?? 0) - (b.year ?? 0));
+  const stages = FUNNEL.map((stage) => {
+    const reached = students.filter((row) => stage.test(row));
+    return {
+      key: stage.key,
+      label: stage.label,
+      count: reached.length,
+      byBatch: batches.map((batch) => ({
+        ...batch,
+        count: reached.filter((row) => `${row.program}|${row.year}` === batch.key).length,
+      })),
+    };
+  });
   const total = students.length;
   const judged = students.map(ready).filter((value) => value !== null);
   const readyCount = judged.filter(Boolean).length;
   const columns: ExportColumn<(typeof stages)[number]>[] = [
     { header: 'Stage', value: (row) => row.label },
     { header: 'Students', value: (row) => row.count },
-    { header: '% of registered', value: (row) => pct(row.count, total) },
+    { header: '% of placement batch', value: (row) => pct(row.count, total) },
+    ...batches.flatMap((batch, index) => [
+      { header: batch.label, value: (row: (typeof stages)[number]) => row.byBatch[index].count },
+      {
+        header: `${batch.label} %`,
+        value: (row: (typeof stages)[number]) => pct(row.byBatch[index].count, batch.size),
+      },
+    ]),
   ];
+  if (!total) {
+    return (
+      <section className={cn(panel, 'p-5')}>
+        <Title icon={Filter} title="Placement Funnel" />
+        <p className="text-sm text-slate-500">
+          The funnel covers the placement batches, those in their final year (B.Tech/BE{' '}
+          {academicYearEnd() - 4}, BCA {academicYearEnd() - 3}, MCA {academicYearEnd() - 2}
+          ). None are in this selection.
+        </p>
+      </section>
+    );
+  }
   return (
     <section className={cn(panel, 'p-5')}>
       <Title
         icon={Filter}
         title="Placement Funnel"
-        description="How far students have got with LMS opportunities: eligible for one, applied, shortlisted in a round, reached an interview round, and got an offer."
+        description={`The placement batches (final year: ${batches.map((batch) => batch.label).join(', ')}): how many were eligible for an LMS opportunity, applied, were shortlisted in a round, reached an interview round and got an offer. Percentages are of the placement batch.`}
         aside={
           <ExportButtons
             name={`prime-coding-funnel-${scope}`}
@@ -135,26 +180,47 @@ function FunnelCard({
         }
       />
       <div className="grid gap-6 lg:grid-cols-[1fr_16rem]">
-        <ol className="space-y-1.5">
+        <ol className="space-y-2.5">
           {stages.map((stage, index) => {
             const share = pct(stage.count, total);
             return (
-              <li key={stage.key} className="flex items-center gap-3">
-                <div className="flex flex-1 justify-center">
-                  <div
-                    className="flex h-9 items-center justify-center rounded-md text-sm font-bold text-white tabular-nums shadow-sm"
-                    style={{
-                      width: `${100 - index * 11}%`,
-                      background: FUNNEL_COLORS[index],
-                    }}
-                  >
-                    {stage.count.toLocaleString('en-IN')}
+              <li key={stage.key}>
+                <div className="flex items-center gap-3">
+                  <div className="flex flex-1 justify-center">
+                    <div
+                      className="flex h-9 items-center justify-center rounded-md text-sm font-bold text-white tabular-nums shadow-sm"
+                      style={{
+                        width: `${100 - index * 11}%`,
+                        background: FUNNEL_COLORS[index],
+                      }}
+                    >
+                      {stage.count.toLocaleString('en-IN')}
+                    </div>
                   </div>
+                  <span className="w-24 text-sm font-medium sm:w-28">{stage.label}</span>
+                  <span className="w-12 text-right text-xs text-slate-500 tabular-nums">
+                    {share ?? 0}%
+                  </span>
                 </div>
-                <span className="w-24 text-sm font-medium sm:w-28">{stage.label}</span>
-                <span className="w-12 text-right text-xs text-slate-500 tabular-nums">
-                  {share ?? 0}%
-                </span>
+                {/* This stage by program and batch: count, and % of that batch. */}
+                <div className="mt-1 flex flex-wrap justify-center gap-1.5 sm:pr-40">
+                  {stage.byBatch.map((batch) => (
+                    <span
+                      key={batch.key}
+                      className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600 tabular-nums dark:bg-slate-800 dark:text-slate-300"
+                      title={`${batch.label}: ${batch.count} of ${batch.size} (${pct(batch.count, batch.size) ?? 0}%)`}
+                    >
+                      {batch.label}{' '}
+                      <b className="text-slate-800 dark:text-slate-100">{batch.count}</b>
+                      {stage.key !== 'registered' && (
+                        <span className="text-slate-400">
+                          {' '}
+                          · {pct(batch.count, batch.size) ?? 0}%
+                        </span>
+                      )}
+                    </span>
+                  ))}
+                </div>
               </li>
             );
           })}
@@ -207,7 +273,7 @@ function BatchFunnel({
       .sort(
         (a, b) =>
           a.campus.localeCompare(b.campus) ||
-          a.program.localeCompare(b.program) ||
+          compareProgram(a.program, b.program) ||
           (b.year ?? 0) - (a.year ?? 0)
       );
   }, [students, allCampuses]);
@@ -225,7 +291,7 @@ function BatchFunnel({
       <Title
         icon={Layers}
         title="Funnel by Batch"
-        description="Each stage of the funnel for every batch in view."
+        description="Each stage of the funnel for every placement (final-year) batch in view."
         aside={
           <ExportButtons
             name={`prime-coding-funnel-by-batch-${scope}`}

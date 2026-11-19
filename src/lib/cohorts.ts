@@ -12,6 +12,39 @@ const LENGTH: Record<string, number> = {
   MBA: 2,
 };
 
+/**
+ * The order programs are always listed in: B.Tech and BE, then BCA, then MCA (as HQ asked), then
+ * the rest; Converge's BBA before MBA. Kept in step with PROGRAM_RANK in api/_db.ts.
+ */
+export const PROGRAM_ORDER = ['B.Tech', 'BE', 'BCA', 'MCA', 'Diploma', 'BBA', 'MBA'];
+
+export const programRank = (program: string | null | undefined) => {
+  const index = PROGRAM_ORDER.indexOf(program ?? '');
+  return index < 0 ? PROGRAM_ORDER.length : index;
+};
+
+/** Sorts programs B.Tech, BE, BCA, MCA…, unknown ones last by name. */
+export const compareProgram = (a: string | null | undefined, b: string | null | undefined) =>
+  programRank(a) - programRank(b) || (a ?? '').localeCompare(b ?? '');
+
+/** The calendar year the current academic year ends in (July to June): 2027 in Nov 2026. */
+export const academicYearEnd = (today = new Date()) =>
+  today.getMonth() >= 6 ? today.getFullYear() + 1 : today.getFullYear();
+
+/**
+ * A batch in its final year, finishing this academic year: the placement batch (B.Tech 2023,
+ * BCA 2024 and MCA 2025 in 2026–27).
+ */
+export function isFinalYear(
+  program: string | null | undefined,
+  year: number | string | null | undefined,
+  today = new Date()
+) {
+  const length = program ? LENGTH[program] : undefined;
+  const start = Number(year);
+  return Boolean(length && start && start + length === academicYearEnd(today));
+}
+
 /** "B.Tech", 2025 → "B.Tech 2025–29". */
 export function cohortLabel(
   program: string | null | undefined,
