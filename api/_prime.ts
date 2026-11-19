@@ -16,6 +16,8 @@ export const HOURS_PER_CREDIT = 15;
 
 /** One name per subject, whatever its spelling in the LMS. */
 const SUBJECT = (column: string) => `case
+  when lower(trim(${column})) in ('prime domain', 'prime domains')
+    then 'PRIME Domain (subject not named in the LMS)'
   when ${column} ~* 'career[[:space:]]*track' then 'Business Development Career Track'
   when ${column} ~* 'trainee' then 'Management Trainee Program'
   when ${column} ~* 'boot[[:space:]]*camp' then 'Prime Domain Boot Camp'
@@ -239,7 +241,7 @@ export async function plannedHours(campusIds: number[] | null): Promise<PlannedH
 }
 
 /** Students needed on each side (opted in, not) for a batch to be compared. */
-const MIN_SIDE = 20;
+const MIN_SIDE = 30;
 
 /**
  * PRIME opt-in students against everyone else at the same campuses, overall and per batch. Only

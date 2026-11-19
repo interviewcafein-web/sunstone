@@ -62,7 +62,7 @@ function toRequest(req: Connect.IncomingMessage, body?: Buffer) {
   return new Request(`http://${req.headers.host ?? 'localhost'}${req.originalUrl ?? req.url}`, {
     method: req.method,
     headers,
-    body: req.method === 'POST' && body ? new Uint8Array(body) : undefined,
+    body: req.method !== 'GET' && req.method !== 'HEAD' && body ? new Uint8Array(body) : undefined,
   });
 }
 

@@ -22,6 +22,7 @@ export type ConvergePath =
   | '/super-100'
   | '/issues'
   | '/placements'
+  | '/prime'
   | '/team';
 
 type Search = Record<string, unknown>;

@@ -165,6 +165,26 @@ export const placementsRoute = createRoute({
   validateSearch: validatePlacementsSearch,
 });
 
+export type PrimeTab = 'overview' | 'hours' | 'assignments' | 'amcat' | 'placements';
+const PRIME_TABS: PrimeTab[] = ['overview', 'hours', 'assignments', 'amcat', 'placements'];
+
+export interface PrimeSearch {
+  tab?: PrimeTab;
+  campus?: number;
+  /** BBA or MBA. */
+  program?: string;
+}
+
+export const primeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/prime',
+  validateSearch: (search: Record<string, unknown>): PrimeSearch => ({
+    tab: PRIME_TABS.includes(search.tab as PrimeTab) ? (search.tab as PrimeTab) : undefined,
+    campus: positive(search.campus),
+    program: text(search.program),
+  }),
+});
+
 export const teamRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/team',
@@ -179,5 +199,6 @@ export const routeTree = rootRoute.addChildren([
   superRoute,
   issuesRoute,
   placementsRoute,
+  primeRoute,
   teamRoute,
 ]);

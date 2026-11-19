@@ -1,5 +1,5 @@
 import { Outlet, useRouterState } from '@tanstack/react-router';
-import { BriefcaseBusiness, Building2, Crown, Flag, Users } from 'lucide-react';
+import { BriefcaseBusiness, Building2, Crown, Flag, Layers, Users } from 'lucide-react';
 
 import { BrandLockup } from '@/components/common/BrandLockup';
 import { NotificationBell } from '@/components/common/NotificationBell';
@@ -14,6 +14,7 @@ import { ConvergeLogo } from './ConvergeLogo';
 const NAV: { to: ConvergePath; label: string; icon: typeof Users; exact: boolean }[] = [
   { to: '/', label: 'Students', icon: Users, exact: true },
   { to: '/campuses', label: 'Campuses', icon: Building2, exact: false },
+  { to: '/prime', label: 'PRIME Domain', icon: Layers, exact: false },
   { to: '/super-100', label: 'Super 100', icon: Crown, exact: false },
   { to: '/placements', label: 'Placements', icon: BriefcaseBusiness, exact: false },
   { to: '/issues', label: 'Issues', icon: Flag, exact: false },
@@ -63,7 +64,7 @@ export function Layout() {
                     activeProps={navItemActive}
                     activeOptions={{ exact, includeSearch: false }}
                   >
-                    <Icon className="size-4" aria-hidden />
+                    <Icon className="size-4 md:max-2xl:hidden" aria-hidden />
                     {label}
                   </Link>
                 ))}
