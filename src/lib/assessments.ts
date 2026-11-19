@@ -340,12 +340,33 @@ export interface CampusDelivery {
   weeks: { week: string; hours: number }[];
   topics: {
     curriculum: string;
+    /** The program and admission years that follow this curriculum. */
+    program?: string;
+    batch_years?: number[];
     topic: string;
     topic_order: number;
     subtopics: number;
     hours: number;
     classes: number;
     first_class: string | null;
+    last_class: string | null;
+  }[];
+  /** Each batch and section, topic by topic (absent in answers saved before it was added). */
+  sectionTopics?: {
+    program: string;
+    batch_year: number | null;
+    section: string | null;
+    curriculum: string;
+    topic: string;
+    /** Verified hours and classes. */
+    hours: number;
+    classes: number;
+    /** Classes waiting for verification. */
+    pending: number;
+    /** Subtopics with a verified class. */
+    subtopics_taught: string[];
+    first_class: string | null;
+    /** Latest class logged on it (verified or waiting). */
     last_class: string | null;
   }[];
   syncedAt: string | null;

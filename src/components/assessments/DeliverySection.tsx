@@ -3,6 +3,7 @@ import {
   BookOpenCheck,
   CalendarDays,
   CheckCircle2,
+  ChevronRight,
   Clock,
   Code2,
   GraduationCap,
@@ -13,6 +14,7 @@ import {
 
 import { AnimatedRing } from '@/components/common/AnimatedRing';
 import { lmsDate, type CampusDelivery } from '@/lib/assessments';
+import { sectionSyllabus, type TopicStatus } from '@/lib/deliverySyllabus';
 import { cohortLabel } from '@/lib/cohorts';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +25,209 @@ const share = (part: number, whole: number) => (whole > 0 ? Math.round((part / w
 const paceColor = (pct: number) => (pct >= 75 ? '#10b981' : pct >= 40 ? '#f59e0b' : '#ef4444');
 /** Hours awaiting verification. */
 const PENDING = '#f59e0b';
+
+type SectionRowData = CampusDelivery['sections'][number];
+
+/** One batch and section: its hours, and when opened, its syllabus topic by topic. */
+function SectionRow({ row, data }: { row: SectionRowData; data: CampusDelivery }) {
+  const [open, setOpen] = useState(false);
+  const pct = share(row.delivered, row.allocated);
+  const syllabus = sectionSyllabus(row, data);
+  const started = syllabus.topics.filter((topic) => topic.status !== 'not').length;
+  return (
+    <li className={cn('rounded-xl transition', open && 'bg-slate-50/80 dark:bg-slate-800/30')}>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="w-full rounded-xl px-2 py-1.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40"
+      >
+        <div className="flex items-baseline justify-between gap-2 text-sm">
+          <span className="flex min-w-0 items-center gap-1.5 font-medium">
+            <ChevronRight
+              className={cn('size-3.5 shrink-0 text-slate-400 transition', open && 'rotate-90')}
+              aria-hidden
+            />
+            <span className="truncate">
+              {cohortLabel(row.program, row.batch_year)}
+              {row.section && <span className="text-slate-500"> · Section {row.section}</span>}
+            </span>
+          </span>
+          <span className="shrink-0 text-xs text-slate-500 tabular-nums">
+            {syllabus.topics.length > 0 && (
+              <span className="mr-2 hidden sm:inline">
+                {started}/{syllabus.topics.length} topics
+              </span>
+            )}
+            <b className="text-slate-800">{row.delivered}</b> / {row.allocated} h
+            {row.allocated > 0 && (
+              <b className="ml-1.5" style={{ color: paceColor(pct) }}>
+                {pct}%
+              </b>
+            )}
+          </span>
+        </div>
+        <div className="mt-1 pl-5">
+          <Bar value={pct} pending={share(row.pending, row.allocated)} color={paceColor(pct)} />
+        </div>
+      </button>
+      {open && <SectionSyllabus syllabus={syllabus} />}
+    </li>
+  );
+}
+
+const STATUS: Record<TopicStatus, { label: string; chip: string; dot: string }> = {
+  done: {
+    label: 'Completed',
+    chip: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+    dot: 'bg-[#10b981] text-white',
+  },
+  progress: {
+    label: 'In Progress',
+    chip: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    dot: 'bg-amber-400 text-white',
+  },
+  pending: {
+    label: 'Awaiting Verification',
+    chip: 'bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',
+    dot: 'bg-sky-400 text-white',
+  },
+  not: {
+    label: 'Not Started',
+    chip: 'bg-slate-100 text-slate-500',
+    dot: 'bg-slate-100 text-slate-500',
+  },
+};
+
+function SectionSyllabus({ syllabus }: { syllabus: ReturnType<typeof sectionSyllabus> }) {
+  const { topics, other, latest } = syllabus;
+  if (!topics.length && !other.length) {
+    return (
+      <p className="px-3 pb-3 text-xs text-slate-500">
+        No syllabus or classes in the tracker for this batch yet.
+      </p>
+    );
+  }
+  const count = (status: TopicStatus) => topics.filter((topic) => topic.status === status).length;
+  const subtopics = topics.reduce((sum, topic) => sum + topic.subtopics, 0);
+  const subtopicsDone = topics.reduce((sum, topic) => sum + topic.subtopicsDone, 0);
+  const curricula = [...new Set(topics.map((topic) => topic.curriculum))];
+  return (
+    <div className="px-3 pt-1 pb-3">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+        <span>
+          <b className="text-emerald-700 dark:text-emerald-300">{count('done')}</b> completed
+        </span>
+        <span>
+          <b className="text-amber-700 dark:text-amber-300">{count('progress')}</b> in progress
+        </span>
+        {count('pending') > 0 && (
+          <span>
+            <b className="text-sky-700 dark:text-sky-300">{count('pending')}</b> awaiting
+            verification
+          </span>
+        )}
+        <span>
+          <b>{count('not')}</b> not started
+        </span>
+        {subtopics > 0 && (
+          <span>
+            Subtopics{' '}
+            <b>
+              {subtopicsDone}/{subtopics}
+            </b>{' '}
+            ({share(subtopicsDone, subtopics)}%)
+          </span>
+        )}
+      </div>
+      {latest && (
+        <p className="mt-1 text-xs text-slate-500">
+          Latest class: <b className="text-slate-700 dark:text-slate-200">{latest.topic}</b>,{' '}
+          {lmsDate(latest.last_class!)}
+        </p>
+      )}
+      {curricula.map((curriculum) => (
+        <div key={curriculum} className="mt-2">
+          {curricula.length > 1 && (
+            <p className="mb-1 text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
+              {curriculum}
+            </p>
+          )}
+          <ol className="space-y-1">
+            {topics
+              .filter((topic) => topic.curriculum === curriculum)
+              .map((topic) => (
+                <li
+                  key={topic.topic}
+                  className="bg-surface rounded-lg border border-slate-100 px-2.5 py-1.5"
+                  title={
+                    topic.taught.length ? `Subtopics taught: ${topic.taught.join(', ')}` : undefined
+                  }
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        'flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold',
+                        STATUS[topic.status].dot
+                      )}
+                    >
+                      {topic.status === 'done' ? '✓' : topic.order}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                      {topic.topic}
+                    </span>
+                    <span
+                      className={cn(
+                        'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                        STATUS[topic.status].chip
+                      )}
+                    >
+                      {STATUS[topic.status].label}
+                    </span>
+                  </div>
+                  {topic.status !== 'not' && (
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 pl-7 text-[11px] text-slate-500 tabular-nums">
+                      {topic.subtopics > 0 && (
+                        <span className="flex items-center gap-1.5">
+                          <span className="block h-1 w-16 overflow-hidden rounded-full bg-slate-100">
+                            <span
+                              className="block h-full bg-[#10b981]"
+                              style={{ width: `${share(topic.subtopicsDone, topic.subtopics)}%` }}
+                            />
+                          </span>
+                          {topic.subtopicsDone}/{topic.subtopics} subtopics
+                        </span>
+                      )}
+                      <span>
+                        {topic.classes} class{topic.classes === 1 ? '' : 'es'} · {topic.hours} h
+                      </span>
+                      {topic.pending > 0 && (
+                        <span className="text-amber-600">
+                          {topic.pending} awaiting verification
+                        </span>
+                      )}
+                      {topic.lastClass && <span>last {lmsDate(topic.lastClass)}</span>}
+                    </div>
+                  )}
+                  {topic.taught.length > 0 && topic.status !== 'done' && (
+                    <p className="mt-0.5 truncate pl-7 text-[11px] text-slate-400">
+                      Taught: {topic.taught.join(' · ')}
+                    </p>
+                  )}
+                </li>
+              ))}
+          </ol>
+        </div>
+      ))}
+      {other.length > 0 && (
+        <p className="mt-2 text-[11px] text-slate-500">
+          Also logged, outside this batch&rsquo;s syllabus:{' '}
+          {other.map((item) => `${item.topic} (${item.classes})`).join(', ')}
+        </p>
+      )}
+    </div>
+  );
+}
 
 function Bar({ value, pending = 0, color }: { value: number; pending?: number; color: string }) {
   return (
@@ -240,37 +445,17 @@ export function DeliverySection({ data }: { data: CampusDelivery | null }) {
             <Hourglass className="size-4 text-slate-400" aria-hidden />
             By Batch and Section
           </h3>
-          <ul className="mt-2 space-y-2.5">
-            {data.sections.map((row) => {
-              const pct = share(row.delivered, row.allocated);
-              return (
-                <li key={`${row.program}-${row.batch_year}-${row.section}`}>
-                  <div className="flex items-baseline justify-between gap-2 text-sm">
-                    <span className="font-medium">
-                      {cohortLabel(row.program, row.batch_year)}
-                      {row.section && (
-                        <span className="text-slate-500"> · Section {row.section}</span>
-                      )}
-                    </span>
-                    <span className="shrink-0 text-xs text-slate-500 tabular-nums">
-                      <b className="text-slate-800">{row.delivered}</b> / {row.allocated} h
-                      {row.allocated > 0 && (
-                        <b className="ml-1.5" style={{ color: paceColor(pct) }}>
-                          {pct}%
-                        </b>
-                      )}
-                    </span>
-                  </div>
-                  <div className="mt-1">
-                    <Bar
-                      value={pct}
-                      pending={share(row.pending, row.allocated)}
-                      color={paceColor(pct)}
-                    />
-                  </div>
-                </li>
-              );
-            })}
+          <p className="mt-0.5 text-xs text-slate-500">
+            Open a batch to see its syllabus topic by topic.
+          </p>
+          <ul className="mt-2 space-y-1">
+            {data.sections.map((row) => (
+              <SectionRow
+                key={`${row.program}-${row.batch_year}-${row.section}`}
+                row={row}
+                data={data}
+              />
+            ))}
           </ul>
         </div>
 

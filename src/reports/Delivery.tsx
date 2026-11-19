@@ -5,6 +5,7 @@
 import { Page, Text, View } from '@react-pdf/renderer';
 
 import { lmsDate, type ReportCampusDelivery } from '@/lib/assessments';
+import { sectionSyllabus, syllabusLine } from '@/lib/deliverySyllabus';
 import { cohortLabel } from '@/lib/cohorts';
 import { INK, LINE, MUTED, ReportFooter, StatTile, base, formatNumber } from '@/reports/shared';
 
@@ -228,12 +229,19 @@ function DeliveryBody({ data }: { data: NonNullable<ReportCampusDelivery['delive
             wrap={false}
             style={rowStyle(index)}
           >
-            <Text style={{ width: widths.section, fontWeight: 700 }}>
-              {cohortLabel(row.program, row.batch_year)}
-              <Text style={{ fontWeight: 400, color: MUTED }}>
-                {row.section ? ` · Section ${row.section}` : ''}
+            <View style={{ width: widths.section, paddingRight: 6 }}>
+              <Text style={{ fontWeight: 700 }}>
+                {cohortLabel(row.program, row.batch_year)}
+                <Text style={{ fontWeight: 400, color: MUTED }}>
+                  {row.section ? ` · Section ${row.section}` : ''}
+                </Text>
               </Text>
-            </Text>
+              {syllabusLine(sectionSyllabus(row, data)) ? (
+                <Text style={{ fontSize: 6.5, color: MUTED, marginTop: 1 }}>
+                  {syllabusLine(sectionSyllabus(row, data))}
+                </Text>
+              ) : null}
+            </View>
             <Text style={{ width: widths.hours, textAlign: 'right', paddingRight: 10 }}>
               {formatNumber(row.delivered)} / {formatNumber(row.allocated)} h
             </Text>

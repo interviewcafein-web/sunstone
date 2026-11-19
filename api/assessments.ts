@@ -664,27 +664,64 @@ async function delivery(campusId: number, batch: string | null) {
               min(class_date)::text as first_class, max(class_date)::text as last_class
        from dlv_classes_counted where campus_code = $1 and ${DLV_FILTER} and status = 'VERIFIED' and ${DLV_VALID}
        group by 1, 2)
-     select t.curriculum, t.topic, t.topic_order, t.subtopics, coalesce(x.hours, 0) as hours,
-            coalesce(x.classes, 0) as classes, x.first_class, x.last_class
+     select t.curriculum, t.program, t.batch_years, t.topic, t.topic_order, t.subtopics,
+            coalesce(x.hours, 0) as hours, coalesce(x.classes, 0) as classes, x.first_class, x.last_class
      from dlv_topics t join cur using (curriculum, program)
      left join taught x on x.curriculum = t.curriculum and x.topic = t.topic
      order by t.curriculum, t.topic_order`,
     params
   );
-  const [[summary], sections, trainers, lmsDays, trackerDays, weeks, topics, [{ synced }]] =
-    await together([
-      summaryQuery,
-      sectionsQuery,
-      trainersQuery,
-      lmsDaysQuery,
-      trackerDaysQuery,
-      weeksQuery,
-      topicsQuery,
-      db()`select (select ran_at::text from sync_state where name = 'delivery') as synced`,
-    ]);
+  // Each batch and section, topic by topic: what has been taught there (verified classes),
+  // which subtopics, and what is waiting for verification.
+  const sectionTopicsQuery = db().query(
+    `select program, batch_year, section, curriculum, topic,
+            round(coalesce(sum(minutes) filter (where status = 'VERIFIED' and ${DLV_VALID}), 0) / 60.0, 1)::float8 as hours,
+            count(*) filter (where status = 'VERIFIED' and ${DLV_VALID})::int as classes,
+            count(*) filter (where status = 'PENDING VERIFICATION')::int as pending,
+            coalesce(array_agg(distinct subtopic order by subtopic)
+              filter (where status = 'VERIFIED' and ${DLV_VALID} and subtopic is not null), '{}') as subtopics_taught,
+            min(class_date) filter (where status = 'VERIFIED' and ${DLV_VALID})::text as first_class,
+            max(class_date) filter (where status <> 'REJECTED')::text as last_class
+     from dlv_classes_counted where campus_code = $1 and ${DLV_FILTER} and topic is not null
+     group by 1, 2, 3, 4, 5`,
+    params
+  );
+  const [
+    [summary],
+    sections,
+    trainers,
+    lmsDays,
+    trackerDays,
+    weeks,
+    topics,
+    sectionTopics,
+    [{ synced }],
+  ] = await together([
+    summaryQuery,
+    sectionsQuery,
+    trainersQuery,
+    lmsDaysQuery,
+    trackerDaysQuery,
+    weeksQuery,
+    topicsQuery,
+    sectionTopicsQuery,
+    db()`select (select ran_at::text from sync_state where name = 'delivery') as synced`,
+  ]);
   if (!summary.allocated && !summary.classes && !summary.pending) return null;
   const unlogged = notLogged(lmsDays as LmsDay[], trackerDays as LmsDay[]);
-  return { ...summary, sections, trainers, unlogged, weeks, topics, syncedAt: synced };
+  return {
+    ...summary,
+    sections,
+    trainers,
+    unlogged,
+    weeks,
+    topics: topics.map((row) => ({
+      ...row,
+      batch_years: ((row.batch_years as number[]) ?? []).map(Number),
+    })),
+    sectionTopics,
+    syncedAt: synced,
+  };
 }
 
 // PRIME subjects in attendance (named by hand in the LMS: "Prime Domain Coding", "Prime
