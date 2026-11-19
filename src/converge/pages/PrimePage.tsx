@@ -9,8 +9,6 @@ import {
   CalendarClock,
   ClipboardCheck,
   Clock,
-  Download,
-  FileSpreadsheet,
   GraduationCap,
   Layers,
   Loader2,
@@ -23,7 +21,8 @@ import {
 import { PageLoader } from '@/components/common/PageLoader';
 import { scoreTone } from '@/lib/assessments';
 import { cohortLabel } from '@/lib/cohorts';
-import { downloadCsv, downloadXlsx, type ExportColumn, type ExportSheet } from '@/lib/exportTable';
+import { DownloadAll, ExportButtons } from '@/components/common/ExportButtons';
+import { type ExportColumn, type ExportSheet } from '@/lib/exportTable';
 import { ROLE_LABELS, formatPay, type PlacementMeasure } from '@/lib/placements';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
@@ -153,16 +152,10 @@ export default function PrimePage() {
                 ))}
               </select>
             )}
-            <button
-              type="button"
-              onClick={() =>
-                downloadXlsx(`converge-prime-domain-${scope}`, allSheets(data, subjects, amcat))
-              }
-              className="text-brand-800 inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-sm font-semibold shadow"
-            >
-              <FileSpreadsheet className="size-4" aria-hidden />
-              Download All
-            </button>
+            <DownloadAll
+              name={`converge-prime-domain-${scope}`}
+              sheets={() => allSheets(data, subjects, amcat)}
+            />
           </div>
         }
       >
@@ -254,37 +247,6 @@ export default function PrimePage() {
 }
 
 // --- Building blocks ---------------------------------------------------------------------
-
-function ExportButtons<T>({
-  name,
-  sheet,
-  columns,
-  rows,
-}: {
-  name: string;
-  sheet: string;
-  columns: ExportColumn<T>[];
-  rows: T[];
-}) {
-  const button =
-    'inline-flex items-center gap-1 rounded-full border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 hover:text-brand-700';
-  return (
-    <span className="flex gap-1.5">
-      <button type="button" className={button} onClick={() => downloadCsv(name, columns, rows)}>
-        <Download className="size-3.5" aria-hidden />
-        CSV
-      </button>
-      <button
-        type="button"
-        className={button}
-        onClick={() => downloadXlsx(name, [{ sheet, columns, rows }])}
-      >
-        <FileSpreadsheet className="size-3.5" aria-hidden />
-        Excel
-      </button>
-    </span>
-  );
-}
 
 function Card({ children, className }: { children: ReactNode; className?: string }) {
   return <section className={cn(panel, 'p-5', className)}>{children}</section>;
@@ -526,6 +488,15 @@ function Overview({ rows, scope }: { rows: PrimeSubjectRow[]; scope: string }) {
   const summary = bySubject(rows);
   return (
     <>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-bold">By Subject</h2>
+        <ExportButtons
+          name={`prime-domain-subjects-${scope}`}
+          sheet="Subjects"
+          columns={SUBJECT_COLUMNS}
+          rows={summary}
+        />
+      </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {summary.map((subject) => (
           <Card key={subject.subject} className="p-4">
@@ -674,6 +645,14 @@ function Hours({
           icon={Clock}
           title="Planned and Taught, by Subject"
           description="Hours taught across every section, against the hours planned for those sections."
+          aside={
+            <ExportButtons
+              name={`prime-domain-hours-by-subject-${scope}`}
+              sheet="Hours by subject"
+              columns={SUBJECT_COLUMNS}
+              rows={summary}
+            />
+          }
         />
         <ul className="mt-3 space-y-3">
           {summary.map((subject) => {
@@ -963,7 +942,7 @@ function Assignments({
       </Card>
       <PrepAndPlacement
         data={data}
-        keys={['domain', 'elq']}
+        keys={['domain', 'comm', 'apt']}
         title="Assignment Scores and Placements"
       />
     </>
@@ -1040,6 +1019,23 @@ function Amcat({
   );
 }
 
+type PrepRow = PrimeResponse['placement'][number]['prep'][number];
+
+const prepColumns = (
+  measures: Map<string, PlacementMeasure>,
+  word: string
+): ExportColumn<PrepRow>[] => [
+  { header: 'Measure', value: (row) => measures.get(row.key)?.label ?? row.key },
+  { header: `${word}: average`, value: (row) => row.placedAvg },
+  { header: `${word}: students`, value: (row) => row.placedCount },
+  { header: 'Still waiting: average', value: (row) => row.othersAvg },
+  { header: 'Still waiting: students', value: (row) => row.othersCount },
+  ...['Bottom', 'Second', 'Third', 'Top'].map((label, index) => ({
+    header: `${label} quarter offer rate %`,
+    value: (row: PrepRow) => row.bands[index]?.rate ?? null,
+  })),
+];
+
 /** Placed against still waiting on some measures, and the offer rate by quarter of the batch. */
 function PrepAndPlacement({
   data,
@@ -1062,14 +1058,26 @@ function PrepAndPlacement({
         icon={TrendingUp}
         title={title}
         description="Students with an offer against those still waiting, and how often each quarter of the batch got one."
-        aside={<KindToggle kind={kind} setKind={setKind} />}
+        aside={
+          <span className="flex flex-wrap items-center gap-2">
+            <KindToggle kind={kind} setKind={setKind} />
+            <ExportButtons
+              name={`prime-${title}-${kind}`}
+              sheet={title}
+              columns={prepColumns(measures, word)}
+              rows={rows}
+            />
+          </span>
+        }
       />
       {entry.totals.offers === 0 ? (
         <p className="mt-3 text-sm text-slate-500">
           No {kind === 'full-time' ? 'job offers' : 'internships'} yet for these campuses.
         </p>
       ) : (
-        <div className="mt-3 grid gap-4 md:grid-cols-2">
+        <div
+          className={cn('mt-3 grid gap-4', rows.length > 2 ? 'lg:grid-cols-3' : 'md:grid-cols-2')}
+        >
           {rows.map((row) => {
             const measure = measures.get(row.key);
             const show = (v: number | null) =>
@@ -1297,7 +1305,28 @@ function PlacementImpact({ data, scope }: { data: PrimeResponse; scope: string }
           icon={Target}
           title="Domain Studied, Role Taken"
           description="Each student's PRIME domain or career track against the role they were selected for. Outlined cells count as a match."
-          aside={<KindToggle kind={kind} setKind={setKind} />}
+          aside={
+            <span className="flex flex-wrap items-center gap-2">
+              <KindToggle kind={kind} setKind={setKind} />
+              {fit && (
+                <ExportButtons
+                  name={`prime-domain-vs-role-${kind}-${scope}`}
+                  sheet="Domain vs role"
+                  columns={[
+                    { header: 'PRIME domain', value: (row) => row.domain },
+                    { header: 'Offers', value: (row) => row.offers },
+                    { header: 'In their domain', value: (row) => row.matched },
+                    { header: 'In their domain %', value: (row) => row.rate },
+                    ...fit.columns.map((column) => ({
+                      header: ROLE_LABELS[column] ?? column,
+                      value: (row: (typeof fit.rows)[number]) => row.cells[column] ?? 0,
+                    })),
+                  ]}
+                  rows={fit.rows}
+                />
+              )}
+            </span>
+          }
         />
         {!fit || !fit.rows.length ? (
           <p className="mt-3 text-sm text-slate-500">

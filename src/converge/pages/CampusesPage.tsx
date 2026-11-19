@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 
 import { AnimatedRing } from '@/components/common/AnimatedRing';
+import { ExportButtons } from '@/components/common/ExportButtons';
 import { CampusLogo } from '@/components/common/CampusLogo';
 import { PageLoader } from '@/components/common/PageLoader';
 import { Sparkline, TrendDelta } from '@/components/common/Sparkline';
@@ -24,6 +25,7 @@ import {
   useStudentMetrics,
   type CampusOverview,
 } from '@/lib/assessments';
+import type { ExportColumn } from '@/lib/exportTable';
 import { cn } from '@/lib/utils';
 
 import { Hero, HeroStat, Problem, heroGrid, panel } from '../components/ui';
@@ -78,7 +80,7 @@ export default function CampusesPage() {
     <div className="rise-stagger space-y-5">
       <Hero eyebrow="Campuses" title="Every Campus at a Glance">
         <p className="text-brand-100 relative mt-2 max-w-2xl text-sm">
-          PRIME domain and communication and aptitude tests, attendance, exams and AMCAT for each
+          PRIME domain, communication and aptitude tests, attendance, exams and AMCAT for each
           campus, from the Sunstone LMS. Open a campus for its full picture.
           {syncedAt && ` Updated ${lmsDate(syncedAt, true)}.`}
         </p>
@@ -101,6 +103,18 @@ export default function CampusesPage() {
         </dl>
       </Hero>
 
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-bold">Every Campus</h2>
+        <ExportButtons
+          name="converge-campuses"
+          sheet="Campuses"
+          columns={CAMPUS_COLUMNS}
+          rows={ordered.map((campus) =>
+            summaryOf(campus, rowsByCampus.get(campus.name) ?? [], Boolean(metrics.data))
+          )}
+        />
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {ordered.map((campus) => (
           <CampusCard
@@ -115,6 +129,44 @@ export default function CampusesPage() {
   );
 }
 
+function summaryOf(campus: CampusOverview, rows: Row[], numbersLoaded: boolean) {
+  const programs = byProgram(rows.map((row) => row.student));
+  const average = (key: 'domain' | 'comm' | 'apt' | 'amcat' | 'exams') =>
+    numbersLoaded ? mean(rows.map((row) => row[key])) : null;
+  return {
+    campus,
+    bba: programs.BBA ?? 0,
+    mba: programs.MBA ?? 0,
+    super100: rows.filter((row) => row.super100).length,
+    participation: campus.expected ? percent(campus.submissions, campus.expected) : null,
+    domain: average('domain') ?? campus.avg_pct,
+    comm: average('comm'),
+    apt: average('apt'),
+    amcat: average('amcat'),
+    exams: average('exams'),
+  };
+}
+
+const CAMPUS_COLUMNS: ExportColumn<ReturnType<typeof summaryOf>>[] = [
+  { header: 'Campus', value: (row) => row.campus.name },
+  { header: 'Students', value: (row) => row.campus.students },
+  { header: 'BBA', value: (row) => row.bba },
+  { header: 'MBA', value: (row) => row.mba },
+  { header: 'Super 100', value: (row) => row.super100 },
+  { header: 'Tests held', value: (row) => row.campus.tests },
+  { header: 'Tests scheduled', value: (row) => row.campus.scheduled },
+  { header: 'Submissions', value: (row) => row.campus.submissions },
+  { header: 'Expected submissions', value: (row) => row.campus.expected },
+  { header: 'Participation %', value: (row) => row.participation },
+  { header: 'PRIME Domain average %', value: (row) => row.domain },
+  { header: 'Communication average %', value: (row) => row.comm },
+  { header: 'Aptitude average %', value: (row) => row.apt },
+  { header: 'Attendance %', value: (row) => row.campus.attendance_pct },
+  { header: 'AMCAT average (latest sitting)', value: (row) => row.amcat },
+  { header: 'Internal exams average %', value: (row) => row.exams },
+  { header: 'Last test', value: (row) => row.campus.last_test_at?.slice(0, 10) },
+];
+
 function CampusCard({
   campus,
   rows,
@@ -126,7 +178,8 @@ function CampusCard({
 }) {
   const participation = campus.expected ? percent(campus.submissions, campus.expected) : null;
   const domain = numbersLoaded ? mean(rows.map((row) => row.domain)) : null;
-  const elq = numbersLoaded ? mean(rows.map((row) => row.elq)) : null;
+  const comm = numbersLoaded ? mean(rows.map((row) => row.comm)) : null;
+  const apt = numbersLoaded ? mean(rows.map((row) => row.apt)) : null;
   const overall = mean([participation, campus.avg_pct, campus.attendance_pct]);
   const health = overall === null ? undefined : HEALTH.find((level) => overall >= level.min);
   const accent = scoreFill(overall);
@@ -200,10 +253,11 @@ function CampusCard({
 
         {campus.tests ? (
           <>
-            <div className="mt-5 grid grid-cols-3 gap-2">
+            <div className="mt-5 grid grid-cols-4 gap-1.5">
               {[
                 { label: TRACKS.domain.short, value: domain ?? campus.avg_pct },
-                { label: TRACKS.elq.short, value: elq },
+                { label: TRACKS.comm.short, value: comm },
+                { label: TRACKS.apt.short, value: apt },
                 { label: 'Attendance', value: campus.attendance_pct },
               ].map(({ label, value }) => (
                 <div
@@ -212,7 +266,7 @@ function CampusCard({
                 >
                   <AnimatedRing
                     value={value}
-                    size={60}
+                    size={52}
                     color={(shown) => scoreFill(value === null ? null : shown)}
                   />
                   <span className="mt-1.5 text-center text-[11px] leading-tight font-medium text-slate-600">

@@ -3,6 +3,7 @@ import {
   Award,
   Building2,
   BriefcaseBusiness,
+  Calculator,
   CalendarCheck,
   ChevronRight,
   Crown,
@@ -13,6 +14,7 @@ import {
   Users,
 } from 'lucide-react';
 
+import { ExportButtons } from '@/components/common/ExportButtons';
 import { PageLoader } from '@/components/common/PageLoader';
 import { useStudents } from '@/hooks/useStudents';
 import { scoreFill, scoreTone, useStudentMetrics } from '@/lib/assessments';
@@ -37,13 +39,14 @@ interface Group {
 }
 
 const METRICS: {
-  key: 'domain' | 'elq' | 'amcat' | 'attendance' | 'exams';
+  key: 'domain' | 'comm' | 'apt' | 'amcat' | 'attendance' | 'exams';
   label: string;
   icon: typeof Award;
   unit: string;
 }[] = [
   { key: 'domain', label: TRACKS.domain.label, icon: BriefcaseBusiness, unit: '%' },
-  { key: 'elq', label: TRACKS.elq.label, icon: MessagesSquare, unit: '%' },
+  { key: 'comm', label: TRACKS.comm.label, icon: MessagesSquare, unit: '%' },
+  { key: 'apt', label: TRACKS.apt.label, icon: Calculator, unit: '%' },
   { key: 'amcat', label: 'AMCAT, Latest', icon: Award, unit: '' },
   { key: 'attendance', label: 'Attendance', icon: CalendarCheck, unit: '%' },
   { key: 'exams', label: 'Internal Exams', icon: NotebookPen, unit: '%' },
@@ -137,14 +140,19 @@ export default function Super100Page() {
           numbers, and every cohort side by side.
         </p>
         <dl className={cn(heroGrid, 'mt-6')}>
-          <HeroStat icon={Crown} label="Students" value={members.length} gold />
+          <HeroStat
+            icon={Crown}
+            label="Students"
+            value={members.length}
+            note={`at ${campuses.length} campus${campuses.length === 1 ? '' : 'es'}`}
+            gold
+          />
           <HeroStat
             icon={GraduationCap}
             label="BBA · MBA"
             value={programs.BBA ?? 0}
             note={`· ${programs.MBA ?? 0}`}
           />
-          <HeroStat icon={Building2} label="Campuses" value={campuses.length} />
           <HeroStat
             icon={BriefcaseBusiness}
             label={TRACKS.domain.label}
@@ -153,8 +161,14 @@ export default function Super100Page() {
           />
           <HeroStat
             icon={MessagesSquare}
-            label={TRACKS.elq.short}
-            value={loaded ? mean(members.map((row) => row.elq)) : null}
+            label={TRACKS.comm.short}
+            value={loaded ? mean(members.map((row) => row.comm)) : null}
+            suffix="%"
+          />
+          <HeroStat
+            icon={Calculator}
+            label={TRACKS.apt.short}
+            value={loaded ? mean(members.map((row) => row.apt)) : null}
             suffix="%"
           />
         </dl>
@@ -166,6 +180,32 @@ export default function Super100Page() {
             icon={Layers}
             title="Cohorts Compared"
             description="Average of each cohort's students; the marker shows all students."
+            aside={
+              <ExportButtons
+                name="converge-cohorts-compared"
+                sheet="Cohorts"
+                columns={[
+                  { header: 'Cohort', value: (group: Group) => group.name },
+                  { header: 'Students', value: (group: Group) => group.rows.length },
+                  {
+                    header: 'BBA',
+                    value: (group: Group) =>
+                      group.rows.filter((row) => row.student.course === 'BBA').length,
+                  },
+                  {
+                    header: 'MBA',
+                    value: (group: Group) =>
+                      group.rows.filter((row) => row.student.course === 'MBA').length,
+                  },
+                  ...METRICS.map(({ key, label, unit }) => ({
+                    header: `${label}${unit ? ` ${unit}` : ''} average`,
+                    value: (group: Group) =>
+                      loaded ? mean(group.rows.map((row) => row[key])) : null,
+                  })),
+                ]}
+                rows={[...groups, { name: 'All students', rows: everyone, super100: false }]}
+              />
+            }
           />
           <div className="grid gap-4 md:grid-cols-2">
             {groups.map((group) => (
@@ -179,6 +219,20 @@ export default function Super100Page() {
             icon={Building2}
             title="By Campus"
             description="Where the Super 100 study."
+            aside={
+              <ExportButtons
+                name="converge-super-100-by-campus"
+                sheet="By campus"
+                columns={[
+                  { header: 'Campus', value: (row: (typeof byCampus)[number]) => row.campus },
+                  {
+                    header: 'Super 100 students',
+                    value: (row: (typeof byCampus)[number]) => row.n,
+                  },
+                ]}
+                rows={byCampus}
+              />
+            }
           />
           <ul className="mt-4 space-y-3">
             {byCampus.map(({ campus, n }) => (
@@ -229,6 +283,7 @@ export default function Super100Page() {
         />
         <StudentTable
           rows={rows}
+          exportName={`converge-super-100-${[search.campus, search.batch ?? search.program].filter(Boolean).join('-') || 'all'}`}
           sort={sort}
           onSort={(next) => setSearch({ sort: next === 'domain' ? undefined : next })}
           empty="No Super 100 students match these filters."

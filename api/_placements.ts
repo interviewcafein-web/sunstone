@@ -63,7 +63,8 @@ export function measuresFor(app = currentApp()): Measure[] {
   return app === 'converge'
     ? [
         { key: 'domain', label: 'PRIME Domain', unit: '%', readiness: true },
-        { key: 'elq', label: 'Communication & Aptitude', unit: '%', readiness: true },
+        { key: 'comm', label: 'Communication', unit: '%', readiness: true },
+        { key: 'apt', label: 'Aptitude', unit: '%', readiness: true },
         { key: 'amcat', label: 'AMCAT', unit: '', readiness: false },
         { key: 'attendance', label: 'Attendance', unit: '%', readiness: true },
         { key: 'exams', label: 'Internal Exams', unit: '%', readiness: true },
@@ -112,6 +113,22 @@ export const isTechRole = (category: string | null) =>
     category &&
       /(^|[^a-z])it([^a-z]|$)|computer|software|data|engineering|electronic/i.test(category)
   );
+
+export type Segment = 'sales' | 'core';
+
+/**
+ * Converge: a sales job (the LMS role category "Sales": business development, BDE, area sales)
+ * or a core job (every other category: marketing, operations, HR, finance, general management,
+ * research). Offers without a category are judged by their designation.
+ */
+export function segmentOf(offer: Pick<Offer, 'category' | 'designation'>): Segment {
+  if (offer.category) return /sales/i.test(offer.category) ? 'sales' : 'core';
+  return /sales|(^|[^a-z])bde([^a-z]|$)|business development/i.test(offer.designation ?? '')
+    ? 'sales'
+    : 'core';
+}
+
+export const SEGMENT_LABELS: Record<Segment, string> = { sales: 'Sales', core: 'Core' };
 
 /**
  * A management student's specialisation: every MBA student takes Revenue Generation, and some
@@ -213,7 +230,8 @@ export async function placementRows(): Promise<{
     const measures: Record<string, number | null> = converge
       ? {
           domain: num(m.domain_avg ?? m.test_avg),
-          elq: num(m.elq_avg),
+          comm: num(m.comm_avg),
+          apt: num(m.apt_avg),
           amcat,
           attendance: num(m.attendance),
           exams: num(m.exam_avg),
@@ -268,15 +286,20 @@ export interface PlacementOptions {
   campusId?: number | null;
   /** Campus staff do not see each student's pay, only averages. */
   showPay: boolean;
+  /** One batch, "MBA:2025"; every in-season batch when absent. */
+  batch?: string | null;
+  /** Converge: sales jobs or core jobs only. */
+  segment?: Segment | null;
 }
 
 /** The Placements page for one viewer, from the saved rows. */
 export function placementReport(
   all: StudentRow[],
   viewer: Viewer,
-  { kind, campusId = null, showPay }: PlacementOptions
+  { kind, campusId = null, showPay, batch = null, segment = null }: PlacementOptions
 ) {
   const converge = currentApp() === 'converge';
+  if (!converge) segment = null;
   const measures = measuresFor();
   const fullTime = kind === 'full-time';
   const visible = all.filter(
@@ -284,7 +307,11 @@ export function placementReport(
       viewer.campusIds === null ||
       (row.campusId !== null && viewer.campusIds.includes(row.campusId))
   );
-  const offersOf = (row: StudentRow) => row.offers.filter((offer) => offer.fullTime === fullTime);
+  /** Every offer of this kind; the season and the Sales/Core split go by these. */
+  const kindOffers = (row: StudentRow) => row.offers.filter((offer) => offer.fullTime === fullTime);
+  /** The offers this page is about: of this kind, and in the chosen segment. */
+  const offersOf = (row: StudentRow) =>
+    kindOffers(row).filter((offer) => !segment || segmentOf(offer) === segment);
   /** What an offer pays: CTC in lakhs a year (full-time), or the stipend a month (internship). */
   const payOf = (offer: Offer) => (fullTime ? offer.totalLpa : offer.stipend);
   const bestPay = (row: StudentRow) => {
@@ -295,7 +322,7 @@ export function placementReport(
   // Batches in season for this kind, among the campuses the viewer may see.
   const batchCounts = new Map<string, number>();
   for (const row of visible) {
-    if (offersOf(row).length) {
+    if (kindOffers(row).length) {
       const key = `${row.program}:${row.year}`;
       batchCounts.set(key, (batchCounts.get(key) ?? 0) + 1);
     }
@@ -310,8 +337,22 @@ export function placementReport(
   ]
     .map(([id, name]) => ({ id: id as number, name }))
     .sort((a, b) => a.name.localeCompare(b.name));
-  const population =
+  const inCampus =
     campusId === null ? seasonAll : seasonAll.filter((row) => row.campusId === campusId);
+  const batchKey = (row: StudentRow) => `${row.program}:${row.year}`;
+  // The batches to pick from: those in season at the chosen campus.
+  const batchOptions = [
+    ...inCampus.reduce(
+      (map, row) => map.set(batchKey(row), (map.get(batchKey(row)) ?? 0) + 1),
+      new Map<string, number>()
+    ),
+  ]
+    .map(([key, students]) => {
+      const [program, year] = key.split(':');
+      return { key, program, year: Number(year), students };
+    })
+    .sort((a, b) => a.program.localeCompare(b.program) || a.year - b.year);
+  const population = batch ? inCampus.filter((row) => batchKey(row) === batch) : inCampus;
   const placed = population.filter((row) => offersOf(row).length);
   const placedSet = new Set(placed);
   const offers = placed.flatMap((row) => offersOf(row).map((offer) => ({ row, offer })));
@@ -540,6 +581,45 @@ export function placementReport(
     });
   }
 
+  // Converge: sales jobs against core jobs, over every offer of this kind (whichever segment
+  // is picked), with how the students who got them prepared.
+  const segments = converge
+    ? (['sales', 'core'] as const).map((key) => {
+        const picked = population.flatMap((row) =>
+          kindOffers(row)
+            .filter((offer) => segmentOf(offer) === key)
+            .map((offer) => ({ row, offer }))
+        );
+        const rows = [...new Set(picked.map((entry) => entry.row))];
+        const pays = present(picked.map(({ offer }) => payOf(offer)));
+        const count = (list: (string | null)[]) =>
+          [
+            ...list.reduce(
+              (map, name) => map.set(name ?? 'Not given', (map.get(name ?? 'Not given') ?? 0) + 1),
+              new Map<string, number>()
+            ),
+          ]
+            .map(([name, offers]) => ({ name, offers }))
+            .sort((a, b) => b.offers - a.offers);
+        return {
+          key,
+          label: SEGMENT_LABELS[key],
+          offers: picked.length,
+          students: rows.length,
+          rate: pct(rows.length, population.length),
+          medianPay: median(pays),
+          highestPay: pays.length ? Math.max(...pays) : null,
+          companies: new Set(picked.map(({ offer }) => offer.company)).size,
+          topCompanies: count(picked.map(({ offer }) => offer.company)).slice(0, 5),
+          categories: count(picked.map(({ offer }) => offer.category)),
+          joined: picked.filter(({ offer }) => !offer.withdrawn && offer.joining === 1).length,
+          measures: Object.fromEntries(
+            measures.map((m) => [m.key, mean(present(rows.map((row) => row.measures[m.key])))])
+          ),
+        };
+      })
+    : null;
+
   const brief = (row: StudentRow) => ({
     slug: row.slug,
     name: row.name,
@@ -570,6 +650,10 @@ export function placementReport(
 
   return {
     kind,
+    batch,
+    segment,
+    batchOptions,
+    segments,
     measures,
     campuses,
     totals: {
@@ -602,6 +686,7 @@ export function placementReport(
         company: offer.company,
         designation: offer.designation,
         category: offer.category,
+        segment: converge ? SEGMENT_LABELS[segmentOf(offer)] : null,
         pay: showPay ? payOf(offer) : null,
         months: offer.months,
         selectedOn: offer.selectedOn,

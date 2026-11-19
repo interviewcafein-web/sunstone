@@ -59,6 +59,8 @@ import {
   type IssueFilter,
 } from '@/lib/issuesApi';
 import type { IssuesSearch } from '@/lib/issuesSearch';
+import { ExportButtons } from '@/components/common/ExportButtons';
+import type { ExportColumn } from '@/lib/exportTable';
 import { cn } from '@/lib/utils';
 
 const CATEGORY_ICONS: Record<IssueCategoryId, LucideIcon> = {
@@ -83,6 +85,30 @@ const quietButton =
   'inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-surface px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50';
 
 const personName = (person: Person) => person.name ?? person.email.split('@')[0];
+
+const day = (ms: number | null) =>
+  ms == null ? null : new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
+/** The issues on screen as a spreadsheet; names only, no email addresses. */
+const ISSUE_COLUMNS: ExportColumn<Issue>[] = [
+  { header: 'Issue', value: (issue) => issue.id },
+  { header: 'Campus', value: (issue) => issue.campus },
+  { header: 'Category', value: (issue) => categoryLabel(issue.category) },
+  { header: 'Priority', value: (issue) => priorityOf(issue.priority).label },
+  { header: 'Status', value: (issue) => statusOf(issue.status).label },
+  { header: 'Location', value: (issue) => issue.location },
+  { header: 'Details', value: (issue) => issue.details },
+  { header: 'Raised by', value: (issue) => issue.raisedBy.name },
+  { header: 'Assigned to', value: (issue) => issue.assignedTo.name },
+  { header: 'Raised on', value: (issue) => day(issue.createdAt) },
+  { header: 'Last updated', value: (issue) => day(issue.updatedAt) },
+  { header: 'Resolved on', value: (issue) => day(issue.resolvedAt) },
+  {
+    header: 'Days open',
+    value: (issue) => Math.floor(((issue.resolvedAt ?? Date.now()) - issue.createdAt) / 86_400_000),
+  },
+  { header: 'Replies', value: (issue) => issue.replies },
+];
 
 function Badge({ label, color }: { label: string; color: string }) {
   return (
@@ -211,6 +237,15 @@ export default function IssuesPage({
               </option>
             ))}
           </select>
+        )}
+        {data && data.issues.length > 0 && (
+          <ExportButtons
+            className="ml-auto"
+            name={`campus-issues-${status}${campus ? `-${data.campuses.find((item) => item.id === campus)?.name ?? campus}` : ''}`}
+            sheet="Issues"
+            columns={ISSUE_COLUMNS}
+            rows={data.issues}
+          />
         )}
       </div>
 

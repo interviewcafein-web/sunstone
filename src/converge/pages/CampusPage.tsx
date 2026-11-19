@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import {
   Bar,
   CartesianGrid,
@@ -13,6 +13,7 @@ import {
   Award,
   BookOpenCheck,
   BriefcaseBusiness,
+  Calculator,
   CalendarCheck,
   CalendarDays,
   Check,
@@ -24,12 +25,14 @@ import {
   NotebookPen,
   Target,
   Users,
+  type LucideIcon,
 } from 'lucide-react';
 
 import { AmcatTab, AttendanceTab } from '@/components/assessments/CampusInsights';
 import { ExamsTab } from '@/components/assessments/ExamsSection';
 import { PeriodFilter, inPeriod, type PeriodChoice } from '@/components/assessments/PeriodFilter';
 import { AnimatedRing } from '@/components/common/AnimatedRing';
+import { DownloadAll, ExportButtons } from '@/components/common/ExportButtons';
 import { CampusLogo } from '@/components/common/CampusLogo';
 import { PageLoader } from '@/components/common/PageLoader';
 import { useStudents } from '@/hooks/useStudents';
@@ -41,29 +44,27 @@ import {
   useCampusDetail,
   useCampusOverview,
   useStudentMetrics,
+  EXAM_KIND_LABELS,
+  examEventLabel,
+  type AmcatRound,
+  type CampusAttendance,
   type CampusDetail,
   type CampusTest,
+  type ExamEvent,
+  type ExamSubject,
   type SyllabusModule,
 } from '@/lib/assessments';
-import { cohortYears, parseBatch } from '@/lib/cohorts';
+import { batchLabel, cohortYears, parseBatch } from '@/lib/cohorts';
+import type { ExportColumn, ExportSheet } from '@/lib/exportTable';
 import { chartColors, useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
 import { CategoryChip, StatusChip, tidy } from '../components/chips';
 import { StudentTable } from '../components/StudentTable';
 import { TestPanel } from '../components/TestPanel';
-import {
-  Empty,
-  Hero,
-  HeroStat,
-  Problem,
-  SectionTitle,
-  Tabs,
-  heroGrid,
-  panel,
-} from '../components/ui';
+import { Empty, Hero, HeroStat, Problem, SectionTitle, Tabs, panel } from '../components/ui';
 import { inBatch, sortRows, toRow, type SortKey } from '../lib/rows';
-import { TRACKS, trackOf, type Track } from '../lib/subjects';
+import { TRACKS, TRACK_IDS, trackOf, type Track } from '../lib/subjects';
 import { Link, useRouteParams, useRouteSearch, useSetSearch } from '../nav';
 import type { CampusSearch } from '../routes';
 
@@ -88,15 +89,279 @@ function testsOf(data: CampusDetail, track?: Track): CampusTest[] {
   ];
 }
 
-/** Average score over the tests that are out, weighted by how many took each. */
+/**
+ * Average score over the tests that are out, weighted by how many took each. Tests with no
+ * score yet (submitted, not graded) are left out.
+ */
 function weightedAverage(tests: CampusTest[]) {
-  const out = tests.filter(isOut);
+  const out = tests.filter((test) => isOut(test) && test.avg_pct != null);
   const submitted = out.reduce((sum, test) => sum + test.submitted, 0);
   return submitted
     ? Math.round(
         out.reduce((sum, test) => sum + (test.avg_pct ?? 0) * test.submitted, 0) / submitted
       )
     : null;
+}
+
+const TRACK_ICONS: Record<Track, LucideIcon> = {
+  domain: BriefcaseBusiness,
+  comm: MessagesSquare,
+  apt: Calculator,
+};
+const TRACK_TEXT: Record<Track, string> = {
+  domain: 'text-brand-600',
+  comm: 'text-violet-600',
+  apt: 'text-amber-600',
+};
+
+/** Six figures on the banner: two across on phones, three on tablets, six on wide screens. */
+const heroGrid6 = 'relative grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6';
+
+/** Every test of one subject: on the subject itself and in its modules. */
+function subjectTests(data: CampusDetail, subject: CampusDetail['subjects'][number]) {
+  return [
+    ...data.subjectTests.filter((test) => sameSubject(test.subject, subject.key)),
+    ...subject.modules.flatMap((module) => [
+      ...module.tests,
+      ...module.folders.flatMap((folder) => folder.tests),
+    ]),
+  ];
+}
+
+/** Each PRIME subject's numbers: PRIME domain first, then communication, then aptitude. */
+function subjectSummary(data: CampusDetail, track?: Track) {
+  return data.subjects
+    .filter((subject) => !track || trackOf(subject.name) === track)
+    .map((subject) => {
+      const tests = subjectTests(data, subject);
+      const out = tests.filter(isOut);
+      const submitted = out.reduce((sum, test) => sum + test.submitted, 0);
+      const eligible = out.reduce((sum, test) => sum + test.eligible, 0);
+      return {
+        key: subject.key,
+        name: subject.name,
+        track: trackOf(subject.name),
+        tests: tests.length,
+        released: out.length,
+        modules: subject.modules.length,
+        started: subject.modules.filter((module) => module.started).length,
+        submitted,
+        eligible,
+        taken: eligible ? percent(submitted, eligible) : null,
+        average: weightedAverage(tests),
+      };
+    })
+    .sort(
+      (a, b) =>
+        TRACK_IDS.indexOf(a.track) - TRACK_IDS.indexOf(b.track) || a.name.localeCompare(b.name)
+    );
+}
+type SubjectSummary = ReturnType<typeof subjectSummary>[number];
+
+const SUBJECT_COLUMNS: ExportColumn<SubjectSummary>[] = [
+  { header: 'Track', value: (row) => TRACKS[row.track].label },
+  { header: 'Subject', value: (row) => row.name },
+  { header: 'Tests', value: (row) => row.tests },
+  { header: 'Tests released', value: (row) => row.released },
+  { header: 'Modules', value: (row) => row.modules },
+  { header: 'Modules started', value: (row) => row.started },
+  { header: 'Submissions', value: (row) => row.submitted },
+  { header: 'Expected submissions', value: (row) => row.eligible },
+  { header: 'Taken %', value: (row) => row.taken },
+  { header: 'Average score %', value: (row) => row.average },
+];
+
+interface ModuleRow {
+  track: Track;
+  subject: string;
+  module: SyllabusModule;
+}
+
+const moduleRows = (data: CampusDetail, track?: Track): ModuleRow[] =>
+  data.subjects
+    .filter((subject) => !track || trackOf(subject.name) === track)
+    .flatMap((subject) =>
+      subject.modules.map((module) => ({
+        track: trackOf(subject.name),
+        subject: subject.name,
+        module,
+      }))
+    );
+
+const MODULE_COLUMNS: ExportColumn<ModuleRow>[] = [
+  { header: 'Track', value: (row) => TRACKS[row.track].label },
+  { header: 'Subject', value: (row) => row.subject },
+  { header: 'Module', value: (row) => tidy(row.module.name) },
+  { header: 'Tests', value: (row) => row.module.total },
+  { header: 'Tests released', value: (row) => row.module.released },
+  {
+    header: 'Released %',
+    value: (row) => (row.module.total ? percent(row.module.released, row.module.total) : null),
+  },
+  { header: 'Started', value: (row) => (row.module.started ? 'Yes' : 'No') },
+  { header: 'Topics', value: (row) => row.module.folders.length },
+];
+
+const TEST_COLUMNS: ExportColumn<CampusTest>[] = [
+  { header: 'Track', value: (test) => TRACKS[trackOf(test.subject)].label },
+  { header: 'Subject', value: (test) => test.subject },
+  { header: 'Module', value: (test) => (test.module ? tidy(test.module) : '') },
+  { header: 'Topic', value: (test) => test.lecture },
+  { header: 'Test', value: (test) => test.name },
+  { header: 'Category', value: (test) => test.category },
+  { header: 'Status', value: (test) => test.status },
+  {
+    header: 'Max marks',
+    value: (test) => (test.max_marks == null ? null : Number(test.max_marks)),
+  },
+  { header: 'Released', value: (test) => test.released_at?.slice(0, 10) },
+  { header: 'Due', value: (test) => test.due_at?.slice(0, 10) },
+  { header: 'Students given the test', value: (test) => test.eligible },
+  { header: 'Submitted', value: (test) => test.submitted },
+  {
+    header: 'Submitted %',
+    value: (test) => (test.eligible ? percent(test.submitted, test.eligible) : null),
+  },
+  { header: 'Average score %', value: (test) => test.avg_pct },
+  { header: 'Top score %', value: (test) => test.top_pct },
+  { header: 'Full marks', value: (test) => test.perfect },
+];
+
+const byRelease = (tests: CampusTest[]) =>
+  [...tests].sort((a, b) => (b.released_at ?? '').localeCompare(a.released_at ?? ''));
+
+const TIMELINE_COLUMNS: ExportColumn<CampusDetail['timeline'][number]>[] = [
+  { header: 'Week of', value: (week) => week.week },
+  { header: 'Tests released', value: (week) => week.tests },
+  { header: 'Average score %', value: (week) => week.avg_pct },
+  { header: 'Participation %', value: (week) => week.participation },
+];
+
+const amcatColumns = (rounds: AmcatRound[]): ExportColumn<AmcatRound>[] => [
+  { header: 'AMCAT round', value: (round) => round.test_name },
+  { header: 'Students', value: (round) => round.students },
+  { header: 'First sitting', value: (round) => round.first_at?.slice(0, 10) },
+  { header: 'Last sitting', value: (round) => round.last_at?.slice(0, 10) },
+  { header: 'Average score', value: (round) => round.avg_score },
+  ...[...new Set(rounds.flatMap((round) => (round.sections ?? []).map((part) => part.name)))].map(
+    (name) => ({
+      header: name,
+      value: (round: AmcatRound) => round.sections?.find((part) => part.name === name)?.avg ?? null,
+    })
+  ),
+];
+
+const AMCAT_SECTION_COLUMNS: ExportColumn<CampusDetail['amcat']['sections'][number]>[] = [
+  { header: 'AMCAT section', value: (row) => row.name },
+  { header: 'Average score', value: (row) => row.avg },
+  { header: 'Students', value: (row) => row.takers },
+];
+
+const EXAM_EVENT_COLUMNS: ExportColumn<ExamEvent>[] = [
+  { header: 'Exam', value: (row) => examEventLabel(row.event) },
+  { header: 'Kind', value: (row) => EXAM_KIND_LABELS[row.kind] ?? row.kind },
+  { header: 'Students', value: (row) => row.students },
+  { header: 'Subjects', value: (row) => row.subjects },
+  { header: 'Marks entered', value: (row) => row.marks },
+  { header: 'Scored', value: (row) => row.scored },
+  { header: 'Absent', value: (row) => row.absent },
+  { header: 'Average %', value: (row) => row.avg_pct },
+  { header: 'Pass %', value: (row) => row.pass_pct },
+  { header: 'First date', value: (row) => row.first_date?.slice(0, 10) },
+  { header: 'Last date', value: (row) => row.last_date?.slice(0, 10) },
+];
+
+const EXAM_SUBJECT_COLUMNS: ExportColumn<ExamSubject>[] = [
+  { header: 'Exam', value: (row) => examEventLabel(row.event) },
+  { header: 'Kind', value: (row) => EXAM_KIND_LABELS[row.kind] ?? row.kind },
+  { header: 'Subject', value: (row) => row.subject },
+  { header: 'Students', value: (row) => row.students },
+  {
+    header: 'Max marks',
+    value: (row) => (row.max_marks == null ? null : Number(row.max_marks)),
+  },
+  { header: 'Average %', value: (row) => row.avg_pct },
+  { header: 'Pass %', value: (row) => row.pass_pct },
+  { header: 'Exam date', value: (row) => row.exam_date?.slice(0, 10) },
+  {
+    header: 'Grades',
+    value: (row) => row.grades.map((grade) => `${grade.grade}: ${grade.n}`).join(', '),
+  },
+];
+
+const EXAM_CRITERIA_COLUMNS: ExportColumn<CampusDetail['exams']['criteria'][number]>[] = [
+  { header: 'Kind', value: (row) => EXAM_KIND_LABELS[row.kind] ?? row.kind },
+  { header: 'Criterion', value: (row) => row.name },
+  { header: 'Average %', value: (row) => row.avg_pct },
+  { header: 'Scores', value: (row) => row.scores },
+];
+
+const ATTENDANCE_SUBJECT_COLUMNS: ExportColumn<CampusAttendance['subjects'][number]>[] = [
+  { header: 'Subject', value: (row) => row.subject },
+  { header: 'PRIME', value: (row) => (row.prime ? 'Yes' : 'No') },
+  { header: 'Students', value: (row) => row.students },
+  { header: 'Attendance marks', value: (row) => row.marks },
+  { header: 'Attendance %', value: (row) => row.pct },
+];
+
+const ATTENDANCE_FACULTY_COLUMNS: ExportColumn<CampusAttendance['faculty'][number]>[] = [
+  { header: 'Faculty', value: (row) => row.faculty },
+  { header: 'PRIME', value: (row) => (row.prime ? 'Yes' : 'No') },
+  { header: 'Subjects', value: (row) => row.subjects },
+  { header: 'Classes', value: (row) => row.sessions },
+  { header: 'Attendance marks', value: (row) => row.marks },
+  { header: 'Attendance %', value: (row) => row.pct },
+  { header: 'Last class', value: (row) => row.last_class?.slice(0, 10) },
+];
+
+const ATTENDANCE_WEEK_COLUMNS: ExportColumn<CampusAttendance['weeks'][number]>[] = [
+  { header: 'Week of', value: (row) => row.week },
+  { header: 'Attendance marks', value: (row) => row.marks },
+  { header: 'Attendance %', value: (row) => row.pct },
+];
+
+const examSheets = (data: CampusDetail): ExportSheet<any>[] => [
+  { sheet: 'Exam subjects', columns: EXAM_SUBJECT_COLUMNS, rows: data.exams.subjects },
+  { sheet: 'Exam events', columns: EXAM_EVENT_COLUMNS, rows: data.exams.events },
+  { sheet: 'Mock PI and GD criteria', columns: EXAM_CRITERIA_COLUMNS, rows: data.exams.criteria },
+];
+
+const attendanceSheets = (data: CampusDetail): ExportSheet<any>[] => [
+  {
+    sheet: 'Attendance by subject',
+    columns: ATTENDANCE_SUBJECT_COLUMNS,
+    rows: data.attendance.subjects,
+  },
+  {
+    sheet: 'Attendance by faculty',
+    columns: ATTENDANCE_FACULTY_COLUMNS,
+    rows: data.attendance.faculty,
+  },
+  { sheet: 'Attendance by week', columns: ATTENDANCE_WEEK_COLUMNS, rows: data.attendance.weeks },
+];
+
+/** The whole campus page as one workbook: a sheet per table. */
+function campusSheets(data: CampusDetail): ExportSheet<any>[] {
+  return [
+    { sheet: 'Subjects', columns: SUBJECT_COLUMNS, rows: subjectSummary(data) },
+    { sheet: 'Modules', columns: MODULE_COLUMNS, rows: moduleRows(data) },
+    { sheet: 'Tests', columns: TEST_COLUMNS, rows: byRelease(testsOf(data)) },
+    { sheet: 'Weekly journey', columns: TIMELINE_COLUMNS, rows: data.timeline },
+    { sheet: 'AMCAT rounds', columns: amcatColumns(data.amcat.rounds), rows: data.amcat.rounds },
+    { sheet: 'AMCAT sections', columns: AMCAT_SECTION_COLUMNS, rows: data.amcat.sections },
+    ...examSheets(data),
+    ...attendanceSheets(data),
+  ];
+}
+
+/** A tab's download, on its own line above a section shared with Vertex. */
+function DownloadBar({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-slate-500">
+      <span>{label}</span>
+      {children}
+    </div>
+  );
 }
 
 /** One campus: PRIME subjects and modules, tests, AMCAT, internal exams, attendance, students. */
@@ -119,31 +384,29 @@ export default function CampusPage() {
 
   const data = detail.data;
   const { summary, batches, syncedAt } = data;
-  const domainTests = testsOf(data, 'domain');
-  const elqTests = testsOf(data, 'elq');
+  const trackTests = Object.fromEntries(
+    TRACK_IDS.map((track) => [track, testsOf(data, track)])
+  ) as Record<Track, CampusTest[]>;
   const tabs: { id: TabId; label: string; icon: typeof Users; count?: number }[] = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    {
-      id: 'domain',
-      label: TRACKS.domain.label,
-      icon: BriefcaseBusiness,
-      count: domainTests.filter(isOut).length,
-    },
-    {
-      id: 'elq',
-      label: TRACKS.elq.label,
-      icon: MessagesSquare,
-      count: elqTests.filter(isOut).length,
-    },
+    ...TRACK_IDS.map((track) => ({
+      id: track,
+      label: TRACKS[track].label,
+      icon: TRACK_ICONS[track],
+      count: trackTests[track].filter(isOut).length,
+    })),
     { id: 'amcat', label: 'AMCAT', icon: Award },
     { id: 'exams', label: 'Internal Exams', icon: NotebookPen },
     { id: 'attendance', label: 'Attendance', icon: CalendarCheck },
     { id: 'students', label: 'Students', icon: Users, count: summary.students },
   ];
-  const tab = (tabs.some((item) => item.id === search.tab) ? search.tab : 'overview') as TabId;
+  // "elq" (communication and aptitude together) was split in two; old links open communication.
+  const requested = search.tab === 'elq' ? 'comm' : search.tab;
+  const tab = (tabs.some((item) => item.id === requested) ? requested : 'overview') as TabId;
   const open = (test: CampusTest) => isOut(test) && setSearch({ test: test.ids.join(',') });
-  const domainAvg = weightedAverage(domainTests);
-  const elqAvg = weightedAverage(elqTests);
+  const fileScope = [name ?? 'campus', search.batch && batchLabel(search.batch)]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <div className="rise-stagger space-y-5">
@@ -163,6 +426,7 @@ export default function CampusPage() {
             {name ?? 'Campus'}
           </span>
         }
+        aside={<DownloadAll name={`${fileScope} campus`} sheets={() => campusSheets(data)} />}
       >
         <p className="text-brand-100 relative mt-2 text-sm">
           {summary.students.toLocaleString('en-IN')} students · {data.subjects.length} PRIME
@@ -178,7 +442,7 @@ export default function CampusPage() {
           />
         )}
 
-        <dl className={cn(heroGrid, 'mt-5')}>
+        <dl className={cn(heroGrid6, 'mt-5')}>
           <HeroStat
             icon={BookOpenCheck}
             label="Tests Held"
@@ -192,13 +456,15 @@ export default function CampusPage() {
             suffix="%"
             trend={data.timeline.map((week) => week.participation)}
           />
-          <HeroStat
-            icon={BriefcaseBusiness}
-            label={TRACKS.domain.label}
-            value={domainAvg}
-            suffix="%"
-          />
-          <HeroStat icon={MessagesSquare} label={TRACKS.elq.short} value={elqAvg} suffix="%" />
+          {TRACK_IDS.map((track) => (
+            <HeroStat
+              key={track}
+              icon={TRACK_ICONS[track]}
+              label={TRACKS[track].short}
+              value={weightedAverage(trackTests[track])}
+              suffix="%"
+            />
+          ))}
           <HeroStat
             icon={CalendarCheck}
             label="Attendance"
@@ -220,18 +486,59 @@ export default function CampusPage() {
       />
 
       {tab === 'overview' && (
-        <OverviewTab data={data} onOpen={open} onTab={(id) => setSearch({ tab: id })} />
-      )}
-      {(tab === 'domain' || tab === 'elq') && (
-        <TrackTab data={data} track={tab} onOpen={open} choice={choice} onChoice={setChoice} />
-      )}
-      {tab === 'amcat' && <AmcatTab data={data.amcat} choice={choice} onChoice={setChoice} />}
-      {tab === 'exams' && <ExamsTab data={data.exams} />}
-      {tab === 'attendance' && (
-        <AttendanceTab
-          data={data.attendance}
-          instructorNote="PRIME domain instructors, with attendance in their PRIME domain classes. Communication and aptitude classes are in the subject list."
+        <OverviewTab
+          data={data}
+          fileScope={fileScope}
+          onOpen={open}
+          onTab={(id) => setSearch({ tab: id })}
         />
+      )}
+      {(tab === 'domain' || tab === 'comm' || tab === 'apt') && (
+        <TrackTab
+          data={data}
+          track={tab}
+          fileScope={fileScope}
+          onOpen={open}
+          choice={choice}
+          onChoice={setChoice}
+        />
+      )}
+      {tab === 'amcat' && (
+        <>
+          <AmcatDownload data={data} fileScope={fileScope} choice={choice} />
+          <AmcatTab data={data.amcat} choice={choice} onChoice={setChoice} />
+        </>
+      )}
+      {tab === 'exams' && (
+        <>
+          <DownloadBar label="Internal exam results">
+            <ExportButtons
+              name={`${fileScope} internal exams`}
+              sheet="Exam subjects"
+              columns={EXAM_SUBJECT_COLUMNS}
+              rows={data.exams.subjects}
+              more={examSheets(data).slice(1)}
+            />
+          </DownloadBar>
+          <ExamsTab data={data.exams} />
+        </>
+      )}
+      {tab === 'attendance' && (
+        <>
+          <DownloadBar label="Attendance by subject, faculty and week">
+            <ExportButtons
+              name={`${fileScope} attendance`}
+              sheet="Attendance by subject"
+              columns={ATTENDANCE_SUBJECT_COLUMNS}
+              rows={data.attendance.subjects}
+              more={attendanceSheets(data).slice(1)}
+            />
+          </DownloadBar>
+          <AttendanceTab
+            data={data.attendance}
+            instructorNote="PRIME domain instructors, with attendance in their PRIME domain classes. Communication and aptitude classes are in the subject list."
+          />
+        </>
       )}
       {tab === 'students' && name && <StudentsTab campus={name} batch={search.batch} />}
 
@@ -244,6 +551,34 @@ export default function CampusPage() {
         />
       )}
     </div>
+  );
+}
+
+/** The AMCAT rounds on the AMCAT tab, with its year, term and name filter. */
+function AmcatDownload({
+  data,
+  fileScope,
+  choice,
+}: {
+  data: CampusDetail;
+  fileScope: string;
+  choice: PeriodChoice;
+}) {
+  const rounds = data.amcat.rounds.filter((round) =>
+    inPeriod(round.last_at ?? round.first_at, round.test_name, choice)
+  );
+  return (
+    <DownloadBar label="AMCAT rounds and sections">
+      <ExportButtons
+        name={`${fileScope} AMCAT`}
+        sheet="AMCAT rounds"
+        columns={amcatColumns(rounds)}
+        rows={rounds}
+        more={[
+          { sheet: 'AMCAT sections', columns: AMCAT_SECTION_COLUMNS, rows: data.amcat.sections },
+        ]}
+      />
+    </DownloadBar>
   );
 }
 
@@ -319,10 +654,12 @@ function BatchPicker({
 
 function OverviewTab({
   data,
+  fileScope,
   onOpen,
   onTab,
 }: {
   data: CampusDetail;
+  fileScope: string;
   onOpen: (test: CampusTest) => void;
   onTab: (tab: Track) => void;
 }) {
@@ -348,6 +685,14 @@ function OverviewTab({
           <SectionTitle
             title="Journey"
             description="Tests released each week, and how the class scored."
+            aside={
+              <ExportButtons
+                name={`${fileScope} weekly journey`}
+                sheet="Weekly journey"
+                columns={TIMELINE_COLUMNS}
+                rows={data.timeline}
+              />
+            }
           />
           {timeline.length ? (
             <div className="mt-3 h-64">
@@ -409,11 +754,21 @@ function OverviewTab({
             <p className="mt-4 text-sm text-slate-500">No tests released yet.</p>
           )}
         </section>
-        <SubjectScores data={data} />
+        <SubjectScores data={data} fileScope={fileScope} />
       </div>
 
       <section className={cn(panel, 'p-5')}>
-        <SectionTitle title="Up Next" />
+        <SectionTitle
+          title="Up Next"
+          aside={
+            <ExportButtons
+              name={`${fileScope} live and scheduled tests`}
+              sheet="Live and scheduled"
+              columns={TEST_COLUMNS}
+              rows={[...live, ...scheduled]}
+            />
+          }
+        />
         <ul className="mt-3 space-y-2">
           {[...live, ...scheduled].slice(0, 6).map((test) => (
             <li key={test.ids.join(',')}>
@@ -467,23 +822,31 @@ function OverviewTab({
         )}
       </section>
 
-      {(['domain', 'elq'] as const).map((track) => {
+      {TRACK_IDS.map((track) => {
         const subjects = data.subjects.filter((subject) => trackOf(subject.name) === track);
         if (!subjects.length) return null;
         return (
           <section key={track} className={cn(panel, 'p-5 lg:col-span-3')}>
             <SectionTitle
-              icon={track === 'domain' ? BriefcaseBusiness : MessagesSquare}
+              icon={TRACK_ICONS[track]}
               title={`${TRACKS[track].label} Coverage`}
               description="Each module: tests released out of all its tests."
               aside={
-                <button
-                  type="button"
-                  onClick={() => onTab(track)}
-                  className="text-brand-700 dark:text-brand-300 text-sm font-semibold hover:underline"
-                >
-                  Open {TRACKS[track].label} →
-                </button>
+                <span className="flex flex-wrap items-center gap-3">
+                  <ExportButtons
+                    name={`${fileScope} ${TRACKS[track].label} coverage`}
+                    sheet={`${TRACKS[track].label} modules`}
+                    columns={MODULE_COLUMNS}
+                    rows={moduleRows(data, track)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onTab(track)}
+                    className="text-brand-700 dark:text-brand-300 text-sm font-semibold hover:underline"
+                  >
+                    Open {TRACKS[track].label} →
+                  </button>
+                </span>
               }
             />
             {subjects.map((subject) => (
@@ -505,59 +868,55 @@ function OverviewTab({
   );
 }
 
-/** Each PRIME subject's average score and participation, domain subjects first. */
-function SubjectScores({ data }: { data: CampusDetail }) {
-  const subjects = [...data.subjects].sort(
-    (a, b) =>
-      Number(trackOf(a.name) === 'elq') - Number(trackOf(b.name) === 'elq') ||
-      a.name.localeCompare(b.name)
-  );
+/** Each PRIME subject's average score and participation: domain, communication, aptitude. */
+function SubjectScores({ data, fileScope }: { data: CampusDetail; fileScope: string }) {
+  const subjects = subjectSummary(data);
   if (!subjects.length) return null;
   return (
     <section className={cn(panel, 'p-5')}>
       <SectionTitle
         title="PRIME Subjects"
         description="Average score and share of tests taken, over the tests released so far."
+        aside={
+          <ExportButtons
+            name={`${fileScope} PRIME subjects`}
+            sheet="Subjects"
+            columns={SUBJECT_COLUMNS}
+            rows={subjects}
+          />
+        }
       />
       <ul className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
         {subjects.map((subject) => {
-          const track = trackOf(subject.name);
-          const tests = [
-            ...data.subjectTests.filter((test) => sameSubject(test.subject, subject.key)),
-            ...subject.modules.flatMap((module) => [
-              ...module.tests,
-              ...module.folders.flatMap((folder) => folder.tests),
-            ]),
-          ].filter(isOut);
-          const submitted = tests.reduce((sum, test) => sum + test.submitted, 0);
-          const eligible = tests.reduce((sum, test) => sum + test.eligible, 0);
-          const average = weightedAverage(tests);
-          const taken = eligible ? percent(submitted, eligible) : null;
+          const Icon = TRACK_ICONS[subject.track];
           return (
             <li key={subject.key}>
               <div className="flex items-baseline justify-between gap-2 text-sm">
                 <span className="flex min-w-0 items-center gap-1.5">
-                  {track === 'domain' ? (
-                    <BriefcaseBusiness className="text-brand-600 size-3.5 shrink-0" aria-hidden />
-                  ) : (
-                    <MessagesSquare className="size-3.5 shrink-0 text-violet-600" aria-hidden />
-                  )}
+                  <Icon
+                    className={cn('size-3.5 shrink-0', TRACK_TEXT[subject.track])}
+                    aria-label={TRACKS[subject.track].label}
+                  />
                   <span className="truncate font-medium" title={subject.name}>
                     {subject.name}
                   </span>
                 </span>
-                <span className={cn('shrink-0 font-bold tabular-nums', scoreTone(average))}>
-                  {average === null ? '—' : `${average}%`}
+                <span className={cn('shrink-0 font-bold tabular-nums', scoreTone(subject.average))}>
+                  {subject.average === null ? '—' : `${subject.average}%`}
                 </span>
               </div>
               <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
                 <div
                   className="bar-fill h-full rounded-full"
-                  style={{ width: `${average ?? 0}%`, background: scoreFill(average) }}
+                  style={{
+                    width: `${subject.average ?? 0}%`,
+                    background: scoreFill(subject.average),
+                  }}
                 />
               </div>
               <p className="mt-0.5 text-[11px] text-slate-500">
-                {tests.length} tests · {taken === null ? '—' : `${taken}%`} taken
+                {subject.released} tests · {subject.taken === null ? '—' : `${subject.taken}%`}{' '}
+                taken
               </p>
             </li>
           );
@@ -640,17 +999,19 @@ function ModuleGrid({ modules }: { modules: SyllabusModule[] }) {
   );
 }
 
-// --- PRIME domain, and communication and aptitude ------------------------------------------
+// --- PRIME domain, communication and aptitude ----------------------------------------------
 
 function TrackTab({
   data,
   track,
+  fileScope,
   onOpen,
   choice,
   onChoice,
 }: {
   data: CampusDetail;
   track: Track;
+  fileScope: string;
   onOpen: (test: CampusTest) => void;
   choice: PeriodChoice;
   onChoice: (next: PeriodChoice) => void;
@@ -658,7 +1019,9 @@ function TrackTab({
   const subjects = data.subjects.filter((subject) => trackOf(subject.name) === track);
   const all = testsOf(data, track);
   const keep = (test: CampusTest) => inPeriod(test.released_at, test.name, choice);
-  const shown = all.filter(keep).length;
+  const kept = byRelease(all.filter(keep));
+  const shown = kept.length;
+  const label = TRACKS[track].label;
 
   if (!all.length) {
     return (
@@ -670,15 +1033,20 @@ function TrackTab({
 
   return (
     <div className="space-y-4">
+      <DownloadBar label={`${label} subjects and modules`}>
+        <ExportButtons
+          name={`${fileScope} ${label} subjects`}
+          sheet={`${label} subjects`}
+          columns={SUBJECT_COLUMNS}
+          rows={subjectSummary(data, track)}
+          more={[
+            { sheet: `${label} modules`, columns: MODULE_COLUMNS, rows: moduleRows(data, track) },
+          ]}
+        />
+      </DownloadBar>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {subjects.map((subject) => {
-          const tests = [
-            ...data.subjectTests.filter((test) => sameSubject(test.subject, subject.key)),
-            ...subject.modules.flatMap((module) => [
-              ...module.tests,
-              ...module.folders.flatMap((folder) => folder.tests),
-            ]),
-          ];
+          const tests = subjectTests(data, subject);
           const out = tests.filter(isOut);
           const submitted = out.reduce((sum, test) => sum + test.submitted, 0);
           const eligible = out.reduce((sum, test) => sum + test.eligible, 0);
@@ -724,6 +1092,18 @@ function TrackTab({
         shown={shown}
         total={all.length}
       />
+      {shown > 0 && (
+        <DownloadBar
+          label={`${shown} ${label} test${shown === 1 ? '' : 's'}${shown < all.length ? ' in this period' : ''}`}
+        >
+          <ExportButtons
+            name={`${fileScope} ${label} tests`}
+            sheet={`${label} tests`}
+            columns={TEST_COLUMNS}
+            rows={kept}
+          />
+        </DownloadBar>
+      )}
       {!shown && (
         <p className={cn(panel, 'p-5 text-sm text-slate-500')}>
           Nothing in this period. Pick another year or term, or clear the filter.
@@ -899,6 +1279,7 @@ function StudentsTab({ campus, batch }: { campus: string; batch?: string }) {
       sort={sort}
       onSort={setSort}
       showCampus={false}
+      exportName={`students-${campus}${batch ? `-${batch}` : ''}`}
       empty="No students at this campus for this batch."
     />
   );

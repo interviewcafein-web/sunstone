@@ -8,6 +8,7 @@
 
 import { type Viewer } from './_auth';
 import { db, together } from './_db';
+import { scorePct } from './assessments';
 
 const NOW = `(now() at time zone 'Asia/Kolkata')`;
 
@@ -121,7 +122,7 @@ export async function primeRows(): Promise<{ subjects: SubjectRow[]; amcat: Amca
               count(distinct (a.lms_user_id, a.test_id)) filter (where tr.submitted)::int as attempted,
               count(distinct (a.lms_user_id, a.test_id))
                 filter (where tr.submitted and coalesce(tr.graded, tr.marks is not null))::int as graded,
-              round(avg(tr.marks / nullif(coalesce(tr.max_marks, t.max_marks), 0) * 100)
+              round(avg(${scorePct('tr', 't')})
                     filter (where tr.submitted))::int as avg_score,
               count(distinct lower(m.name))::int as modules_started
        from assigned a

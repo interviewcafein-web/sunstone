@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import {
   CartesianGrid,
   Legend,
@@ -14,6 +14,7 @@ import {
   Award,
   BookOpenCheck,
   BriefcaseBusiness,
+  Calculator,
   CalendarCheck,
   CalendarDays,
   ChevronRight,
@@ -25,10 +26,12 @@ import {
   NotebookPen,
   Target,
   TrendingUp,
+  type LucideIcon,
 } from 'lucide-react';
 
 import { StudentExams } from '@/components/assessments/ExamsSection';
 import { AnimatedRing } from '@/components/common/AnimatedRing';
+import { DownloadAll, ExportButtons } from '@/components/common/ExportButtons';
 import { Avatar } from '@/components/common/Avatar';
 import { CampusLogo } from '@/components/common/CampusLogo';
 import { InlineLoader, PageLoader } from '@/components/common/PageLoader';
@@ -41,11 +44,16 @@ import {
   scoreTone,
   useCampusOverview,
   useStudentAssessments,
+  EXAM_KIND_LABELS,
+  examEventLabel,
   type AmcatSitting,
   type StudentAssessmentsData,
+  type StudentExam,
   type StudentTest,
 } from '@/lib/assessments';
 import { cohortLabel } from '@/lib/cohorts';
+import type { ExportColumn, ExportSheet } from '@/lib/exportTable';
+import type { StudentPlacement } from '@/lib/placements';
 import { chartColors, useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { PlacementCard } from '@/components/students/PlacementCard';
@@ -60,18 +68,27 @@ import {
   Problem,
   SectionTitle,
   Tabs,
-  heroGrid,
   panel,
 } from '../components/ui';
 import { mean } from '../lib/rows';
-import { TRACKS, isSuper100, trackOf, type Track } from '../lib/subjects';
+import { TRACKS, TRACK_IDS, isSuper100, trackOf, type Track } from '../lib/subjects';
 import { attendanceFill, attendanceTone } from '../lib/tones';
 import { Link, useRouteParams, useRouteSearch, useSetSearch } from '../nav';
 import type { StudentSearch, StudentView } from '../routes';
 
+const TRACK_ICONS: Record<Track, LucideIcon> = {
+  domain: BriefcaseBusiness,
+  comm: MessagesSquare,
+  apt: Calculator,
+};
+const TRACK_LINE: Record<Track, string> = { domain: '#3863a0', comm: '#8b5cf6', apt: '#d97706' };
+
 const TABS: { id: StudentView; label: string; icon: typeof Award }[] = [
-  { id: 'domain', label: TRACKS.domain.label, icon: BriefcaseBusiness },
-  { id: 'elq', label: TRACKS.elq.label, icon: MessagesSquare },
+  ...TRACK_IDS.map((track) => ({
+    id: track,
+    label: TRACKS[track].label,
+    icon: TRACK_ICONS[track],
+  })),
   { id: 'amcat', label: 'AMCAT', icon: Award },
   { id: 'exams', label: 'Internal Exams', icon: NotebookPen },
   { id: 'attendance', label: 'Attendance', icon: CalendarCheck },
@@ -89,6 +106,144 @@ function amcatScores(amcat: AmcatSitting[]) {
     .sort((a, b) => (a.taken_at ?? '').localeCompare(b.taken_at ?? ''))
     .map((sitting) => mean(sitting.sections.map((section) => section.score)))
     .filter((score): score is number => score !== null);
+}
+
+/** Six figures on the banner: two across on phones, three on tablets, six on wide screens. */
+const heroGrid6 = 'relative grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6';
+
+// --- Downloads ---------------------------------------------------------------------------
+
+const TEST_COLUMNS: ExportColumn<StudentTest>[] = [
+  { header: 'Track', value: (test) => TRACKS[trackOf(test.subject)].label },
+  { header: 'Subject', value: (test) => test.subject },
+  { header: 'Module', value: (test) => (test.module ? tidy(test.module) : '') },
+  { header: 'Topic', value: (test) => test.lecture },
+  { header: 'Test', value: (test) => test.name },
+  { header: 'Category', value: (test) => test.category },
+  { header: 'Status', value: (test) => test.status },
+  { header: 'Released', value: (test) => test.released_at?.slice(0, 10) },
+  { header: 'Due', value: (test) => test.due_at?.slice(0, 10) },
+  { header: 'Submitted', value: (test) => (test.submitted ? 'Yes' : 'No') },
+  { header: 'Submitted at', value: (test) => test.submitted_at },
+  { header: 'Attempts', value: (test) => test.attempts },
+  { header: 'Marks', value: (test) => (test.marks == null ? null : Number(test.marks)) },
+  {
+    header: 'Max marks',
+    value: (test) => (test.max_marks == null ? null : Number(test.max_marks)),
+  },
+  { header: 'Score %', value: (test) => test.pct },
+  {
+    header: 'Grading',
+    value: (test) => (test.submitted ? (test.pct == null ? 'Awaiting grading' : 'Graded') : ''),
+  },
+  { header: 'Class average %', value: (test) => test.class_avg_pct },
+  { header: 'Rank', value: (test) => test.rank },
+  { header: 'Classmates who submitted', value: (test) => test.takers },
+];
+
+const byRelease = (tests: StudentTest[]) =>
+  [...tests].sort((a, b) => (b.released_at ?? '').localeCompare(a.released_at ?? ''));
+
+const amcatColumns = (amcat: AmcatSitting[]): ExportColumn<AmcatSitting>[] => [
+  { header: 'AMCAT', value: (sitting) => sitting.test_name },
+  { header: 'Taken on', value: (sitting) => sitting.taken_at?.slice(0, 10) },
+  { header: 'Status', value: (sitting) => sitting.status },
+  {
+    header: 'Overall (average of sections)',
+    value: (sitting) => mean(sitting.sections.map((section) => section.score)),
+  },
+  ...[...new Set(amcat.flatMap((sitting) => sitting.sections.map((part) => part.name)))].map(
+    (name) => ({
+      header: name,
+      value: (sitting: AmcatSitting) =>
+        sitting.sections.find((part) => part.name === name)?.score ?? null,
+    })
+  ),
+];
+
+const EXAM_COLUMNS: ExportColumn<StudentExam>[] = [
+  { header: 'Exam', value: (exam) => examEventLabel(exam.event) },
+  { header: 'Kind', value: (exam) => EXAM_KIND_LABELS[exam.kind] ?? exam.kind },
+  { header: 'Subject', value: (exam) => exam.subject },
+  { header: 'Title', value: (exam) => exam.title },
+  { header: 'Date', value: (exam) => exam.exam_date?.slice(0, 10) },
+  { header: 'Marks', value: (exam) => (exam.marks == null ? null : Number(exam.marks)) },
+  {
+    header: 'Max marks',
+    value: (exam) => (exam.max_marks == null ? null : Number(exam.max_marks)),
+  },
+  { header: 'Score %', value: (exam) => exam.pct },
+  { header: 'Class average %', value: (exam) => exam.class_avg_pct },
+  { header: 'Grade', value: (exam) => exam.grade_text },
+  {
+    header: 'Criteria',
+    value: (exam) =>
+      (exam.criteria ?? [])
+        .map((part) => `${part.name}: ${part.marks ?? '—'}${part.max ? `/${part.max}` : ''}`)
+        .join('; '),
+  },
+];
+
+type AttendanceSubject = StudentAssessmentsData['attendance']['subjects'][number];
+type AttendanceWeek = StudentAssessmentsData['attendance']['weeks'][number];
+
+const ATTENDANCE_SUBJECT_COLUMNS: ExportColumn<AttendanceSubject>[] = [
+  { header: 'Subject', value: (row) => row.subject },
+  { header: 'PRIME', value: (row) => (row.prime ? 'Yes' : 'No') },
+  { header: 'Classes', value: (row) => row.sessions },
+  { header: 'Attended', value: (row) => row.present },
+  { header: 'Attendance %', value: (row) => row.pct },
+  { header: 'Last class', value: (row) => row.last_date?.slice(0, 10) },
+];
+
+const ATTENDANCE_WEEK_COLUMNS: ExportColumn<AttendanceWeek>[] = [
+  { header: 'Week of', value: (row) => row.week },
+  { header: 'Classes', value: (row) => row.sessions },
+  { header: 'Attended', value: (row) => row.present },
+  { header: 'Attendance %', value: (row) => row.pct },
+];
+
+const PLACEMENT_COLUMNS: ExportColumn<StudentPlacement>[] = [
+  { header: 'Company', value: (row) => row.company },
+  { header: 'Designation', value: (row) => row.designation },
+  { header: 'Role category', value: (row) => row.category },
+  { header: 'Kind', value: (row) => (row.full_time ? 'Full-time job' : 'Internship') },
+  { header: 'CTC (LPA)', value: (row) => row.total_lpa },
+  { header: 'Stipend (₹/month)', value: (row) => row.stipend },
+  { header: 'Months', value: (row) => row.months },
+  { header: 'Selected on', value: (row) => row.selected_on?.slice(0, 10) },
+  { header: 'Joining', value: (row) => row.joining },
+  { header: 'Withdrawn', value: (row) => (row.withdrawn ? 'Yes' : 'No') },
+];
+
+/** Everything on the student's page as one workbook: a sheet per tab. */
+function studentSheets(data: StudentAssessmentsData): ExportSheet<any>[] {
+  return [
+    ...TRACK_IDS.map((track) => ({
+      sheet: `${TRACKS[track].label} tests`,
+      columns: TEST_COLUMNS,
+      rows: byRelease(data.tests.filter((test) => trackOf(test.subject) === track)),
+    })),
+    { sheet: 'AMCAT', columns: amcatColumns(data.amcat), rows: data.amcat },
+    { sheet: 'Internal exams', columns: EXAM_COLUMNS, rows: data.exams },
+    {
+      sheet: 'Attendance by subject',
+      columns: ATTENDANCE_SUBJECT_COLUMNS,
+      rows: data.attendance.subjects,
+    },
+    { sheet: 'Attendance by week', columns: ATTENDANCE_WEEK_COLUMNS, rows: data.attendance.weeks },
+    { sheet: 'Placements', columns: PLACEMENT_COLUMNS, rows: data.placements ?? [] },
+  ];
+}
+
+/** A tab's download, on its own line. */
+function DownloadBar({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-slate-500">
+      <span>{label}</span>
+      {children}
+    </div>
+  );
 }
 
 const tooltipStyle = (colors: ReturnType<typeof chartColors>) => ({
@@ -126,8 +281,9 @@ export default function StudentPage() {
 
   const data = record.data;
   const tests = data?.tests ?? [];
-  const domain = tests.filter((test) => trackOf(test.subject) === 'domain');
-  const elq = tests.filter((test) => trackOf(test.subject) === 'elq');
+  const byTrack = Object.fromEntries(
+    TRACK_IDS.map((track) => [track, tests.filter((test) => trackOf(test.subject) === track)])
+  ) as Record<Track, StudentTest[]>;
   const attended = (data?.attendance.subjects ?? []).reduce(
     (sum, subject) => ({
       sessions: sum.sessions + subject.sessions,
@@ -159,6 +315,11 @@ export default function StudentPage() {
 
       <Hero
         eyebrow={isSuper100(student) ? 'Super 100 Student' : 'Student'}
+        aside={
+          data && (
+            <DownloadAll name={`${student.name} Converge`} sheets={() => studentSheets(data)} />
+          )
+        }
         title={
           <span className="flex items-center gap-3">
             <Avatar
@@ -198,21 +359,17 @@ export default function StudentPage() {
           </div>
         )}
 
-        <dl className={cn(heroGrid, 'mt-5')}>
-          <HeroStat
-            icon={BriefcaseBusiness}
-            label={TRACKS.domain.label}
-            value={data ? averageOf(domain) : null}
-            suffix="%"
-            trend={trend(domain).slice(-10)}
-          />
-          <HeroStat
-            icon={MessagesSquare}
-            label={TRACKS.elq.short}
-            value={data ? averageOf(elq) : null}
-            suffix="%"
-            trend={trend(elq).slice(-10)}
-          />
+        <dl className={cn(heroGrid6, 'mt-5')}>
+          {TRACK_IDS.map((track) => (
+            <HeroStat
+              key={track}
+              icon={TRACK_ICONS[track]}
+              label={TRACKS[track].short}
+              value={data ? averageOf(byTrack[track]) : null}
+              suffix="%"
+              trend={trend(byTrack[track]).slice(-10)}
+            />
+          ))}
           <HeroStat
             icon={Award}
             label="AMCAT"
@@ -239,13 +396,11 @@ export default function StudentPage() {
         tabs={TABS.map((tab) => ({
           ...tab,
           count:
-            tab.id === 'domain'
-              ? domain.filter(isOut).length
-              : tab.id === 'elq'
-                ? elq.filter(isOut).length
-                : tab.id === 'amcat'
-                  ? data?.amcat.length
-                  : undefined,
+            tab.id === 'domain' || tab.id === 'comm' || tab.id === 'apt'
+              ? byTrack[tab.id].filter(isOut).length
+              : tab.id === 'amcat'
+                ? data?.amcat.length
+                : undefined,
         }))}
         value={view}
         onChange={(next) => setSearch({ view: next === 'domain' ? undefined : next })}
@@ -260,35 +415,52 @@ export default function StudentPage() {
         <Problem message={record.error.message} onRetry={() => record.refetch()} />
       ) : (
         <div className="animate-rise space-y-5" key={view}>
-          {(view === 'domain' || view === 'elq') && (
-            <TrackSection track={view} tests={view === 'domain' ? domain : elq} data={data!} />
+          {(view === 'domain' || view === 'comm' || view === 'apt') && (
+            <TrackSection
+              track={view}
+              tests={byTrack[view]}
+              data={data!}
+              studentName={student.name}
+            />
           )}
-          {view === 'amcat' && <AmcatSection amcat={data!.amcat} />}
+          {view === 'amcat' && <AmcatSection amcat={data!.amcat} studentName={student.name} />}
           {view === 'exams' &&
             (data!.exams.length ? (
-              <StudentExams exams={data!.exams} />
+              <>
+                <DownloadBar label="Internal exam marks">
+                  <ExportButtons
+                    name={`${student.name} internal exams`}
+                    sheet="Internal exams"
+                    columns={EXAM_COLUMNS}
+                    rows={data!.exams}
+                  />
+                </DownloadBar>
+                <StudentExams exams={data!.exams} />
+              </>
             ) : (
               <Empty title="No Internal Exam Marks Yet">
                 Midterm and end-term marks appear here once the LMS has them.
               </Empty>
             ))}
-          {view === 'attendance' && <AttendanceSection data={data!} />}
+          {view === 'attendance' && <AttendanceSection data={data!} studentName={student.name} />}
         </div>
       )}
     </div>
   );
 }
 
-// --- PRIME domain, and communication and aptitude ------------------------------------------
+// --- PRIME domain, communication and aptitude ----------------------------------------------
 
 function TrackSection({
   track,
   tests,
   data,
+  studentName,
 }: {
   track: Track;
   tests: StudentTest[];
   data: StudentAssessmentsData;
+  studentName: string;
 }) {
   const colors = chartColors(useTheme());
   const released = tests.filter(isOut);
@@ -327,6 +499,14 @@ function TrackSection({
 
   return (
     <>
+      <DownloadBar label={`Every ${TRACKS[track].label} test given to ${studentName}`}>
+        <ExportButtons
+          name={`${studentName} ${TRACKS[track].label} tests`}
+          sheet={`${TRACKS[track].label} tests`}
+          columns={TEST_COLUMNS}
+          rows={byRelease(tests)}
+        />
+      </DownloadBar>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi
           icon={BookOpenCheck}
@@ -439,7 +619,7 @@ function TrackSection({
                   type="monotone"
                   dataKey="student"
                   isAnimationActive={false}
-                  stroke={track === 'domain' ? '#3863a0' : '#8b5cf6'}
+                  stroke={TRACK_LINE[track]}
                   strokeWidth={2.5}
                   dot={{ r: 3 }}
                 />
@@ -451,7 +631,20 @@ function TrackSection({
 
       {upcoming.length > 0 && (
         <section className={cn(panel, 'p-5')}>
-          <SectionTitle title="Live and Upcoming" aside="Not submitted yet" />
+          <SectionTitle
+            title="Live and Upcoming"
+            aside={
+              <span className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                Not submitted yet
+                <ExportButtons
+                  name={`${studentName} ${TRACKS[track].label} live and upcoming`}
+                  sheet="Live and upcoming"
+                  columns={TEST_COLUMNS}
+                  rows={upcoming}
+                />
+              </span>
+            }
+          />
           <ul className="mt-3 grid gap-2 md:grid-cols-2">
             {upcoming.map((test) => (
               <li
@@ -484,6 +677,7 @@ function TrackSection({
           subject={subject}
           tests={released.filter((test) => (test.subject ?? 'Other') === subject)}
           syncedAt={data.syncedAt}
+          studentName={studentName}
         />
       ))}
     </>
@@ -495,10 +689,12 @@ function SubjectTests({
   subject,
   tests,
   syncedAt,
+  studentName,
 }: {
   subject: string;
   tests: StudentTest[];
   syncedAt: string | null;
+  studentName: string;
 }) {
   const subjectLevel = tests.filter((test) => !test.module);
   // module > sub-folder ('' = tests on the module itself) > tests
@@ -521,7 +717,17 @@ function SubjectTests({
           icon={FolderTree}
           title={subject}
           description={`${tests.length} tests released · ${modules.length} modules`}
-          aside={syncedAt && `From the LMS · ${lmsDate(syncedAt, true)}`}
+          aside={
+            <span className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              {syncedAt && `From the LMS · ${lmsDate(syncedAt, true)}`}
+              <ExportButtons
+                name={`${studentName} ${subject}`}
+                sheet={subject}
+                columns={TEST_COLUMNS}
+                rows={byRelease(tests)}
+              />
+            </span>
+          }
         />
       </div>
       <div className="divide-y divide-slate-200 border-t border-slate-200">
@@ -615,7 +821,11 @@ function ResultsTable({ tests, showRank = false }: { tests: StudentTest[]; showR
                 </td>
               )}
               <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                {test.submitted ? (
+                {test.submitted && test.pct == null ? (
+                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                    Awaiting grading
+                  </span>
+                ) : test.submitted ? (
                   <>
                     <span className={cn('font-bold tabular-nums', scoreTone(test.pct))}>
                       {test.pct ?? '—'}%
@@ -645,7 +855,7 @@ function ResultsTable({ tests, showRank = false }: { tests: StudentTest[]; showR
 
 const AMCAT_COLORS = ['#0f5951', '#c8913a', '#10b981', '#8b5cf6', '#ef4444', '#0ea5e9', '#64748b'];
 
-function AmcatSection({ amcat }: { amcat: AmcatSitting[] }) {
+function AmcatSection({ amcat, studentName }: { amcat: AmcatSitting[]; studentName: string }) {
   const colors = chartColors(useTheme());
   if (!amcat.length) {
     return (
@@ -664,6 +874,14 @@ function AmcatSection({ amcat }: { amcat: AmcatSitting[] }) {
 
   return (
     <>
+      <DownloadBar label={`${sittings.length} AMCAT sitting${sittings.length === 1 ? '' : 's'}`}>
+        <ExportButtons
+          name={`${studentName} AMCAT`}
+          sheet="AMCAT"
+          columns={amcatColumns(sittings)}
+          rows={sittings}
+        />
+      </DownloadBar>
       {points.length > 1 && (
         <section className={cn(panel, 'p-5')}>
           <SectionTitle
@@ -778,7 +996,13 @@ function AmcatCard({ sitting }: { sitting: AmcatSitting }) {
 
 // --- Attendance --------------------------------------------------------------------------
 
-function AttendanceSection({ data }: { data: StudentAssessmentsData }) {
+function AttendanceSection({
+  data,
+  studentName,
+}: {
+  data: StudentAssessmentsData;
+  studentName: string;
+}) {
   const colors = chartColors(useTheme());
   const { subjects, weeks } = data.attendance;
   if (!subjects.length) {
@@ -852,6 +1076,14 @@ function AttendanceSection({ data }: { data: StudentAssessmentsData }) {
           icon={CalendarCheck}
           title="Week by Week"
           description="Share of classes attended each week, since 1 July."
+          aside={
+            <ExportButtons
+              name={`${studentName} attendance by week`}
+              sheet="Attendance by week"
+              columns={ATTENDANCE_WEEK_COLUMNS}
+              rows={weeks}
+            />
+          }
         />
         <div className="mt-3 h-56">
           <ResponsiveContainer width="100%" height="100%">
@@ -893,7 +1125,17 @@ function AttendanceSection({ data }: { data: StudentAssessmentsData }) {
       <div className="grid gap-5 lg:grid-cols-2">
         {groups.map((group) => (
           <section key={group.title} className={cn(panel, 'self-start p-5')}>
-            <SectionTitle title={`By Subject: ${group.title}`} />
+            <SectionTitle
+              title={`By Subject: ${group.title}`}
+              aside={
+                <ExportButtons
+                  name={`${studentName} attendance ${group.title}`}
+                  sheet={group.title}
+                  columns={ATTENDANCE_SUBJECT_COLUMNS}
+                  rows={group.list}
+                />
+              }
+            />
             <ul className="mt-3 space-y-3">
               {group.list.map((subject) => (
                 <li key={subject.subject}>

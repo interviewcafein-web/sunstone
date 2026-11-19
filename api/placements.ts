@@ -1,10 +1,11 @@
-// GET /api/placements?kind=full-time|internship[&campus=ID]: the Placements page. Staff only,
-// and campus staff only for their campuses; they see averages but not each student's pay.
-// The numbers come from api/_placements.ts.
+// GET /api/placements?kind=full-time|internship[&campus=ID][&batch=MBA:2025][&segment=sales|core]:
+// the Placements page. Staff only, and campus staff only for their campuses; they see averages
+// but not each student's pay. Segment (sales or core jobs) is Converge only. The numbers come
+// from api/_placements.ts.
 
 import { json, seesCampus, sessionViewer } from './_auth';
 import { forApp } from './_app';
-import { placementReport, placementRowsSnapshot, type Kind } from './_placements';
+import { placementReport, placementRowsSnapshot, type Kind, type Segment } from './_placements';
 import type { WaitUntil } from './_snapshot';
 
 export const config = { runtime: 'edge' };
@@ -21,11 +22,18 @@ async function handler(request: Request, context?: WaitUntil): Promise<Response>
   if (campusId !== null && !seesCampus(viewer, campusId)) {
     return json(403, { error: 'You do not have access to this campus' });
   }
+  const rawBatch = params.get('batch');
+  const batch = rawBatch && /^[A-Za-z. ]{2,20}:\d{4}$/.test(rawBatch) ? rawBatch : null;
+  const rawSegment = params.get('segment');
+  const segment: Segment | null =
+    rawSegment === 'sales' || rawSegment === 'core' ? rawSegment : null;
   try {
     const { students, syncedAt } = await placementRowsSnapshot(context);
     const report = placementReport(students, viewer, {
       kind,
       campusId,
+      batch,
+      segment,
       showPay: viewer.role !== 'campus',
     });
     return json(200, { ...report, syncedAt });

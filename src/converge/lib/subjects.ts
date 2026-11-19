@@ -1,18 +1,22 @@
-// PRIME for management students has two tracks: the PRIME domains ("IT Prime Domain", "HR
+// PRIME for management students has three tracks: the PRIME domains ("IT Prime Domain", "HR
 // Prime Domain", "Finance Prime Domain", "Revenue Generation Prime Domain", "Operations Prime
-// Domain") and communication and aptitude ("Prime Communication", "Prime Aptitude", their
-// spelling variants, and "ELQ Test"), called ELQ. Kept in step with ELQ_SUBJECT in
-// api/assessments.ts, which splits the students table's averages the same way.
+// Domain", the BBA career tracks), communication ("Prime Communication", its spelling variants,
+// "ELQ Test") and aptitude ("Prime Aptitude", "Prime_Aptitude", "Aptitude (Prime)"…). Kept in
+// step with APT_SUBJECT and COMM_SUBJECT in api/assessments.ts, which split the students
+// table's averages the same way.
 
 import type { Student } from '@/lib/students/types';
 
-export type Track = 'domain' | 'elq';
+export type Track = 'domain' | 'comm' | 'apt';
 
-const ELQ = /(^|[^a-z])apt|com+u|elq/i;
+export const TRACK_IDS: Track[] = ['domain', 'comm', 'apt'];
+
+const APT = /(^|[^a-z])apt/i;
+const COMM = /com+u|elq/i;
 
 /** Which track an LMS subject (course) belongs to. */
 export const trackOf = (subject: string | null | undefined): Track =>
-  subject && ELQ.test(subject) ? 'elq' : 'domain';
+  subject && APT.test(subject) ? 'apt' : subject && COMM.test(subject) ? 'comm' : 'domain';
 
 export const TRACKS: Record<Track, { label: string; short: string; note: string }> = {
   domain: {
@@ -20,10 +24,15 @@ export const TRACKS: Record<Track, { label: string; short: string; note: string 
     short: 'PRIME Domain',
     note: 'IT, HR, finance, revenue generation and operations',
   },
-  elq: {
-    label: 'Communication & Aptitude',
-    short: 'Comm. & Aptitude',
-    note: 'PRIME communication, aptitude and ELQ',
+  comm: {
+    label: 'Communication',
+    short: 'Communication',
+    note: 'PRIME communication and ELQ',
+  },
+  apt: {
+    label: 'Aptitude',
+    short: 'Aptitude',
+    note: 'PRIME aptitude',
   },
 };
 

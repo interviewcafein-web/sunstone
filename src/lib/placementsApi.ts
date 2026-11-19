@@ -2,10 +2,20 @@
 
 import { useQuery } from '@tanstack/react-query';
 
-import type { PlacementKind, PlacementsResponse } from './placements';
+import type { PlacementKind, PlacementSegment, PlacementsResponse } from './placements';
 
-async function load(kind: PlacementKind, campus?: number) {
-  const response = await fetch(`/api/placements?kind=${kind}${campus ? `&campus=${campus}` : ''}`);
+interface Filters {
+  campus?: number;
+  batch?: string;
+  segment?: PlacementSegment;
+}
+
+async function load(kind: PlacementKind, campus?: number, filters: Omit<Filters, 'campus'> = {}) {
+  const params = new URLSearchParams({ kind });
+  if (campus) params.set('campus', String(campus));
+  if (filters.batch) params.set('batch', filters.batch);
+  if (filters.segment) params.set('segment', filters.segment);
+  const response = await fetch(`/api/placements?${params}`);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error ?? 'Placements could not be loaded.');
   return data as PlacementsResponse;
@@ -22,9 +32,10 @@ export async function fetchReportPlacements(campusName?: string): Promise<Placem
   return campus ? Promise.all(kinds.map((kind) => load(kind, campus.id))) : [];
 }
 
-export const usePlacements = (kind: PlacementKind, campus?: number) =>
+export const usePlacements = (kind: PlacementKind, { campus, batch, segment }: Filters = {}) =>
   useQuery({
-    queryKey: ['placements', kind, campus ?? null],
-    queryFn: () => load(kind, campus),
+    queryKey: ['placements', kind, campus ?? null, batch ?? null, segment ?? null],
+    queryFn: () => load(kind, campus, { batch, segment }),
     staleTime: 5 * 60_000,
+    placeholderData: (previous) => previous,
   });

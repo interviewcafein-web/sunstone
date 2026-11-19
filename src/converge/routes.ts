@@ -19,9 +19,10 @@ const positive = (value: unknown) => {
   return Number.isInteger(number) && number > 0 ? number : undefined;
 };
 
-const SORT_KEYS: SortKey[] = ['name', 'domain', 'elq', 'amcat', 'attendance', 'exams'];
+const SORT_KEYS: SortKey[] = ['name', 'domain', 'comm', 'apt', 'amcat', 'attendance', 'exams'];
 const sortOf = (value: unknown) => {
-  const sort = text(value);
+  // "elq" (communication and aptitude together) was split in two; old links sort by communication.
+  const sort = text(value) === 'elq' ? 'comm' : text(value);
   return SORT_KEYS.includes(sort as SortKey) ? (sort as SortKey) : undefined;
 };
 
@@ -79,8 +80,8 @@ export const studentsRoute = createRoute({
   validateSearch: studentsSearch,
 });
 
-export type StudentView = 'domain' | 'elq' | 'amcat' | 'exams' | 'attendance';
-const VIEWS: StudentView[] = ['domain', 'elq', 'amcat', 'exams', 'attendance'];
+export type StudentView = 'domain' | 'comm' | 'apt' | 'amcat' | 'exams' | 'attendance';
+const VIEWS: StudentView[] = ['domain', 'comm', 'apt', 'amcat', 'exams', 'attendance'];
 
 export interface StudentSearch {
   view?: StudentView;
@@ -90,7 +91,12 @@ export const studentRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/s/$slug',
   validateSearch: (search: Record<string, unknown>): StudentSearch => ({
-    view: VIEWS.includes(search.view as StudentView) ? (search.view as StudentView) : undefined,
+    view:
+      search.view === 'elq'
+        ? 'comm'
+        : VIEWS.includes(search.view as StudentView)
+          ? (search.view as StudentView)
+          : undefined,
   }),
 });
 

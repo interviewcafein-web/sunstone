@@ -7,7 +7,7 @@ import type { Student } from '@/lib/students/types';
 
 import { isSuper100 } from './subjects';
 
-export type SortKey = 'name' | 'domain' | 'elq' | 'amcat' | 'attendance' | 'exams';
+export type SortKey = 'name' | 'domain' | 'comm' | 'apt' | 'amcat' | 'attendance' | 'exams';
 
 export interface Row {
   student: Student;
@@ -15,9 +15,11 @@ export interface Row {
   super100: boolean;
   /** PRIME domain test average, %. */
   domain: number | null;
-  /** Communication and aptitude (ELQ) average, %. */
-  elq: number | null;
-  /** True while the server's numbers do not split domain and ELQ yet: `domain` is all PRIME tests. */
+  /** PRIME communication test average, %. */
+  comm: number | null;
+  /** PRIME aptitude test average, %. */
+  apt: number | null;
+  /** True while the server's numbers do not split the tracks yet: `domain` is all PRIME tests. */
   combined: boolean;
   /** Average section score of the latest AMCAT sitting. */
   amcat: number | null;
@@ -32,7 +34,8 @@ export function toRow(student: Student, metrics?: StudentMetrics): Row {
     metrics,
     super100: isSuper100(student),
     domain: (split ? metrics.domain_avg : metrics?.test_avg) ?? null,
-    elq: (split ? metrics.elq_avg : null) ?? null,
+    comm: (split ? metrics.comm_avg : null) ?? null,
+    apt: (split ? metrics.apt_avg : null) ?? null,
     combined: metrics !== undefined && !split,
     amcat: metrics?.amcat?.at(-1)?.[1] ?? null,
     attendance: metrics?.attendance ?? null,

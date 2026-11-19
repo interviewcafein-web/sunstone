@@ -24,6 +24,15 @@ export const config = { runtime: 'edge' };
 
 const int = (value: string | null) => (value && /^\d+$/.test(value) ? Number(value) : null);
 const NOW = `(now() at time zone 'Asia/Kolkata')`;
+
+/**
+ * A result's score in %, or null while the trainer has not graded it: the LMS stores an
+ * ungraded submission (an assignment, mostly) as 0 marks, which is not a score. Vertex has no
+ * grading status (null), so its scores are unchanged.
+ */
+export const scorePct = (tr: string, t: string) =>
+  `(case when ${tr}.graded is false and coalesce(${tr}.marks, 0) = 0 then null
+     else ${tr}.marks / nullif(coalesce(${tr}.max_marks, ${t}.max_marks), 0) * 100 end)`;
 const BATCH_FILTER = /^(\d{4}|[A-Za-z. ]{2,20}:(\d{4})?)$/;
 
 // A batch filter ($2): an admission year ("2025"), a whole program ("BCA:"), a cohort, program
@@ -52,7 +61,7 @@ const SCOPE = `
   res as (
     select e.test_id, e.lms_user_id, tr.marks, tr.submitted, tr.attempts, tr.submitted_at,
            coalesce(tr.max_marks, t.max_marks) as max_marks,
-           tr.marks / nullif(coalesce(tr.max_marks, t.max_marks), 0) * 100 as pct
+           ${scorePct('tr', 't')} as pct
     from eligible e
     join lms_tests t on t.id = e.test_id
     left join lms_test_results tr on tr.test_id = e.test_id and tr.lms_user_id = e.lms_user_id)`;
@@ -86,7 +95,7 @@ export async function campuses(viewer: Viewer) {
      res as (
        select e.campus_id, e.test_id, e.lms_user_id, tr.submitted,
               lower(trim(t.name)) || '|' || coalesce(t.max_marks::text, '') as test_key,
-              tr.marks / nullif(coalesce(tr.max_marks, t.max_marks), 0) * 100 as pct
+              ${scorePct('tr', 't')} as pct
        from eligible e join lms_tests t on t.id = e.test_id
        left join lms_test_results tr on tr.test_id = e.test_id and tr.lms_user_id = e.lms_user_id),
      upcoming as (
@@ -125,7 +134,7 @@ export async function campuses(viewer: Viewer) {
   const testWeeksQuery = db().query(
     `with scored as (
        select s.campus_id, date_trunc('week', min(r.release_at)) as week,
-              max(tr.marks / nullif(coalesce(tr.max_marks, t.max_marks), 0) * 100) as pct
+              max(${scorePct('tr', 't')}) as pct
        from lms_test_results tr
        join students s on s.lms_user_id = tr.lms_user_id
        join lms_section_students ss on ss.lms_user_id = tr.lms_user_id
@@ -685,10 +694,11 @@ const PRIME_SUBJECT = `subject ~* '(^|[^a-z])prime([^a-z]|$)|competitive coding'
 // Domain"…), not PRIME aptitude or communication.
 const PRIME_CODING = `(subject ~* '(^|[^a-z])pri[mne]{2}([^a-z]|$)' and subject ~* 'domain|coding|tech'
   and subject !~* 'apti|comm') or subject ~* 'competitive coding'`;
-// Converge: PRIME communication and aptitude subjects ("Prime Aptitude", "Prime Communication",
-// spelling variants, "ELQ Test"), as opposed to the PRIME domains. Kept in step with
-// src/converge/lib/subjects.ts.
-const ELQ_SUBJECT = `(^|[^a-z])apt|com+u|elq`;
+// Converge: PRIME aptitude ("Prime Aptitude", "Prime_Aptitude", "Aptitude (Prime)"…) and
+// PRIME communication ("Prime Communication", spelling variants, "ELQ Test") subjects, as
+// opposed to the PRIME domains. Kept in step with src/converge/lib/subjects.ts.
+const APT_SUBJECT = `(^|[^a-z])apt`;
+const COMM_SUBJECT = `com+u|elq`;
 
 interface LmsDay {
   name: string;
@@ -1017,8 +1027,11 @@ export async function student(viewer: Viewer, username: string) {
              where p.test_id = t.id) as lecture,
            tr.marks, coalesce(tr.submitted, false) as submitted, tr.attempts,
            tr.submitted_at::text as submitted_at,
-           round(tr.marks / nullif(coalesce(tr.max_marks, t.max_marks), 0) * 100)::int as pct,
-           (select round(avg(o.marks / nullif(coalesce(o.max_marks, t.max_marks), 0) * 100))::int
+           -- As scorePct(): an ungraded submission (0 marks in the LMS) has no score yet.
+           round(case when tr.graded is false and coalesce(tr.marks, 0) = 0 then null
+             else tr.marks / nullif(coalesce(tr.max_marks, t.max_marks), 0) * 100 end)::int as pct,
+           (select round(avg(case when o.graded is false and coalesce(o.marks, 0) = 0 then null
+             else o.marks / nullif(coalesce(o.max_marks, t.max_marks), 0) * 100 end))::int
               from lms_test_results o
               where o.test_id = t.id and o.submitted
                 and o.lms_user_id in (select lms_user_id from classmates c where c.test_id = t.id)) as class_avg_pct,
@@ -1089,8 +1102,8 @@ export async function student(viewer: Viewer, username: string) {
   const syncedAt = syncedAtOf(synced);
   const tests = rows.map((row) => ({
     ...row,
-    // A rank only means something for a submitted test.
-    rank: row.submitted ? row.rank : null,
+    // A rank only means something for a submitted, graded test.
+    rank: row.submitted && row.pct != null ? row.rank : null,
     status: statusOf(row.released_at as string | null, row.due_at as string | null, now),
   }));
   return {
@@ -1119,34 +1132,34 @@ export async function student(viewer: Viewer, username: string) {
  */
 export async function metrics(viewer: Viewer) {
   // Converge (management students) splits PRIME tests into the domain subjects ("IT Prime
-  // Domain", "HR Prime Domain"…) and communication and aptitude ("Prime Aptitude", "Prime
-  // Communication", "ELQ Test"). Vertex's query and answer stay exactly as they were.
+  // Domain", "HR Prime Domain"…), communication ("Prime Communication", "ELQ Test") and
+  // aptitude ("Prime Aptitude"). Vertex's query and answer stay exactly as they were.
   const split = currentApp() === 'converge';
+  // scorePct() leaves submissions not graded yet out of the averages; they still count as taken.
+  const part = (track: string, test: string) => `
+              count(*) filter (where ${test})::int as ${track}_released,
+              count(*) filter (where ${test} and tr.submitted)::int as ${track}_submitted,
+              round(avg(${scorePct('tr', 't')})
+                    filter (where tr.submitted and ${test}))::int as ${track}_avg`;
   const splitCtes = split
     ? `,
-     elq as (
-       select p.test_id, bool_or(c.name ~* '${ELQ_SUBJECT}') as elq
+     track as (
+       select p.test_id, bool_or(c.name ~* '${APT_SUBJECT}') as apt,
+              bool_or(c.name !~* '${APT_SUBJECT}' and c.name ~* '${COMM_SUBJECT}') as comm
        from lms_test_placements p join lms_courses c on c.id = p.course_id
        group by p.test_id),
      part as (
-       select e.lms_user_id,
-              count(*) filter (where not coalesce(q.elq, false))::int as domain_released,
-              count(*) filter (where not coalesce(q.elq, false) and tr.submitted)::int as domain_submitted,
-              round(avg(tr.marks / nullif(coalesce(tr.max_marks, t.max_marks), 0) * 100)
-                    filter (where tr.submitted and not coalesce(q.elq, false)))::int as domain_avg,
-              count(*) filter (where q.elq)::int as elq_released,
-              count(*) filter (where q.elq and tr.submitted)::int as elq_submitted,
-              round(avg(tr.marks / nullif(coalesce(tr.max_marks, t.max_marks), 0) * 100)
-                    filter (where tr.submitted and q.elq))::int as elq_avg
+       select e.lms_user_id,${part('domain', 'not coalesce(q.apt or q.comm, false)')},${part('comm', 'coalesce(q.comm and not q.apt, false)')},${part('apt', 'coalesce(q.apt, false)')}
        from eligible e join lms_tests t on t.id = e.test_id
-       left join elq q on q.test_id = e.test_id
+       left join track q on q.test_id = e.test_id
        left join lms_test_results tr on tr.test_id = e.test_id and tr.lms_user_id = e.lms_user_id
        group by e.lms_user_id)`
     : '';
   const splitColumns = split
     ? `,
             part.domain_avg, part.domain_submitted, part.domain_released,
-            part.elq_avg, part.elq_submitted, part.elq_released`
+            part.comm_avg, part.comm_submitted, part.comm_released,
+            part.apt_avg, part.apt_submitted, part.apt_released`
     : '';
   const splitJoin = split ? ' left join part using (lms_user_id)' : '';
   const rows = await db().query(
@@ -1181,7 +1194,7 @@ export async function metrics(viewer: Viewer) {
        group by lms_user_id),
      scored as (
        select ss.lms_user_id, d.test_id, min(d.release_at) as released,
-              round(max(tr.marks / nullif(coalesce(tr.max_marks, t.max_marks), 0) * 100))::int as pct
+              round(max(${scorePct('tr', 't')}))::int as pct
        from done d join lms_section_students ss using (section_id)
        join lms_tests t on t.id = d.test_id
        join lms_test_results tr on tr.test_id = d.test_id and tr.lms_user_id = ss.lms_user_id and tr.submitted
@@ -1198,7 +1211,7 @@ export async function metrics(viewer: Viewer) {
        group by m.lms_user_id),
      tst as (
        select e.lms_user_id, count(*)::int as released, count(*) filter (where tr.submitted)::int as submitted,
-              round(avg(tr.marks / nullif(coalesce(tr.max_marks, t.max_marks), 0) * 100)
+              round(avg(${scorePct('tr', 't')})
                     filter (where tr.submitted))::int as avg
        from eligible e join lms_tests t on t.id = e.test_id
        left join lms_test_results tr on tr.test_id = e.test_id and tr.lms_user_id = e.lms_user_id

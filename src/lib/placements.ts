@@ -54,6 +54,8 @@ export interface PlacementOffer extends PlacementStudent {
   company: string | null;
   designation: string | null;
   category: string | null;
+  /** Converge: "Sales" or "Core". */
+  segment?: 'Sales' | 'Core' | null;
   /** Hidden (null) for campus staff. */
   pay: number | null;
   months: number | null;
@@ -83,9 +85,34 @@ export interface RoleGroup {
   measures: Record<string, number | null>;
 }
 
+export type PlacementSegment = 'sales' | 'core';
+
+/** Converge: sales jobs against core jobs. */
+export interface SegmentSummary {
+  key: PlacementSegment;
+  label: string;
+  offers: number;
+  students: number;
+  rate: number | null;
+  medianPay: number | null;
+  highestPay: number | null;
+  companies: number;
+  topCompanies: { name: string; offers: number }[];
+  categories: { name: string; offers: number }[];
+  joined: number;
+  measures: Record<string, number | null>;
+}
+
 /** GET /api/placements (api/_placements.ts). */
 export interface PlacementsResponse {
   kind: PlacementKind;
+  /** The batch picked ("MBA:2025"), or null for every in-season batch. */
+  batch?: string | null;
+  segment?: PlacementSegment | null;
+  /** In-season batches at the chosen campus, to filter by. */
+  batchOptions?: { key: string; program: string; year: number; students: number }[];
+  /** Converge only. */
+  segments?: SegmentSummary[] | null;
   measures: PlacementMeasure[];
   campuses: { id: number; name: string }[];
   totals: {
@@ -163,16 +190,23 @@ export const ROLE_LABELS: Record<string, string> = {
   'General roles': 'General Roles',
 };
 
-/** The Placements page's address: /placements?kind=internship&campus=12. */
+/** The Placements page's address: /placements?kind=internship&campus=12&batch=MBA:2025. */
 export interface PlacementsSearch {
   kind?: PlacementKind;
   campus?: number;
+  /** "MBA:2025". */
+  batch?: string;
+  /** Converge: sales or core jobs only. */
+  segment?: PlacementSegment;
 }
 
 export const validatePlacementsSearch = (search: Record<string, unknown>): PlacementsSearch => {
   const campus = Number(search.campus);
+  const batch = typeof search.batch === 'string' ? search.batch : undefined;
   return {
     kind: search.kind === 'internship' ? 'internship' : undefined,
     campus: Number.isInteger(campus) && campus > 0 ? campus : undefined,
+    batch: batch && /^[A-Za-z. ]{2,20}:\d{4}$/.test(batch) ? batch : undefined,
+    segment: search.segment === 'sales' || search.segment === 'core' ? search.segment : undefined,
   };
 };

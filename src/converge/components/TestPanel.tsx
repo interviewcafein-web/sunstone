@@ -12,9 +12,11 @@ import {
 import { ClipboardCheck, ShieldAlert, Target, Trophy, X } from 'lucide-react';
 
 import { Avatar } from '@/components/common/Avatar';
+import { ExportButtons } from '@/components/common/ExportButtons';
 import { InlineLoader } from '@/components/common/PageLoader';
-import { lmsDate, scoreFill, scoreTone, useTestDetail } from '@/lib/assessments';
+import { lmsDate, scoreFill, scoreTone, useTestDetail, type TestStudent } from '@/lib/assessments';
 import { cohortLabel } from '@/lib/cohorts';
+import type { ExportColumn } from '@/lib/exportTable';
 import { INTEGRITY_NOTE, integrityOf } from '@/lib/integrity';
 import { chartColors, useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
@@ -28,6 +30,18 @@ const BANDS = [
   { label: '25–49%', from: 25, to: 50 },
   { label: '50–74%', from: 50, to: 75 },
   { label: '75–100%', from: 75, to: 101 },
+];
+
+const RESULT_COLUMNS: ExportColumn<TestStudent>[] = [
+  { header: 'Student', value: (row) => row.name },
+  { header: 'Program', value: (row) => row.program },
+  { header: 'Batch', value: (row) => cohortLabel(row.program, row.admission_year) },
+  { header: 'Submitted', value: (row) => (row.submitted ? 'Yes' : 'No') },
+  { header: 'Marks', value: (row) => (row.marks == null ? null : Number(row.marks)) },
+  { header: 'Max marks', value: (row) => (row.max_marks == null ? null : Number(row.max_marks)) },
+  { header: 'Score %', value: (row) => row.pct },
+  { header: 'Attempts', value: (row) => row.attempts },
+  { header: 'Submitted at', value: (row) => row.submitted_at },
 ];
 
 /** A test's results at one campus (and batch), in a panel over the page. */
@@ -218,7 +232,15 @@ export function TestPanel({
               )}
 
               <div>
-                <h3 className="mb-2 text-sm font-semibold">Results · {done.length}</h3>
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold">Results · {done.length}</h3>
+                  <ExportButtons
+                    name={`${detail.data?.test.name ?? 'test'} results`}
+                    sheet="Results"
+                    columns={RESULT_COLUMNS}
+                    rows={[...done, ...pending]}
+                  />
+                </div>
                 <ol className="divide-y divide-dotted divide-slate-200 rounded-xl border border-slate-200">
                   {done.map((student, index) => (
                     <li key={student.username} className="flex items-center gap-3 px-3 py-2">

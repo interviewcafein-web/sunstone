@@ -3,16 +3,19 @@ import {
   ArrowDown,
   Award,
   BriefcaseBusiness,
+  Calculator,
   CalendarCheck,
   MessagesSquare,
   NotebookPen,
 } from 'lucide-react';
 
 import { Avatar } from '@/components/common/Avatar';
+import { ExportButtons } from '@/components/common/ExportButtons';
 import { Sparkline } from '@/components/common/Sparkline';
 import { StatusTags } from '@/components/students/StatusTags';
 import { scoreTone } from '@/lib/assessments';
 import { cohortLabel } from '@/lib/cohorts';
+import type { ExportColumn } from '@/lib/exportTable';
 import { cn } from '@/lib/utils';
 
 import type { Row, SortKey } from '../lib/rows';
@@ -34,12 +37,15 @@ export function StudentTable({
   onSort,
   showCampus = true,
   empty = 'No students match these filters.',
+  exportName,
 }: {
   rows: Row[];
   sort: SortKey;
   onSort: (sort: SortKey) => void;
   showCampus?: boolean;
   empty?: string;
+  /** The download's file name; no download buttons without it. */
+  exportName?: string;
 }) {
   const [limit, setLimit] = useState(PAGE);
   // A new sort or filter starts again from the top.
@@ -76,121 +82,156 @@ export function StudentTable({
   );
 
   return (
-    <div className={cn(panel, 'overflow-x-auto')}>
-      <table className="w-full min-w-[60rem] text-sm">
-        <thead>
-          <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs text-slate-600">
-            <th scope="col" className="w-10 px-3 py-2.5 font-semibold">
-              #
-            </th>
-            <th
-              scope="col"
-              className="sticky left-0 z-10 bg-slate-50 px-3 py-2.5 font-semibold shadow-[6px_0_8px_-6px_rgb(15_23_42/0.18)] sm:shadow-none"
-              aria-sort={sort === 'name' ? 'ascending' : undefined}
-            >
-              <SortButton label="Student" active={sort === 'name'} onClick={() => onSort('name')} />
-            </th>
-            {header(
-              'domain',
-              TRACKS.domain.label,
-              <BriefcaseBusiness className="text-brand-600 size-3.5" aria-hidden />,
-              combined ? 'all PRIME tests, taken' : 'average, taken'
-            )}
-            {header(
-              'elq',
-              TRACKS.elq.label,
-              <MessagesSquare className="size-3.5 text-violet-600" aria-hidden />,
-              'ELQ average, taken'
-            )}
-            {header(
-              'amcat',
-              'AMCAT',
-              <Award className="size-3.5 text-amber-600" aria-hidden />,
-              'latest, trend'
-            )}
-            {header(
-              'attendance',
-              'Attendance',
-              <CalendarCheck className="size-3.5 text-emerald-600" aria-hidden />,
-              'all classes, weekly'
-            )}
-            {header(
-              'exams',
-              'Internal Exams',
-              <NotebookPen className="size-3.5 text-sky-600" aria-hidden />,
-              'midterms, end-term'
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {visible.map((row, index) => {
-            const { student, metrics } = row;
-            return (
-              <tr
-                key={student.id}
-                className="group/row animate-rise border-b border-slate-200 last:border-0"
-                style={{ animationDelay: `${Math.min(index, 15) * 25}ms` }}
+    <div className={cn(panel, 'overflow-hidden')}>
+      {exportName && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-2.5">
+          <p className="text-sm text-slate-600">
+            <b className="text-slate-900 dark:text-slate-100">
+              {rows.length.toLocaleString('en-IN')}
+            </b>{' '}
+            student{rows.length === 1 ? '' : 's'}
+          </p>
+          <ExportButtons name={exportName} sheet="Students" columns={STUDENT_COLUMNS} rows={rows} />
+        </div>
+      )}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[66rem] text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs text-slate-600">
+              <th scope="col" className="w-10 px-3 py-2.5 font-semibold">
+                #
+              </th>
+              <th
+                scope="col"
+                className="sticky left-0 z-10 bg-slate-50 px-3 py-2.5 font-semibold shadow-[6px_0_8px_-6px_rgb(15_23_42/0.18)] sm:shadow-none"
+                aria-sort={sort === 'name' ? 'ascending' : undefined}
               >
-                <td className="px-3 py-3 align-middle text-slate-400 tabular-nums transition-colors group-hover/row:bg-[#f3f6fb] dark:group-hover/row:bg-[#17284a]">
-                  {index + 1}
-                </td>
-                <th
-                  scope="row"
-                  className="bg-surface sticky left-0 z-10 w-44 max-w-44 px-3 py-3 sm:w-auto sm:max-w-[17rem] shadow-[6px_0_8px_-6px_rgb(15_23_42/0.18)] sm:shadow-none text-left align-middle font-normal transition-colors group-hover/row:bg-[#f3f6fb] dark:group-hover/row:bg-[#17284a]"
+                <SortButton
+                  label="Student"
+                  active={sort === 'name'}
+                  onClick={() => onSort('name')}
+                />
+              </th>
+              {header(
+                'domain',
+                TRACKS.domain.label,
+                <BriefcaseBusiness className="text-brand-600 size-3.5" aria-hidden />,
+                combined ? 'all PRIME tests, taken' : 'average, taken'
+              )}
+              {header(
+                'comm',
+                TRACKS.comm.label,
+                <MessagesSquare className="size-3.5 text-violet-600" aria-hidden />,
+                'average, taken'
+              )}
+              {header(
+                'apt',
+                TRACKS.apt.label,
+                <Calculator className="size-3.5 text-fuchsia-600" aria-hidden />,
+                'average, taken'
+              )}
+              {header(
+                'amcat',
+                'AMCAT',
+                <Award className="size-3.5 text-amber-600" aria-hidden />,
+                'latest, trend'
+              )}
+              {header(
+                'attendance',
+                'Attendance',
+                <CalendarCheck className="size-3.5 text-emerald-600" aria-hidden />,
+                'all classes, weekly'
+              )}
+              {header(
+                'exams',
+                'Internal Exams',
+                <NotebookPen className="size-3.5 text-sky-600" aria-hidden />,
+                'midterms, end-term'
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((row, index) => {
+              const { student, metrics } = row;
+              return (
+                <tr
+                  key={student.id}
+                  className="group/row animate-rise border-b border-slate-200 last:border-0"
+                  style={{ animationDelay: `${Math.min(index, 15) * 25}ms` }}
                 >
-                  <div className="flex items-center gap-3">
-                    <Avatar name={student.name} className="hidden sm:inline-flex" />
-                    <div className="min-w-0">
-                      <Link
-                        to="/s/$slug"
-                        params={{ slug: student.slug }}
-                        className="text-brand-700 dark:text-brand-300 block truncate font-semibold hover:underline"
-                      >
-                        {student.name}
-                      </Link>
-                      <div className="truncate text-xs text-slate-500">
-                        {[showCampus && student.campus, cohortLabel(student.course, student.batch)]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </div>
-                      {(row.super100 || student.status) && (
-                        <div className="mt-1 flex flex-wrap items-center gap-1">
-                          {row.super100 && <SuperBadge />}
-                          <StatusTags status={student.status} />
+                  <td className="px-3 py-3 align-middle text-slate-400 tabular-nums transition-colors group-hover/row:bg-[#f3f6fb] dark:group-hover/row:bg-[#17284a]">
+                    {index + 1}
+                  </td>
+                  <th
+                    scope="row"
+                    className="bg-surface sticky left-0 z-10 w-44 max-w-44 px-3 py-3 sm:w-auto sm:max-w-[17rem] shadow-[6px_0_8px_-6px_rgb(15_23_42/0.18)] sm:shadow-none text-left align-middle font-normal transition-colors group-hover/row:bg-[#f3f6fb] dark:group-hover/row:bg-[#17284a]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar name={student.name} className="hidden sm:inline-flex" />
+                      <div className="min-w-0">
+                        <Link
+                          to="/s/$slug"
+                          params={{ slug: student.slug }}
+                          className="text-brand-700 dark:text-brand-300 block truncate font-semibold hover:underline"
+                        >
+                          {student.name}
+                        </Link>
+                        <div className="truncate text-xs text-slate-500">
+                          {[
+                            showCampus && student.campus,
+                            cohortLabel(student.course, student.batch),
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
                         </div>
-                      )}
+                        {(row.super100 || student.status) && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            {row.super100 && <SuperBadge />}
+                            <StatusTags status={student.status} />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </th>
-                <td className={cellBase}>
-                  <ScoreCell
-                    value={row.domain}
-                    hint={taken(
-                      row.combined ? metrics?.submitted : metrics?.domain_submitted,
-                      row.combined ? metrics?.released : metrics?.domain_released
-                    )}
-                  />
-                </td>
-                <td className={cellBase}>
-                  <ScoreCell
-                    value={row.elq}
-                    hint={taken(metrics?.elq_submitted, metrics?.elq_released)}
-                  />
-                </td>
-                <td className={cellBase}>
-                  <AmcatCell sittings={metrics?.amcat ?? null} />
-                </td>
-                <td className={cellBase}>
-                  <AttendanceCell pct={row.attendance} weeks={metrics?.attendance_weeks ?? null} />
-                </td>
-                <td className={cellBase}>
-                  <ScoreCell value={row.exams} />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                  </th>
+                  <td className={cellBase}>
+                    <ScoreCell
+                      value={row.domain}
+                      hint={taken(
+                        row.combined ? metrics?.submitted : metrics?.domain_submitted,
+                        row.combined ? metrics?.released : metrics?.domain_released
+                      )}
+                    />
+                  </td>
+                  <td className={cellBase}>
+                    <ScoreCell
+                      value={row.comm}
+                      hint={taken(metrics?.comm_submitted, metrics?.comm_released)}
+                    />
+                  </td>
+                  <td className={cellBase}>
+                    <ScoreCell
+                      value={row.apt}
+                      hint={taken(metrics?.apt_submitted, metrics?.apt_released)}
+                    />
+                  </td>
+                  <td className={cellBase}>
+                    <AmcatCell sittings={metrics?.amcat ?? null} />
+                  </td>
+                  <td className={cellBase}>
+                    <AttendanceCell
+                      pct={row.attendance}
+                      weeks={metrics?.attendance_weeks ?? null}
+                    />
+                  </td>
+                  <td className={cellBase}>
+                    <ScoreCell value={row.exams} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
       {more > 0 && (
         <div
           ref={sentinel}
@@ -211,13 +252,44 @@ export function StudentTable({
       )}
       {combined && (
         <p className="border-t border-slate-200 px-4 py-2.5 text-xs text-slate-500">
-          PRIME Domain shows all PRIME tests for now: the split into domain and communication and
+          PRIME Domain shows all PRIME tests for now: the split into domain, communication and
           aptitude appears once the numbers are next refreshed.
         </p>
       )}
     </div>
   );
 }
+
+/** Every student row as a spreadsheet: the numbers in the table, without contact details. */
+export const STUDENT_COLUMNS: ExportColumn<Row>[] = [
+  { header: 'Name', value: (row) => row.student.name },
+  { header: 'Username', value: (row) => row.student.slug },
+  { header: 'Campus', value: (row) => row.student.campus },
+  { header: 'Program', value: (row) => row.student.course },
+  { header: 'Batch', value: (row) => cohortLabel(row.student.course, row.student.batch) },
+  { header: 'Cohorts', value: (row) => row.student.cohorts?.join(', ') },
+  { header: 'Super 100', value: (row) => (row.super100 ? 'Yes' : '') },
+  { header: 'PRIME Domain %', value: (row) => row.domain },
+  {
+    header: 'PRIME Domain tests taken',
+    value: (row) => (row.combined ? row.metrics?.submitted : row.metrics?.domain_submitted),
+  },
+  {
+    header: 'PRIME Domain tests released',
+    value: (row) => (row.combined ? row.metrics?.released : row.metrics?.domain_released),
+  },
+  { header: 'Communication %', value: (row) => row.comm },
+  { header: 'Communication tests taken', value: (row) => row.metrics?.comm_submitted },
+  { header: 'Communication tests released', value: (row) => row.metrics?.comm_released },
+  { header: 'Aptitude %', value: (row) => row.apt },
+  { header: 'Aptitude tests taken', value: (row) => row.metrics?.apt_submitted },
+  { header: 'Aptitude tests released', value: (row) => row.metrics?.apt_released },
+  { header: 'AMCAT (latest sitting)', value: (row) => row.amcat },
+  { header: 'AMCAT sittings', value: (row) => row.metrics?.amcat?.length ?? 0 },
+  { header: 'Attendance %', value: (row) => row.attendance },
+  { header: 'PRIME attendance %', value: (row) => row.metrics?.prime_attendance },
+  { header: 'Internal exams %', value: (row) => row.exams },
+];
 
 const taken = (submitted: number | null | undefined, released: number | null | undefined) =>
   released ? `${submitted ?? 0}/${released} taken` : undefined;
