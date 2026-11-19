@@ -1,8 +1,10 @@
 // Copies our students' job offers (selections) from the LMS into placements, replacing the
 // previous copy: full-time jobs and internships, each marked. The rules follow the placement
-// team's own report: jobs opened to the student's program and batch, live jobs only (not the test ones), and every
+// team's own report: jobs opened to the student's program and batch, live jobs only (not the
+// test ones), and every
 // selection except those entered by mistake or turned down over a JD/CTC mismatch. Offers
-// withdrawn later (revoked, terminated, resigned) still count, marked as withdrawn.
+// withdrawn later (revoked, terminated, resigned) still count, marked as withdrawn. Also the
+// whole school at our campuses (placement_population), PRIME opt-in or not, for comparison.
 //
 //   REDASH_KEY=... npm run db:sync-placements      (DATABASE_URL from .env.local)
 //   REDASH_KEY=... npm run db:sync-placements -- --dry
@@ -10,6 +12,7 @@
 import { neon } from '@neondatabase/serverless';
 
 import { redash } from './_redash';
+import { PROGRAM_NAMES, SCHOOL } from './_school';
 
 const DRY_RUN = process.argv.includes('--dry');
 const url = process.env.DATABASE_URL;
@@ -29,6 +32,19 @@ const NOT_COUNTED = [
   'Uploaded by mistake',
   'JD/CTC Discrepancy',
 ];
+
+/** The offers the placement team counts (pol = the offer, o = its job, u = the student). */
+const COUNTED = `o.status not in ('-1', '0', '1')
+  and o.id not in (${TEST_JOBS})
+  and coalesce(o.created_by, 0) <> ${TEST_ACCOUNT} and coalesce(o.launched_by, 0) <> ${TEST_ACCOUNT}
+  and exists (
+    select 1 from opportunity_program_mapping pm
+    join campus_program_live_map lm on lm.id = pm.cplm_id
+    join program_campus_batch_mapping bm on bm.id = lm.pcbm_id
+    where pm.opportunity_id = o.id and lm.batch = u.admission_year and lm.program = u.program
+      and bm.type = 'box')
+  and (pol.status = '1'
+       or (pol.status = '0' and coalesce(pol.reason, '') not in (${NOT_COUNTED.map((r) => `'${r}'`).join(', ')})))`;
 
 interface Offer {
   user_id: number;
@@ -76,17 +92,7 @@ for (let start = 0; start < ids.length; start += 3000) {
       join opportunity o on o.id = pol.opportunity_id
       left join company co on co.id = o.company_id
       where pol.user_id in (${chunk.join(',')})
-        and o.status not in ('-1', '0', '1')
-        and o.id not in (${TEST_JOBS})
-        and coalesce(o.created_by, 0) <> ${TEST_ACCOUNT} and coalesce(o.launched_by, 0) <> ${TEST_ACCOUNT}
-        and exists (
-          select 1 from opportunity_program_mapping pm
-          join campus_program_live_map lm on lm.id = pm.cplm_id
-          join program_campus_batch_mapping bm on bm.id = lm.pcbm_id
-          where pm.opportunity_id = o.id and lm.batch = u.admission_year and lm.program = u.program
-            and bm.type = 'box')
-        and (pol.status = '1'
-             or (pol.status = '0' and coalesce(pol.reason, '') not in (${NOT_COUNTED.map((r) => `'${r}'`).join(', ')})))
+        and ${COUNTED}
       group by pol.user_id, pol.opportunity_id`))
   );
 }
@@ -111,6 +117,69 @@ const rows = offers.map((offer) => ({
   withdrawn_reason: String(offer.status) !== '1' ? offer.reason || null : null,
   crc: offer.crc || null,
 }));
+
+// Every student of the school at our campuses and batches, PRIME opt-in or not, with their best
+// offer of each kind: to compare placement outcomes of PRIME students with everyone else.
+const PRIME_POLICY_ID = 20; // policies.type = 'PRIME_OPT_IN', as in import-students.ts
+const scope = await sql`
+  select distinct campus_id, admission_year from students
+  where on_platform and campus_id is not null and admission_year is not null`;
+const campusIds = [...new Set(scope.map((row) => Number(row.campus_id)))];
+const years = [...new Set(scope.map((row) => Number(row.admission_year)))];
+const population = campusIds.length
+  ? await redash<{
+      user_id: number;
+      campus_id: number;
+      program: string;
+      admission_year: number;
+      opted_in: number;
+      ft_offers: number | null;
+      ft_best_lpa: number | null;
+      intern_offers: number | null;
+      intern_best_stipend: number | null;
+    }>(`
+      select u.id user_id, u.campus_id, pr.short_name program, u.admission_year,
+        exists (select 1 from user_policy_mapping m
+                where m.user_id = u.id and m.policy_id = ${PRIME_POLICY_ID}) opted_in,
+        x.ft_offers, x.ft_best_lpa, x.intern_offers, x.intern_best_stipend
+      from users u
+      join programs pr on pr.id = u.program
+      left join (
+        select pol.user_id,
+          sum(o.type_of_role = 'full-time' or o.is_fulltime = '1') ft_offers,
+          round(max(case when o.type_of_role = 'full-time' or o.is_fulltime = '1' then
+            case when coalesce(pol.fixed_salary, 0) = 0 then o.fixed_ctc
+                 else pol.fixed_salary + coalesce(pol.variable_pay, 0) end end) / 100000, 2) ft_best_lpa,
+          sum(not (o.type_of_role = 'full-time' or o.is_fulltime = '1')) intern_offers,
+          max(case when not (o.type_of_role = 'full-time' or o.is_fulltime = '1')
+            then nullif(pol.stipend, 0) end) intern_best_stipend
+        from placed_offer_letters pol
+        join users u on u.id = pol.user_id
+        join programs pr on pr.id = u.program
+        join opportunity o on o.id = pol.opportunity_id
+        where u.campus_id in (${campusIds.join(',')}) and pr.course_type = '${SCHOOL}'
+          and ${COUNTED}
+        group by pol.user_id) x on x.user_id = u.id
+      where u.role = 'student' and u.status = '1' and u.isTestingUser = '0'
+        and pr.course_type = '${SCHOOL}' and u.campus_id in (${campusIds.join(',')})
+        and u.admission_year in (${years.map((year) => `'${year}'`).join(',')})`)
+  : [];
+const populationRows = population.map((row) => ({
+  lms_user_id: Number(row.user_id),
+  campus_id: Number(row.campus_id),
+  program: PROGRAM_NAMES[String(row.program).toUpperCase()] ?? String(row.program),
+  admission_year: Number(row.admission_year),
+  opted_in: Number(row.opted_in) === 1,
+  ft_offers: Number(row.ft_offers ?? 0),
+  ft_best_lpa: row.ft_best_lpa == null ? null : Number(row.ft_best_lpa),
+  intern_offers: Number(row.intern_offers ?? 0),
+  intern_best_stipend:
+    row.intern_best_stipend == null ? null : Math.round(Number(row.intern_best_stipend)),
+}));
+console.log(
+  `Population: ${populationRows.length} students at our campuses` +
+    ` (${populationRows.filter((row) => row.opted_in).length} PRIME opt-in).`
+);
 
 const students = new Set(rows.map((row) => row.user_id)).size;
 console.log(
@@ -137,6 +206,17 @@ await sql.transaction([
        stipend int, months int, selected_on text, joining_status int, joining_on text, withdrawn boolean,
        withdrawn_reason text, crc text)`,
     [JSON.stringify(rows)]
+  ),
+  sql`delete from placement_population`,
+  sql.query(
+    `insert into placement_population (lms_user_id, campus_id, program, admission_year, opted_in,
+       ft_offers, ft_best_lpa, intern_offers, intern_best_stipend)
+     select x.lms_user_id, x.campus_id, x.program, x.admission_year, x.opted_in, x.ft_offers,
+       x.ft_best_lpa, x.intern_offers, x.intern_best_stipend
+     from jsonb_to_recordset($1::jsonb) as x(lms_user_id int, campus_id int, program text,
+       admission_year int, opted_in boolean, ft_offers int, ft_best_lpa numeric,
+       intern_offers int, intern_best_stipend int)`,
+    [JSON.stringify(populationRows)]
   ),
   sql`insert into sync_state (name, ran_at, detail)
       values ('placements', now(), ${JSON.stringify({ offers: rows.length, students })})

@@ -21,13 +21,15 @@ export const PROGRAM_NAMES: Record<string, string> = {
 /**
  * The PRIME subjects (LMS courses, by their hand-typed names; `c` is the course table) whose
  * tests are synced. Tech: PRIME Domain Coding. Management: the PRIME domains (Revenue
- * Generation, Finance, HR, IT, Operations), PRIME Communication & Aptitude (ELQ) and the ELQ Test.
+ * Generation, Finance, HR, IT, Operations), the BBA career tracks (Business Development Career
+ * Track, Management Trainee Program), PRIME Communication & Aptitude (ELQ) and the ELQ Test.
  */
 export const PRIME_SUBJECTS =
   SCHOOL === 'SSM'
     ? `(lower(c.course_name) like '%prime domain%'
         or (lower(c.course_name) like '%prime%'
             and (lower(c.course_name) like '%communication%' or lower(c.course_name) like '%aptitude%'))
-        or lower(trim(c.course_name)) = 'elq test')`
+        or lower(trim(c.course_name)) in
+          ('elq test', 'business development career track', 'management trainee program'))`
     : `lower(trim(c.course_name)) in
         ('prime domain coding', 'competitive coding (sunstone prime tech domain)')`;

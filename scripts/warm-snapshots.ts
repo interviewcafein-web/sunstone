@@ -9,6 +9,8 @@ import { neon } from '@neondatabase/serverless';
 import { EVERYONE, campus, campusKey, campuses, metricsByCampus } from '../api/assessments';
 import { dataVersion, remake } from '../api/_snapshot';
 import { placementRows } from '../api/_placements';
+import { primeRows } from '../api/_prime';
+import { currentApp } from '../api/_app';
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error('DATABASE_URL is not set (add it to .env.local).');
@@ -19,6 +21,7 @@ const version = await dataVersion();
 await remake('campuses', () => campuses(EVERYONE), version);
 await remake('metrics', metricsByCampus, version);
 await remake('placements', placementRows, version);
+if (currentApp() === 'converge') await remake('prime', primeRows, version);
 
 // Each campus with all batches, each program ("B.Tech:") and each batch ("B.Tech:2025"), the
 // choices the campus page offers.

@@ -78,6 +78,9 @@ export function measuresFor(app = currentApp()): Measure[] {
 }
 
 const DOMAINS: [RegExp, string][] = [
+  // BBA career tracks (Converge): business development, and the management trainee program.
+  [/career\s*track/i, 'Business Development'],
+  [/trainee/i, 'Management Trainee'],
   [/finance/i, 'Finance'],
   [/(^|[^a-z])hr([^a-z]|$)/i, 'HR'],
   [/(^|[^a-z])it([^a-z]|$)/i, 'IT'],
@@ -96,6 +99,13 @@ export function domainOfRole(category: string | null): string | null {
   return null;
 }
 
+/** The role groups (domainOfRole, or 'General roles') that count as a match for a domain. */
+export function rolesFor(domain: string): string[] {
+  if (domain === 'Business Development') return ['Revenue Generation'];
+  if (domain === 'Management Trainee') return ['General roles', 'Operations'];
+  return [domain];
+}
+
 /** Vertex: whether a role category is a tech job. */
 export const isTechRole = (category: string | null) =>
   Boolean(
@@ -104,8 +114,9 @@ export const isTechRole = (category: string | null) =>
   );
 
 /**
- * A management student's specialisation: every student takes Revenue Generation, and some
- * also a second domain (Finance, HR, IT, Operations), which is then theirs.
+ * A management student's specialisation: every MBA student takes Revenue Generation, and some
+ * also a second domain (Finance, HR, IT, Operations), which is then theirs. BBA students take a
+ * career track (Business Development, Management Trainee) or Revenue Generation.
  */
 function specialisation(subjects: string[]): string | null {
   const domains = new Set<string>();
@@ -149,7 +160,7 @@ export async function placementRows(): Promise<{
         from lms_section_students ss
         join lms_course_sections cs using (section_id)
         join lms_courses c on c.id = cs.course_id
-        where c.name ~* 'prime domain'
+        where c.name ~* 'prime domain|career track|management trainee'
         group by ss.lms_user_id`
     : db()`
         select s.lms_user_id, sum((ps.summary->>'value')::int)::int as solved
@@ -485,10 +496,12 @@ export function placementReport(
       cells.set(`${domain}|${role}`, (cells.get(`${domain}|${role}`) ?? 0) + 1);
       const entry = rowsOf.get(domain) ?? { offers: 0, matched: 0 };
       entry.offers++;
-      if (role === domain) entry.matched++;
+      if (rolesFor(domain).includes(role)) entry.matched++;
       rowsOf.set(domain, entry);
     }
     const order = [
+      'Business Development',
+      'Management Trainee',
       'Revenue Generation',
       'Finance',
       'HR',
@@ -505,6 +518,7 @@ export function placementReport(
         offers: rowsOf.get(domain)!.offers,
         matched: rowsOf.get(domain)!.matched,
         rate: pct(rowsOf.get(domain)!.matched, rowsOf.get(domain)!.offers),
+        matches: rolesFor(domain),
         cells: Object.fromEntries(
           [...columns].map((column) => [column, cells.get(`${domain}|${column}`) ?? 0])
         ),

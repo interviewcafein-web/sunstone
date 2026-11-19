@@ -97,16 +97,24 @@ const results = await redash<{
   max_marks: number | null;
   submitted: number;
   submitted_at: string | null;
+  graded: number | null;
 }>(`
   select academic_assessment_id aid, student_id, count(*) attempts,
          max(total_marks_obtained) marks, max(max_marks) max_marks,
-         max(submission_status = 'submitted') submitted, max(submitted_at) submitted_at
+         max(submission_status = 'submitted') submitted, max(submitted_at) submitted_at,
+         max(grading_status = 'graded') graded
   from academic_assessment_submission
   where status = '1' and student_id in (${idList}) and academic_assessment_id in (${testIds})
   group by academic_assessment_id, student_id`);
 
-const courses = await redash<{ id: number; name: string; modules: number; lectures: number }>(`
-  select c.id, trim(c.course_name) name,
+const courses = await redash<{
+  id: number;
+  name: string;
+  modules: number;
+  lectures: number;
+  credits: number | null;
+}>(`
+  select c.id, trim(c.course_name) name, coalesce(c.total_credits, c.credit) credits,
     (select count(*) from academic_modules m where m.course_id = c.id and m.status = '1') modules,
     (select count(*) from academic_lectures l where l.course_id = c.id and l.status = '1') lectures
   from course c where c.id in (${courseIds})`);
@@ -199,6 +207,7 @@ const counts = {
   amcatSittings: sittings.length,
 };
 
+console.log(counts);
 await sql.transaction([
   sql`delete from lms_courses`,
   sql`delete from lms_modules`,
@@ -217,6 +226,7 @@ await sql.transaction([
       name: titleText(course.name),
       modules: Number(course.modules),
       lectures: Number(course.lectures),
+      credits: number(course.credits),
     }))
   ),
   ...inserts(
@@ -287,6 +297,7 @@ await sql.transaction([
       max_marks: number(result.max_marks),
       submitted: Number(result.submitted) === 1,
       submitted_at: result.submitted_at,
+      graded: result.graded == null ? null : Number(result.graded) === 1,
     }))
   ),
   ...inserts(

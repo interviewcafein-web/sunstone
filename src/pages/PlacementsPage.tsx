@@ -605,7 +605,7 @@ function Fit({
                 </th>
                 {fit.columns.map((column) => {
                   const count = row.cells[column] ?? 0;
-                  const match = column === row.domain;
+                  const match = (row.matches ?? [row.domain]).includes(column);
                   return (
                     <td key={column} className="px-1 py-1 text-center">
                       <span

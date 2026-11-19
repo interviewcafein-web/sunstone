@@ -69,6 +69,8 @@ export interface FitMatrix {
     offers: number;
     matched: number;
     rate: number | null;
+    /** The role groups that count as a match for this domain. */
+    matches?: string[];
     cells: Record<string, number>;
   }[];
 }
