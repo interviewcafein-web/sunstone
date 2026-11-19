@@ -20,6 +20,7 @@ import { Route as InsightsRouteImport } from './routes/insights'
 import { Route as IssuesRouteImport } from './routes/issues'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PlacementsRouteImport } from './routes/placements'
+import { Route as PrimeRouteImport } from './routes/prime'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ResourcesRouteImport } from './routes/resources'
@@ -81,6 +82,11 @@ const PlacementsRoute = PlacementsRouteImport.update({
   path: '/placements',
   getParentRoute: () => rootRouteImport,
 } as any).lazy(() => import('./routes/placements.lazy').then((d) => d.Route))
+const PrimeRoute = PrimeRouteImport.update({
+  id: '/prime',
+  path: '/prime',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() => import('./routes/prime.lazy').then((d) => d.Route))
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
@@ -122,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/issues': typeof IssuesRoute
   '/login': typeof LoginRoute
   '/placements': typeof PlacementsRoute
+  '/prime': typeof PrimeRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
@@ -140,6 +147,7 @@ export interface FileRoutesByTo {
   '/issues': typeof IssuesRoute
   '/login': typeof LoginRoute
   '/placements': typeof PlacementsRoute
+  '/prime': typeof PrimeRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
@@ -159,6 +167,7 @@ export interface FileRoutesById {
   '/issues': typeof IssuesRoute
   '/login': typeof LoginRoute
   '/placements': typeof PlacementsRoute
+  '/prime': typeof PrimeRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/resources': typeof ResourcesRoute
@@ -179,6 +188,7 @@ export interface FileRouteTypes {
     | '/issues'
     | '/login'
     | '/placements'
+    | '/prime'
     | '/privacy'
     | '/profile'
     | '/resources'
@@ -197,6 +207,7 @@ export interface FileRouteTypes {
     | '/issues'
     | '/login'
     | '/placements'
+    | '/prime'
     | '/privacy'
     | '/profile'
     | '/resources'
@@ -215,6 +226,7 @@ export interface FileRouteTypes {
     | '/issues'
     | '/login'
     | '/placements'
+    | '/prime'
     | '/privacy'
     | '/profile'
     | '/resources'
@@ -234,6 +246,7 @@ export interface RootRouteChildren {
   IssuesRoute: typeof IssuesRoute
   LoginRoute: typeof LoginRoute
   PlacementsRoute: typeof PlacementsRoute
+  PrimeRoute: typeof PrimeRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   ResourcesRoute: typeof ResourcesRoute
@@ -315,6 +328,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlacementsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/prime': {
+      id: '/prime'
+      path: '/prime'
+      fullPath: '/prime'
+      preLoaderRoute: typeof PrimeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/privacy': {
       id: '/privacy'
       path: '/privacy'
@@ -370,6 +390,7 @@ const rootRouteChildren: RootRouteChildren = {
   IssuesRoute: IssuesRoute,
   LoginRoute: LoginRoute,
   PlacementsRoute: PlacementsRoute,
+  PrimeRoute: PrimeRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   ResourcesRoute: ResourcesRoute,

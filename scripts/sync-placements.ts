@@ -118,6 +118,53 @@ const rows = offers.map((offer) => ({
   crc: offer.crc || null,
 }));
 
+// How far each student got with opportunities: eligible, applied, shortlisted in a round, and
+// reached an interview round (personal / HR / face-to-face / technical interview, or a group
+// discussion). The LMS keeps one row per student and opportunity (eligibility and
+// application) and one per student and selection round.
+const INTERVIEW_ROUND = `interview|(^|[^a-z])(pi|hr|gd)([^a-z]|$)|face|technical|group discussion`;
+const pipeline = ids.length
+  ? await redash<{
+      user_id: number;
+      eligible: number;
+      applied: number;
+      last_applied: string | null;
+      shortlisted: number | null;
+      interviews: number | null;
+    }>(`
+      select e.user_id,
+        count(distinct case when e.is_eligible = 1 then e.opportunity_id end) eligible,
+        count(distinct case when e.is_applied = 1 then e.opportunity_id end) applied,
+        date(max(e.opportunity_applied_datetime)) last_applied,
+        r.shortlisted, r.interviews
+      from opportunity_user_eligible_map e
+      left join (
+        select s.user_id,
+          count(distinct case when s.is_shortlisted = 1 then s.opportunity_id end) shortlisted,
+          count(distinct case when lower(spm.name) regexp '${INTERVIEW_ROUND}'
+                then s.opportunity_id end) interviews
+        from opportunity_user_shortlisting_map s
+        join opportunity_selection_process_map spm on spm.id = s.selection_process_map_id
+        where s.user_id in (${ids.join(',')}) and s.status = '1'
+        group by s.user_id) r on r.user_id = e.user_id
+      where e.user_id in (${ids.join(',')}) and e.status = '1'
+      group by e.user_id, r.shortlisted, r.interviews`)
+  : [];
+const pipelineRows = pipeline.map((row) => ({
+  lms_user_id: Number(row.user_id),
+  eligible: Number(row.eligible ?? 0),
+  applied: Number(row.applied ?? 0),
+  shortlisted: Number(row.shortlisted ?? 0),
+  interviews: Number(row.interviews ?? 0),
+  last_applied: row.last_applied && row.last_applied !== '0000-00-00' ? row.last_applied : null,
+}));
+console.log(
+  `Pipeline: ${pipelineRows.filter((row) => row.eligible).length} eligible for an opportunity,` +
+    ` ${pipelineRows.filter((row) => row.applied).length} applied,` +
+    ` ${pipelineRows.filter((row) => row.shortlisted).length} shortlisted,` +
+    ` ${pipelineRows.filter((row) => row.interviews).length} reached an interview.`
+);
+
 // Every student of the school at our campuses and batches, PRIME opt-in or not, with their best
 // offer of each kind: to compare placement outcomes of PRIME students with everyone else.
 const PRIME_POLICY_ID = 20; // policies.type = 'PRIME_OPT_IN', as in import-students.ts
@@ -217,6 +264,14 @@ await sql.transaction([
        admission_year int, opted_in boolean, ft_offers int, ft_best_lpa numeric,
        intern_offers int, intern_best_stipend int)`,
     [JSON.stringify(populationRows)]
+  ),
+  sql`delete from placement_pipeline`,
+  sql.query(
+    `insert into placement_pipeline (lms_user_id, eligible, applied, shortlisted, interviews, last_applied)
+     select x.lms_user_id, x.eligible, x.applied, x.shortlisted, x.interviews, x.last_applied::date
+     from jsonb_to_recordset($1::jsonb) as x(lms_user_id int, eligible int, applied int,
+       shortlisted int, interviews int, last_applied text)`,
+    [JSON.stringify(pipelineRows)]
   ),
   sql`insert into sync_state (name, ran_at, detail)
       values ('placements', now(), ${JSON.stringify({ offers: rows.length, students })})

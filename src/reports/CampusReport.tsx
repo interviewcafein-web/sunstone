@@ -46,6 +46,8 @@ export interface CampusReportRow {
   insight: StudentInsight;
   /** Attendance, PRIME tests, AMCAT and exams from the LMS, when there are any. */
   metrics?: StudentMetrics;
+  /** "Placed", "Internship", LMS cohorts and the COE track, e.g. "Placed · Pinnacle · COE DE Tech". */
+  tags?: string;
 }
 
 export interface CampusReportData {
@@ -674,6 +676,9 @@ function TableRow({ row, index, origin }: { row: CampusReportRow; index: number;
       <View style={{ width: COLUMNS.student, paddingRight: 8 }}>
         <Text style={{ fontWeight: 600 }}>{row.name}</Text>
         <Text style={{ fontSize: 7, color: MUTED }}>{cohortLabel(row.course, row.batch)}</Text>
+        {row.tags ? (
+          <Text style={{ fontSize: 6.5, color: NAVY, fontWeight: 600 }}>{row.tags}</Text>
+        ) : null}
       </View>
       <View style={{ width: COLUMNS.basis }}>
         {row.zone.basis ? (

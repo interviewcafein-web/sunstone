@@ -7,6 +7,7 @@
 import { neon } from '@neondatabase/serverless';
 
 import { EVERYONE, campus, campusKey, campuses, metricsByCampus } from '../api/assessments';
+import { codingRows } from '../api/_coding';
 import { dataVersion, remake } from '../api/_snapshot';
 import { placementRows } from '../api/_placements';
 import { primeRows } from '../api/_prime';
@@ -22,6 +23,7 @@ await remake('campuses', () => campuses(EVERYONE), version);
 await remake('metrics', metricsByCampus, version);
 await remake('placements', placementRows, version);
 if (currentApp() === 'converge') await remake('prime', primeRows, version);
+else await remake('coding', codingRows, version);
 
 // Each campus with all batches, each program ("B.Tech:") and each batch ("B.Tech:2025"), the
 // choices the campus page offers.

@@ -16,6 +16,10 @@ export interface StudentsSearch {
   sort?: SortKey;
   /** Show only one zone (green, yellow, orange, red, none). */
   zone?: ZoneId;
+  /** Placement: "placed" (any offer), "full-time", "internship" or "none". */
+  placed?: string;
+  /** An LMS cohort ("Cohort A - Pinnacle"), or "coe:" / "coe:DE Tech" for the Centre of Excellence. */
+  group?: string;
 }
 
 const SORT_KEYS: string[] = [
@@ -45,6 +49,10 @@ export const Route = createFileRoute('/')({
       q: search.q === undefined || search.q === '' ? undefined : String(search.q),
       sort: sort && SORT_KEYS.includes(sort) && sort !== 'total' ? (sort as SortKey) : undefined,
       zone: ZONES.find((zone) => zone.id === text(search.zone))?.id,
+      placed: ['placed', 'full-time', 'internship', 'none'].includes(text(search.placed) ?? '')
+        ? text(search.placed)
+        : undefined,
+      group: text(search.group),
     };
   },
   component: () => (

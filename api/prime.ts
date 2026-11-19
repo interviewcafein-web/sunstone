@@ -1,4 +1,6 @@
-// Converge's PRIME Domain page (api/_prime.ts). Staff only; campus staff see their campuses.
+// The PRIME page of each site. Staff only; campus staff see their campuses.
+// Converge: the PRIME Domain page (api/_prime.ts). Vertex: the PRIME Coding Domain page
+// (api/_coding.ts): GET /api/prime[?campus=ID] gives the student rows and the delivery.
 //
 //   GET /api/prime[?campus=ID]   subjects (tests, assignments, hours), AMCAT, the opt-in
 //                                comparison and PRIME against placements
@@ -6,7 +8,8 @@
 //                                HQ sets (or clears, with null) a subject's planned hours
 
 import { json, managesTeam, seesCampus, sessionViewer } from './_auth';
-import { forApp } from './_app';
+import { currentApp, forApp } from './_app';
+import { CYCLES, SKILLS, codingRowsSnapshot, deliveryReport, narrowStudents } from './_coding';
 import { db } from './_db';
 import { placementReport, placementRowsSnapshot } from './_placements';
 import { HOURS_PER_CREDIT, narrow, optInComparison, plannedHours, primeRows } from './_prime';
@@ -51,6 +54,40 @@ async function handler(request: Request, context?: WaitUntil): Promise<Response>
     return json(403, { error: 'You do not have access to this campus' });
   }
   const scope = campusId !== null ? [campusId] : viewer.campusIds;
+  // Vertex: the PRIME Coding Domain page (api/_coding.ts).
+  if (currentApp() === 'vertex') {
+    try {
+      const [{ students, syncedAt }, delivery, codes] = await Promise.all([
+        codingRowsSnapshot(context),
+        deliveryReport(scope),
+        db()`select id, code from campuses`,
+      ]);
+      const visible = narrowStudents(students, viewer, null);
+      const codeOf = new Map(codes.map((row) => [Number(row.id), String(row.code ?? '').trim()]));
+      const campuses = [
+        ...new Map(
+          visible
+            .filter((row) => row.campusId !== null)
+            .map((row) => [row.campusId, row.campus] as const)
+        ),
+      ]
+        .map(([id, name]) => ({ id: id as number, name, code: codeOf.get(id as number) ?? null }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      return json(200, {
+        students: campusId === null ? visible : narrowStudents(visible, viewer, campusId),
+        campuses,
+        delivery,
+        cycles: CYCLES,
+        skills: SKILLS,
+        syncedAt,
+      });
+    } catch (error) {
+      console.error('[prime coding]', error);
+      return json(503, {
+        error: 'The PRIME coding numbers could not be loaded. Try again shortly.',
+      });
+    }
+  }
   try {
     const [rows, planned, optIn, placementRows] = await Promise.all([
       snapshot('prime', primeRows, context),

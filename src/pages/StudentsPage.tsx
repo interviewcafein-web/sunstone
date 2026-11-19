@@ -112,7 +112,19 @@ function toReportRow(row: StudentRow, insight: StudentInsight): CampusReportRow 
       return [platform, cell.kind === 'loading' ? 'loading' : 'error'];
     })
   ) as Record<PlatformId, ReportValue>;
+  const tags = [
+    row.student.placement === 'full-time'
+      ? 'Placed'
+      : row.student.placement === 'internship'
+        ? 'Internship'
+        : null,
+    ...(row.student.cohorts ?? []).map((cohort) => cohort.replace(/^Cohort\s+/i, '')),
+    row.student.track && `COE ${row.student.track}`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   return {
+    tags: tags || undefined,
     name: row.student.name,
     campus: row.student.campus,
     course: row.student.course,
@@ -176,6 +188,15 @@ export default function StudentsPage() {
       campus: unique(all.map((student) => student.campus)),
       course: unique(all.map((student) => student.course)),
       batch: unique(all.map((student) => student.batch)),
+      placed: all.some((student) => student.placement)
+        ? ['placed', 'full-time', 'internship', 'none']
+        : [],
+      group: [
+        ...unique(all.flatMap((student) => student.cohorts ?? [])),
+        ...(all.some((student) => student.track)
+          ? ['coe:', ...unique(all.map((student) => (student.track ? `coe:${student.track}` : '')))]
+          : []),
+      ],
     }),
     [all]
   );
@@ -187,9 +208,20 @@ export default function StudentsPage() {
         (!search.campus || student.campus === search.campus) &&
         (!search.course || student.course === search.course) &&
         (!search.batch || student.batch === search.batch) &&
-        (!needle || student.name.toLowerCase().includes(needle))
+        (!needle || student.name.toLowerCase().includes(needle)) &&
+        (!search.placed ||
+          (search.placed === 'placed'
+            ? Boolean(student.placement)
+            : search.placed === 'none'
+              ? !student.placement
+              : student.placement === search.placed)) &&
+        (!search.group ||
+          (search.group.startsWith('coe:')
+            ? Boolean(student.track) &&
+              (search.group === 'coe:' || student.track === search.group.slice(4))
+            : (student.cohorts ?? []).includes(search.group)))
     );
-  }, [all, search.campus, search.course, search.batch, search.q]);
+  }, [all, search.campus, search.course, search.batch, search.q, search.placed, search.group]);
 
   // Only the students on screen are fetched, so a campus or batch view loads faster.
   const summaries = useStudentSummaries(filtered);

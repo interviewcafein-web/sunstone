@@ -25,6 +25,10 @@ export interface Student {
   status?: StudentStatus;
   /** LMS opportunity cohorts, e.g. "Cohort E - Super-100". Staff only. */
   cohorts?: string[];
+  /** The student's best offer in the LMS: a full-time job or an internship. Staff only. */
+  placement?: 'full-time' | 'internship';
+  /** A special track HQ put the student in, e.g. the Centre of Excellence "DE Tech". Staff only. */
+  track?: string;
 }
 
 export interface StudentsResponse {

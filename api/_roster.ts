@@ -19,7 +19,10 @@ const COLUMNS = `id, username, campus_id, name, campus, program, admission_year,
   leetcode, geeksforgeeks, hackerrank, codeforces, codechef, github,
   is_debarred, debarred_reason, debarred_until::text as debarred_until, is_inactive, inactive_reason,
   (select coalesce(array_agg(c.cohort order by c.cohort_id), '{}') from student_cohorts c
-    where c.lms_user_id = students.lms_user_id) as cohorts`;
+    where c.lms_user_id = students.lms_user_id) as cohorts,
+  (select case when bool_or(p.full_time) then 'full-time' when count(*) > 0 then 'internship' end
+    from placements p where p.lms_user_id = students.lms_user_id and not p.withdrawn) as placement,
+  (select t.track from student_tracks t where t.lms_user_id = students.lms_user_id) as track`;
 
 type Row = Record<string, unknown>;
 
@@ -44,6 +47,11 @@ function toStudent(row: Row, staff: boolean): Student {
   if (staff && Array.isArray(row.cohorts) && row.cohorts.length) {
     student.cohorts = row.cohorts.map(String);
   }
+  // Offers from the LMS and special tracks (Centre of Excellence): staff only.
+  if (staff && (row.placement === 'full-time' || row.placement === 'internship')) {
+    student.placement = row.placement;
+  }
+  if (staff && row.track) student.track = String(row.track);
   if (staff && (row.is_debarred || row.is_inactive)) {
     student.status = {};
     if (row.is_debarred) {

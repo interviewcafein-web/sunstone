@@ -104,13 +104,20 @@ export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
 
   return (
     <div className="shadow-card bg-surface overflow-x-auto rounded-2xl border border-slate-200">
-      <table className="w-full min-w-272 text-sm">
+      <table className="w-full min-w-300 text-sm">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50/80 text-left text-xs text-slate-600">
             <th scope="col" className="w-10 px-3 py-2.5 font-semibold">
               #
             </th>
             <SortHeader label="Student" sortKey="name" sort={sort} onSort={onSort} />
+            <th
+              scope="col"
+              className="border-l border-dotted border-slate-200 px-3 py-2.5 font-semibold"
+            >
+              Placement · Cohort
+              <div className="font-normal text-slate-400">offer, LMS cohort, COE</div>
+            </th>
             {TABLE_PLATFORMS.map((platform) => (
               <SortHeader
                 key={platform.id}
@@ -212,6 +219,9 @@ export function StudentsTable({ rows, sort, onSort }: StudentsTableProps) {
                       </div>
                     </div>
                   </th>
+                  <td className="border-l border-dotted border-slate-200 px-3 py-3 align-middle">
+                    <PlacementCohort student={student} />
+                  </td>
                   {TABLE_PLATFORMS.map((platform) => (
                     <td
                       key={platform.id}
@@ -439,6 +449,56 @@ function PlatformCell({
 const DAY_MS = 86_400_000;
 
 /** "Today", "Yesterday", "5d ago", "3w ago", "4mo ago", with a dot coloured by freshness. */
+/** The student's offer (or none yet), LMS cohorts and Centre of Excellence track. */
+function PlacementCohort({ student }: { student: Student }) {
+  const chip = 'inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap';
+  return (
+    <div className="flex max-w-44 flex-wrap gap-1">
+      {student.placement === 'full-time' ? (
+        <span
+          className={cn(
+            chip,
+            'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+          )}
+        >
+          Placed
+        </span>
+      ) : student.placement === 'internship' ? (
+        <span className={cn(chip, 'bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300')}>
+          Internship
+        </span>
+      ) : (
+        <span className={cn(chip, 'bg-slate-100 text-slate-500')}>No Offer Yet</span>
+      )}
+      {(student.cohorts ?? []).map((cohort) => (
+        <span
+          key={cohort}
+          title={cohort}
+          className={cn(
+            chip,
+            /pinnacle|super/i.test(cohort)
+              ? 'bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200'
+              : 'bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-200'
+          )}
+        >
+          {cohort.replace(/^Cohort\s+/i, '')}
+        </span>
+      ))}
+      {student.track && (
+        <span
+          title="Centre of Excellence"
+          className={cn(
+            chip,
+            'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'
+          )}
+        >
+          COE · {student.track}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function LastActive({ value }: { value?: StudentRow['lastActive'] }) {
   if (!value) {
     return (
