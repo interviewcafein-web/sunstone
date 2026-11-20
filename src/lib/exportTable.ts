@@ -1,5 +1,5 @@
-// Download a table as CSV or Excel (.xlsx), from the rows already on the page. The Excel writer
-// loads only when someone asks for a file.
+// Download a table as CSV, Excel (.xlsx) or PDF, from the rows already on the page. The Excel
+// writer and the PDF renderer load only when someone asks for a file.
 
 export interface ExportColumn<T> {
   header: string;
@@ -68,4 +68,10 @@ export async function downloadXlsx(fileName: string, sheets: ExportSheet<any>[])
   });
   const blob = await writeXlsxFile(workbook as never).toBlob();
   save(blob, `${fileName}.xlsx`);
+}
+
+/** The tables as a PDF (src/reports/TablePdf.tsx): one titled table per sheet. */
+export async function downloadPdf(fileName: string, title: string, sheets: ExportSheet<any>[]) {
+  const { tablePdf } = await import('@/reports/TablePdf');
+  save(await tablePdf(title, sheets), `${fileName}.pdf`);
 }

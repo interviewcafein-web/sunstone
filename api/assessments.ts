@@ -1164,6 +1164,11 @@ export async function student(viewer: Viewer, username: string) {
   };
 }
 
+/** Converge: a PRIME domain subject (MBA domain, BBA career track), not ELQ or coding. */
+const DOMAIN_SUBJECT = (column: string) =>
+  `(${column} ~* 'prime[[:space:]]*domain|career[[:space:]]*track|management[[:space:]]*trainee'
+    and ${column} !~* 'coding')`;
+
 /**
  * For the students table and the 360° view: per student (by username) the viewer may see,
  * attendance, AMCAT sitting averages in date order (for the trend), PRIME test average and
@@ -1192,15 +1197,34 @@ export async function metrics(viewer: Viewer) {
        from eligible e join lms_tests t on t.id = e.test_id
        left join track q on q.test_id = e.test_id
        left join lms_test_results tr on tr.test_id = e.test_id and tr.lms_user_id = e.lms_user_id
-       group by e.lms_user_id)`
+       group by e.lms_user_id),
+     dsub as (
+       select ss.lms_user_id, array_agg(distinct c.name order by c.name) as domain_subjects
+       from lms_section_students ss
+       join lms_course_sections cs using (section_id)
+       join lms_courses c on c.id = cs.course_id
+       where ss.lms_user_id in (select lms_user_id from roster) and ${DOMAIN_SUBJECT('c.name')}
+       group by ss.lms_user_id),
+     dlen as (
+       select subject, avg(coalesce(minutes, 60)) as minutes from att_sessions group by subject),
+     dhrs as (
+       select a.lms_user_id, sum(a.sessions)::int as domain_classes,
+              sum(a.present)::int as domain_attended,
+              round(sum(a.present * coalesce(l.minutes, 60)) / 60.0, 1)::float as domain_hours
+       from att_student_subject a left join dlen l using (subject)
+       where a.lms_user_id in (select lms_user_id from roster) and ${DOMAIN_SUBJECT('a.subject')}
+       group by a.lms_user_id)`
     : '';
   const splitColumns = split
     ? `,
             part.domain_avg, part.domain_submitted, part.domain_released,
             part.comm_avg, part.comm_submitted, part.comm_released,
-            part.apt_avg, part.apt_submitted, part.apt_released`
+            part.apt_avg, part.apt_submitted, part.apt_released,
+            dsub.domain_subjects, dhrs.domain_classes, dhrs.domain_attended, dhrs.domain_hours`
     : '';
-  const splitJoin = split ? ' left join part using (lms_user_id)' : '';
+  const splitJoin = split
+    ? ' left join part using (lms_user_id) left join dsub using (lms_user_id) left join dhrs using (lms_user_id)'
+    : '';
   // Vertex's "PRIME Mock Tests" are the mock tests only (the LMS category "AMCAT mock", and
   // tests named "Mock Test…"), not the assignments, MCQs and practice tests released alongside.
   const mockOnly = split ? '' : ` and ${MOCK_TEST}`;

@@ -621,6 +621,12 @@ export interface StudentMetrics {
   apt_avg?: number | null;
   apt_submitted?: number | null;
   apt_released?: number | null;
+  /** The PRIME domain subjects (LMS names) the student is enrolled in. */
+  domain_subjects?: string[] | null;
+  /** PRIME domain classes marked in the LMS, those attended, and the hours attended. */
+  domain_classes?: number | null;
+  domain_attended?: number | null;
+  domain_hours?: number | null;
 }
 
 export const useStudentMetrics = (enabled = true) =>

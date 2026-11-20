@@ -162,7 +162,7 @@ const SUBJECT_COLUMNS: ExportColumn<SubjectSummary>[] = [
   { header: 'Track', value: (row) => TRACKS[row.track].label },
   { header: 'Subject', value: (row) => row.name },
   { header: 'Tests', value: (row) => row.tests },
-  { header: 'Tests released', value: (row) => row.released },
+  { header: 'Tests published', value: (row) => row.released },
   { header: 'Modules', value: (row) => row.modules },
   { header: 'Modules started', value: (row) => row.started },
   { header: 'Submissions', value: (row) => row.submitted },
@@ -193,9 +193,9 @@ const MODULE_COLUMNS: ExportColumn<ModuleRow>[] = [
   { header: 'Subject', value: (row) => row.subject },
   { header: 'Module', value: (row) => tidy(row.module.name) },
   { header: 'Tests', value: (row) => row.module.total },
-  { header: 'Tests released', value: (row) => row.module.released },
+  { header: 'Tests published', value: (row) => row.module.released },
   {
-    header: 'Released %',
+    header: 'Published %',
     value: (row) => (row.module.total ? percent(row.module.released, row.module.total) : null),
   },
   { header: 'Started', value: (row) => (row.module.started ? 'Yes' : 'No') },
@@ -214,7 +214,7 @@ const TEST_COLUMNS: ExportColumn<CampusTest>[] = [
     header: 'Max marks',
     value: (test) => (test.max_marks == null ? null : Number(test.max_marks)),
   },
-  { header: 'Released', value: (test) => test.released_at?.slice(0, 10) },
+  { header: 'Published', value: (test) => test.released_at?.slice(0, 10) },
   { header: 'Due', value: (test) => test.due_at?.slice(0, 10) },
   { header: 'Students given the test', value: (test) => test.eligible },
   { header: 'Submitted', value: (test) => test.submitted },
@@ -232,7 +232,7 @@ const byRelease = (tests: CampusTest[]) =>
 
 const TIMELINE_COLUMNS: ExportColumn<CampusDetail['timeline'][number]>[] = [
   { header: 'Week of', value: (week) => week.week },
-  { header: 'Tests released', value: (week) => week.tests },
+  { header: 'Tests published', value: (week) => week.tests },
   { header: 'Average score %', value: (week) => week.avg_pct },
   { header: 'Participation %', value: (week) => week.participation },
 ];
@@ -684,7 +684,7 @@ function OverviewTab({
         <section className={cn(panel, 'p-5')}>
           <SectionTitle
             title="Journey"
-            description="Tests released each week, and how the class scored."
+            description="Tests published each week, and how the class scored."
             aside={
               <ExportButtons
                 name={`${fileScope} weekly journey`}
@@ -728,7 +728,7 @@ function OverviewTab({
                     }}
                     labelFormatter={(label) => `Week of ${label}`}
                     formatter={(value, key) =>
-                      key === 'tests' ? [value, 'Tests released'] : [`${value}%`, 'Average score']
+                      key === 'tests' ? [value, 'Tests published'] : [`${value}%`, 'Average score']
                     }
                   />
                   <Bar
@@ -751,7 +751,7 @@ function OverviewTab({
               </ResponsiveContainer>
             </div>
           ) : (
-            <p className="mt-4 text-sm text-slate-500">No tests released yet.</p>
+            <p className="mt-4 text-sm text-slate-500">No tests published yet.</p>
           )}
         </section>
         <SubjectScores data={data} fileScope={fileScope} />
@@ -830,7 +830,7 @@ function OverviewTab({
             <SectionTitle
               icon={TRACK_ICONS[track]}
               title={`${TRACKS[track].label} Coverage`}
-              description="Each module: tests released out of all its tests."
+              description="Each module: tests published out of all its tests."
               aside={
                 <span className="flex flex-wrap items-center gap-3">
                   <ExportButtons
@@ -876,7 +876,7 @@ function SubjectScores({ data, fileScope }: { data: CampusDetail; fileScope: str
     <section className={cn(panel, 'p-5')}>
       <SectionTitle
         title="PRIME Subjects"
-        description="Average score and share of tests taken, over the tests released so far."
+        description="Average score and share of tests taken, over the tests published so far."
         aside={
           <ExportButtons
             name={`${fileScope} PRIME subjects`}
@@ -1059,7 +1059,7 @@ function TrackTab({
                 {subject.name}
               </p>
               <p className="text-xs text-slate-500">
-                {out.length} of {tests.length} tests released · {started} of{' '}
+                {out.length} of {tests.length} tests published · {started} of{' '}
                 {subject.modules.length} modules started
               </p>
               <div className="mt-4 flex items-center gap-5">

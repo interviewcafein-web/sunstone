@@ -290,7 +290,7 @@ function CampusCard({
         ) : (
           <p className="mt-5 flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-4 text-sm text-slate-500">
             <CircleDashed className="size-4" aria-hidden />
-            No PRIME tests released yet
+            No PRIME tests published yet
           </p>
         )}
 

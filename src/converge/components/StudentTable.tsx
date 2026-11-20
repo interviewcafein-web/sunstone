@@ -19,10 +19,13 @@ import type { ExportColumn } from '@/lib/exportTable';
 import { cn } from '@/lib/utils';
 
 import type { Row, SortKey } from '../lib/rows';
-import { TRACKS } from '../lib/subjects';
+import { TRACKS, domainOf } from '../lib/subjects';
 import { attendanceFill, attendanceTone } from '../lib/tones';
 import { Link } from '../nav';
 import { ScoreCell, SuperBadge, panel } from './ui';
+
+const fmtHours = (hours: number | null | undefined) =>
+  hours == null ? '0' : Number(hours.toFixed(1)).toLocaleString('en-IN');
 
 // Thousands of rows (every campus) are too many to draw at once: draw a page, then more as
 // the reader scrolls near the end.
@@ -194,13 +197,29 @@ export function StudentTable({
                     </div>
                   </th>
                   <td className={cellBase}>
-                    <ScoreCell
-                      value={row.domain}
-                      hint={taken(
-                        row.combined ? metrics?.submitted : metrics?.domain_submitted,
-                        row.combined ? metrics?.released : metrics?.domain_released
+                    <span className="inline-flex flex-col items-end gap-0.5">
+                      {domainOf(metrics?.domain_subjects) && (
+                        <span className="bg-brand-50 text-brand-800 dark:bg-brand-900/30 dark:text-brand-200 rounded-full px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap">
+                          {domainOf(metrics?.domain_subjects)}
+                        </span>
                       )}
-                    />
+                      <ScoreCell
+                        value={row.domain}
+                        hint={taken(
+                          row.combined ? metrics?.submitted : metrics?.domain_submitted,
+                          row.combined ? metrics?.released : metrics?.domain_released
+                        )}
+                      />
+                      {metrics?.domain_classes ? (
+                        <span
+                          className="text-[11px] whitespace-nowrap text-slate-500"
+                          title={`${metrics.domain_attended} of ${metrics.domain_classes} PRIME domain classes attended`}
+                        >
+                          {fmtHours(metrics.domain_hours)} h · {metrics.domain_attended}/
+                          {metrics.domain_classes} classes
+                        </span>
+                      ) : null}
+                    </span>
                   </td>
                   <td className={cellBase}>
                     <ScoreCell
@@ -269,15 +288,19 @@ export const STUDENT_COLUMNS: ExportColumn<Row>[] = [
   { header: 'Batch', value: (row) => cohortLabel(row.student.course, row.student.batch) },
   { header: 'Cohorts', value: (row) => row.student.cohorts?.join(', ') },
   { header: 'Super 100', value: (row) => (row.super100 ? 'Yes' : '') },
+  { header: 'PRIME domain', value: (row) => domainOf(row.metrics?.domain_subjects) },
   { header: 'PRIME Domain %', value: (row) => row.domain },
   {
     header: 'PRIME Domain tests taken',
     value: (row) => (row.combined ? row.metrics?.submitted : row.metrics?.domain_submitted),
   },
   {
-    header: 'PRIME Domain tests released',
+    header: 'PRIME Domain tests published',
     value: (row) => (row.combined ? row.metrics?.released : row.metrics?.domain_released),
   },
+  { header: 'PRIME Domain classes attended', value: (row) => row.metrics?.domain_attended },
+  { header: 'PRIME Domain classes held', value: (row) => row.metrics?.domain_classes },
+  { header: 'PRIME Domain hours attended', value: (row) => row.metrics?.domain_hours },
   { header: 'Communication %', value: (row) => row.comm },
   { header: 'Communication tests taken', value: (row) => row.metrics?.comm_submitted },
   { header: 'Communication tests released', value: (row) => row.metrics?.comm_released },

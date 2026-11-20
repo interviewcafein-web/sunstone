@@ -121,7 +121,7 @@ const TEST_COLUMNS: ExportColumn<StudentTest>[] = [
   { header: 'Test', value: (test) => test.name },
   { header: 'Category', value: (test) => test.category },
   { header: 'Status', value: (test) => test.status },
-  { header: 'Released', value: (test) => test.released_at?.slice(0, 10) },
+  { header: 'Published', value: (test) => test.released_at?.slice(0, 10) },
   { header: 'Due', value: (test) => test.due_at?.slice(0, 10) },
   { header: 'Submitted', value: (test) => (test.submitted ? 'Yes' : 'No') },
   { header: 'Submitted at', value: (test) => test.submitted_at },
@@ -491,7 +491,7 @@ function TrackSection({
   if (!tests.length) {
     return (
       <Empty title={`No ${TRACKS[track].label} Tests Yet`}>
-        Tests from {TRACKS[track].note} appear here once they are released to this student&rsquo;s
+        Tests from {TRACKS[track].note} appear here once they are published to this student&rsquo;s
         sections.
       </Empty>
     );
@@ -510,7 +510,7 @@ function TrackSection({
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi
           icon={BookOpenCheck}
-          label="Tests Released"
+          label="Tests Published"
           value={String(released.length)}
           hint={
             upcoming.length ? `${upcoming.length} live or upcoming` : `${subjects.length} subjects`
@@ -684,7 +684,7 @@ function TrackSection({
   );
 }
 
-/** One subject's released tests: those on the subject itself, then module by module. */
+/** One subject's published tests: those on the subject itself, then module by module. */
 function SubjectTests({
   subject,
   tests,
@@ -716,7 +716,7 @@ function SubjectTests({
         <SectionTitle
           icon={FolderTree}
           title={subject}
-          description={`${tests.length} tests released · ${modules.length} modules`}
+          description={`${tests.length} tests published · ${modules.length} modules`}
           aside={
             <span className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
               {syncedAt && `From the LMS · ${lmsDate(syncedAt, true)}`}
@@ -805,7 +805,7 @@ function ResultsTable({ tests, showRank = false }: { tests: StudentTest[]; showR
                 <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
                   <CategoryChip category={test.category} />
                   {test.status === 'live' && <StatusChip status="live" />}
-                  <span>Released {lmsDate(test.released_at)}</span>
+                  <span>Published {lmsDate(test.released_at)}</span>
                 </p>
               </td>
               {showRank && (

@@ -241,6 +241,90 @@ export async function plannedHours(campusIds: number[] | null): Promise<PlannedH
   return rows as PlannedHours[];
 }
 
+export interface TaughtHours {
+  campus_id: number;
+  program: string;
+  admission_year: number;
+  subject: string;
+  hours: number | null;
+  trainers: string | null;
+}
+
+/** Hours taught and faculty typed in by HQ, for subjects the LMS timetable does not cover. */
+export async function taughtHours(campusIds: number[] | null): Promise<TaughtHours[]> {
+  const rows = await db().query(
+    `select campus_id, program, admission_year, subject, hours::float as hours, trainers
+     from prime_taught_hours where $1::int[] is null or campus_id = any($1::int[])`,
+    [campusIds]
+  );
+  return rows as TaughtHours[];
+}
+
+/**
+ * Some students' PRIME domain subjects: tests released to them, submitted and the average score,
+ * and the classes they attended. Only students at campuses the viewer may see.
+ */
+export async function peopleSubjects(slugs: string[], campusIds: number[] | null) {
+  if (!slugs.length) return {};
+  const rows = await db().query(
+    `with who as (
+       select lms_user_id, username from students
+       where username = any($1::text[]) and ($2::int[] is null or campus_id = any($2::int[]))),
+     enrol as (
+       select distinct w.lms_user_id, w.username, cs.section_id, c.id as course_id,
+              ${SUBJECT('c.name')} as subject
+       from who w
+       join lms_section_students ss on ss.lms_user_id = w.lms_user_id
+       join lms_course_sections cs on cs.section_id = ss.section_id
+       join lms_courses c on c.id = cs.course_id
+       where ${IS_DOMAIN('c.name')}),
+     tests as (
+       select e.username, e.subject, count(distinct r.test_id)::int as released,
+              count(distinct r.test_id) filter (where tr.submitted)::int as submitted,
+              round(avg(${scorePct('tr', 't')}) filter (where tr.submitted))::int as avg
+       from enrol e
+       left join lms_test_releases r on r.section_id = e.section_id and r.course_id = e.course_id
+         and r.visible and r.release_at <= ${NOW}
+       left join lms_tests t on t.id = r.test_id
+       left join lms_test_results tr on tr.test_id = r.test_id and tr.lms_user_id = e.lms_user_id
+       group by 1, 2),
+     att as (
+       select w.username, ${SUBJECT('a.subject')} as subject,
+              sum(a.sessions)::int as classes, sum(a.present)::int as attended
+       from who w join att_student_subject a on a.lms_user_id = w.lms_user_id
+       where ${IS_DOMAIN('a.subject')}
+       group by 1, 2)
+     select coalesce(t.username, a.username) as username, coalesce(t.subject, a.subject) as subject,
+            coalesce(t.released, 0) as released, coalesce(t.submitted, 0) as submitted, t.avg,
+            a.classes, a.attended
+     from tests t full join att a using (username, subject)
+     order by 1, 2`,
+    [slugs, campusIds]
+  );
+  const out: Record<
+    string,
+    {
+      subject: string;
+      released: number;
+      submitted: number;
+      avg: number | null;
+      classes: number | null;
+      attended: number | null;
+    }[]
+  > = {};
+  for (const row of rows) {
+    (out[String(row.username)] ??= []).push({
+      subject: String(row.subject),
+      released: Number(row.released),
+      submitted: Number(row.submitted),
+      avg: row.avg == null ? null : Number(row.avg),
+      classes: row.classes == null ? null : Number(row.classes),
+      attended: row.attended == null ? null : Number(row.attended),
+    });
+  }
+  return out;
+}
+
 /** Students needed on each side (opted in, not) for a batch to be compared. */
 const MIN_SIDE = 30;
 

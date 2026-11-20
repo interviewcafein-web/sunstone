@@ -179,6 +179,8 @@ export interface PrimeSearch {
   campus?: number;
   /** BBA or MBA. */
   program?: string;
+  /** Admission year. */
+  batch?: number;
 }
 
 export const primeRoute = createRoute({
@@ -188,6 +190,7 @@ export const primeRoute = createRoute({
     tab: PRIME_TABS.includes(search.tab as PrimeTab) ? (search.tab as PrimeTab) : undefined,
     campus: positive(search.campus),
     program: text(search.program),
+    batch: positive(search.batch),
   }),
 });
 

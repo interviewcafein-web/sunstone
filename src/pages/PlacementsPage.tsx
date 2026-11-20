@@ -879,6 +879,95 @@ function Segments({
   );
 }
 
+/** How strong a correlation is, in words. */
+const strength = (r: number) => {
+  const size = Math.abs(r);
+  const words =
+    size < 0.1 ? 'no real link' : size < 0.3 ? 'weak' : size < 0.5 ? 'moderate' : 'strong';
+  return size < 0.1
+    ? words
+    : `${words}, ${r > 0 ? 'higher goes with offers' : 'higher goes with fewer offers'}`;
+};
+
+/** Where each measure's numbers come from. */
+const MEASURE_SOURCES: Record<string, string> = {
+  domain:
+    'PRIME domain tests and assignments in the LMS (the MBA domains and BBA career tracks): the average score of the ones the student submitted.',
+  comm: 'Communication tests in the LMS (Prime Communication, ELQ): the average score of those submitted.',
+  apt: 'Aptitude tests in the LMS (Prime Aptitude): the average score of those submitted.',
+  tests: 'The AMCAT mock tests in the LMS: the average score of those submitted.',
+  solved:
+    'Problems solved on LeetCode, GeeksforGeeks, HackerRank, Codeforces and CodeChef, from the usernames students gave.',
+  amcat:
+    "The student's latest AMCAT sitting: the average of its sections, from the LMS's AMCAT results.",
+  attendance: 'Class attendance marked in the LMS timetable, every class since the term began.',
+  exams: 'Internal exams (midterms and end-terms; not mock PI or GD): the average percentage.',
+};
+
+/** What the preparation cards mean, and how the numbers are worked out. */
+function HowPrepWorks({
+  measureOf,
+  word,
+  keys,
+}: {
+  measureOf: Record<string, PlacementMeasure>;
+  word: string;
+  keys: string[];
+}) {
+  return (
+    <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-sm dark:bg-slate-800/30">
+      <summary className="cursor-pointer font-semibold text-slate-700 dark:text-slate-200">
+        How this is worked out
+      </summary>
+      <div className="mt-3 space-y-3 text-slate-600 dark:text-slate-300">
+        <div>
+          <p className="font-semibold text-slate-800 dark:text-slate-100">
+            Where the numbers come from
+          </p>
+          <p className="mt-1">
+            Everything is copied from the Sunstone LMS every night: offers from its placement
+            records, and each measure as below. Only batches in placement season (at least 3
+            students with an offer of this kind) are counted.
+          </p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-5">
+            {keys.map((key) => (
+              <li key={key}>
+                <b>{measureOf[key]?.label ?? key}:</b> {MEASURE_SOURCES[key] ?? ''}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <p className="font-semibold text-slate-800 dark:text-slate-100">The two bars</p>
+          <p className="mt-1">
+            The average of each measure for students {word}, against students still waiting for an
+            offer. Students without a number for a measure (no tests taken, no AMCAT) are left out
+            of that card.
+          </p>
+        </div>
+        <div>
+          <p className="font-semibold text-slate-800 dark:text-slate-100">Offer rate by quarter</p>
+          <p className="mt-1">
+            The students are lined up from the lowest score to the highest and split into four equal
+            groups. Each bar is the share of that group with an offer. Bars that rise from left to
+            right mean better-prepared students get offers more often. &ldquo;Top quarter: N points
+            more likely&rdquo; is the top group&rsquo;s offer rate minus the bottom group&rsquo;s.
+          </p>
+        </div>
+        <div>
+          <p className="font-semibold text-slate-800 dark:text-slate-100">The correlation</p>
+          <p className="mt-1">
+            r measures how closely the score and having an offer move together, from −1 to 1: 0 is
+            no link, below 0.3 weak, 0.3 to 0.5 moderate, above 0.5 strong. It shows that the two go
+            together, not that one causes the other: students who work harder in PRIME may also
+            apply to more companies, for example.
+          </p>
+        </div>
+      </div>
+    </details>
+  );
+}
+
 /** Placed against not-yet-placed on each measure, and the offer rate by quarter. */
 function Prep({
   data,
@@ -982,12 +1071,21 @@ function Prep({
                         : 'No clear link yet'}
                     </p>
                   )}
+                  {row.correlation != null && (
+                    <p
+                      className="mt-1 text-[11px] text-slate-500"
+                      title="Pearson's r between this measure and having an offer: 0 is no link, 1 a perfect one."
+                    >
+                      Correlation r = {row.correlation.toFixed(2)} ({strength(row.correlation)})
+                    </p>
+                  )}
                 </div>
               )}
             </div>
           );
         })}
       </div>
+      <HowPrepWorks measureOf={measureOf} word={word} keys={data.prep.map((row) => row.key)} />
     </section>
   );
 }

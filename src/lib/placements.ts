@@ -64,7 +64,24 @@ export interface PlacementOffer extends PlacementStudent {
   crc: string | null;
 }
 
+/** One offer behind a cell of the domain-vs-role grid (Converge). */
+export interface FitPerson {
+  domain: string;
+  role: string;
+  slug: string;
+  name: string;
+  campus: string;
+  program: string;
+  year: number | null;
+  company: string | null;
+  designation: string | null;
+  segment: PlacementSegment;
+  measures: Record<string, number | null>;
+}
+
 export interface FitMatrix {
+  /** Every offer in the grid, with its student. */
+  people?: FitPerson[];
   columns: string[];
   rows: {
     domain: string;
@@ -144,6 +161,8 @@ export interface PlacementsResponse {
   fit: FitMatrix | RoleGroup[] | null;
   prep: {
     key: string;
+    /** Pearson's r between the measure and having an offer: −1 to 1, null when too few. */
+    correlation?: number | null;
     placedAvg: number | null;
     othersAvg: number | null;
     placedCount: number;

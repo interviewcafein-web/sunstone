@@ -278,6 +278,27 @@ const mean = (values: number[]) =>
     : null;
 const pct = (part: number, whole: number) =>
   whole ? Math.round((1000 * part) / whole) / 10 : null;
+/**
+ * Pearson's r between a measure and having an offer (1) or not (0): from −1 to 1, 0 for no link.
+ * null with fewer than 20 students or when either side does not vary.
+ */
+function correlation(xs: number[], ys: number[]): number | null {
+  const n = xs.length;
+  if (n < 20) return null;
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = ys.reduce((a, b) => a + b, 0) / n;
+  let sxy = 0;
+  let sxx = 0;
+  let syy = 0;
+  for (let i = 0; i < n; i++) {
+    sxy += (xs[i] - mx) * (ys[i] - my);
+    sxx += (xs[i] - mx) ** 2;
+    syy += (ys[i] - my) ** 2;
+  }
+  if (!sxx || !syy) return null;
+  return Math.round((sxy / Math.sqrt(sxx * syy)) * 100) / 100;
+}
+
 const present = (values: (number | null | undefined)[]) =>
   values.filter((value): value is number => value != null && Number.isFinite(value));
 
@@ -425,6 +446,10 @@ export function placementReport(
     }
     return {
       key: measure.key,
+      correlation: correlation(
+        scored.map(valueOf),
+        scored.map((row) => (placedSet.has(row) ? 1 : 0))
+      ),
       placedAvg: mean(yes.map(valueOf)),
       othersAvg: mean(no.map(valueOf)),
       placedCount: yes.length,
@@ -531,9 +556,36 @@ export function placementReport(
     const cells = new Map<string, number>();
     const columns = new Set<string>();
     const rowsOf = new Map<string, { offers: number; matched: number }>();
+    // Each offer behind the grid, so a cell can open to its students (no pay here).
+    const people: {
+      domain: string;
+      role: string;
+      slug: string;
+      name: string;
+      campus: string;
+      program: string;
+      year: number | null;
+      company: string | null;
+      designation: string | null;
+      segment: Segment;
+      measures: Record<string, number | null>;
+    }[] = [];
     for (const { row, offer } of offers) {
       const domain = row.domain ?? 'Not known';
       const role = domainOfRole(offer.category) ?? 'General roles';
+      people.push({
+        domain,
+        role,
+        slug: row.slug,
+        name: row.name,
+        campus: row.campus,
+        program: row.program,
+        year: row.year,
+        company: offer.company,
+        designation: offer.designation,
+        segment: segmentOf(offer),
+        measures: row.measures,
+      });
       columns.add(role);
       cells.set(`${domain}|${role}`, (cells.get(`${domain}|${role}`) ?? 0) + 1);
       const entry = rowsOf.get(domain) ?? { offers: 0, matched: 0 };
@@ -554,6 +606,7 @@ export function placementReport(
     ];
     const sort = (list: string[]) => list.sort((a, b) => order.indexOf(a) - order.indexOf(b));
     fit = {
+      people,
       columns: sort([...columns]),
       rows: sort([...rowsOf.keys()]).map((domain) => ({
         domain,

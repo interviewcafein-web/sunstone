@@ -4,15 +4,28 @@
 //
 //   GET /api/prime[?campus=ID]   subjects (tests, assignments, hours), AMCAT, the opt-in
 //                                comparison and PRIME against placements
+//   GET /api/prime?people=slug,… Converge: those students' PRIME subjects (tests released,
+//                                submitted, average score), for the domain-vs-role details
 //   PUT /api/prime               { campusId, program, admissionYear, subject, hours | null }
 //                                HQ sets (or clears, with null) a subject's planned hours
+//   PUT /api/prime               { …, field: 'taught', hours | null, trainers | null }
+//                                HQ types the hours taught per section and the faculty
+//                                (null keeps the LMS's own)
 
 import { json, managesTeam, seesCampus, sessionViewer } from './_auth';
 import { currentApp, forApp } from './_app';
 import { CYCLES, SKILLS, codingRowsSnapshot, deliveryReport, narrowStudents } from './_coding';
 import { db } from './_db';
 import { placementReport, placementRowsSnapshot } from './_placements';
-import { HOURS_PER_CREDIT, narrow, optInComparison, plannedHours, primeRows } from './_prime';
+import {
+  HOURS_PER_CREDIT,
+  narrow,
+  optInComparison,
+  peopleSubjects,
+  plannedHours,
+  primeRows,
+  taughtHours,
+} from './_prime';
 import { snapshot, type WaitUntil } from './_snapshot';
 
 export const config = { runtime: 'edge' };
@@ -23,18 +36,35 @@ async function handler(request: Request, context?: WaitUntil): Promise<Response>
   if (!viewer) return json(401, { error: 'Login required' });
 
   if (request.method === 'PUT') {
-    if (!managesTeam(viewer)) return json(403, { error: 'Only HQ can set planned hours' });
+    if (!managesTeam(viewer)) return json(403, { error: 'Only HQ can change hours' });
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     const campusId = Number(body?.campusId);
     const year = Number(body?.admissionYear);
     const program = typeof body?.program === 'string' ? body.program.trim() : '';
     const subject = typeof body?.subject === 'string' ? body.subject.trim() : '';
-    const hours = body?.hours == null ? null : Number(body.hours);
+    const hours = body?.hours == null || body.hours === '' ? null : Number(body.hours);
     if (!Number.isInteger(campusId) || !Number.isInteger(year) || !program || !subject) {
       return json(400, { error: 'Choose the campus, batch and subject' });
     }
     if (hours !== null && !(hours >= 0 && hours <= 1000)) {
-      return json(400, { error: 'Planned hours must be between 0 and 1000' });
+      return json(400, { error: 'Hours must be between 0 and 1000' });
+    }
+    if (body?.field === 'taught') {
+      const trainers =
+        typeof body.trainers === 'string' && body.trainers.trim()
+          ? body.trainers.trim().replace(/\s+/g, ' ').slice(0, 300)
+          : null;
+      if (hours === null && trainers === null) {
+        await db()`delete from prime_taught_hours where campus_id = ${campusId}
+          and program = ${program} and admission_year = ${year} and subject = ${subject}`;
+      } else {
+        await db()`insert into prime_taught_hours (campus_id, program, admission_year, subject, hours, trainers, set_by)
+          values (${campusId}, ${program}, ${year}, ${subject}, ${hours}, ${trainers}, ${viewer.user})
+          on conflict (campus_id, program, admission_year, subject)
+          do update set hours = excluded.hours, trainers = excluded.trainers,
+            set_by = excluded.set_by, set_at = now()`;
+      }
+      return json(200, { ok: true });
     }
     if (hours === null) {
       await db()`delete from prime_planned_hours where campus_id = ${campusId}
@@ -46,6 +76,17 @@ async function handler(request: Request, context?: WaitUntil): Promise<Response>
         do update set hours = excluded.hours, set_by = excluded.set_by, set_at = now()`;
     }
     return json(200, { ok: true });
+  }
+
+  // Converge: some students' PRIME subjects, for the domain-vs-role details.
+  const people = new URL(request.url).searchParams.get('people');
+  if (people !== null && currentApp() === 'converge') {
+    const slugs = people
+      .split(',')
+      .map((slug) => slug.trim())
+      .filter(Boolean)
+      .slice(0, 400);
+    return json(200, { subjects: await peopleSubjects(slugs, viewer.campusIds) });
   }
 
   const raw = new URL(request.url).searchParams.get('campus');
@@ -89,9 +130,10 @@ async function handler(request: Request, context?: WaitUntil): Promise<Response>
     }
   }
   try {
-    const [rows, planned, optIn, placementRows] = await Promise.all([
+    const [rows, planned, taught, optIn, placementRows] = await Promise.all([
       snapshot('prime', primeRows, context),
       plannedHours(scope),
+      taughtHours(scope),
       optInComparison(scope),
       placementRowsSnapshot(context),
     ]);
@@ -101,12 +143,27 @@ async function handler(request: Request, context?: WaitUntil): Promise<Response>
         row,
       ])
     );
+    const taughtBy = new Map(
+      taught.map((row) => [
+        `${row.campus_id}|${row.program}|${row.admission_year}|${row.subject}`,
+        row,
+      ])
+    );
     const subjects = narrow(rows.subjects, viewer, campusId).map((row) => {
-      const set = plannedBy.get(
-        `${row.campus_id}|${row.program}|${row.admission_year}|${row.subject}`
-      );
+      const key = `${row.campus_id}|${row.program}|${row.admission_year}|${row.subject}`;
+      const set = plannedBy.get(key);
+      // Hours and faculty HQ typed in take the place of the LMS's.
+      const typed = taughtBy.get(key);
+      const typedHours = typed?.hours ?? null;
       return {
         ...row,
+        lms_hours_per_section: row.hours_per_section,
+        lms_trainers: row.trainers,
+        hours_per_section: typedHours ?? row.hours_per_section,
+        total_hours: typedHours != null ? typedHours * Math.max(row.sections, 1) : row.total_hours,
+        taught_source: typedHours != null ? 'hq' : row.hours_per_section != null ? 'lms' : null,
+        trainers: typed?.trainers ?? row.trainers,
+        trainers_source: typed?.trainers ? 'hq' : row.trainers ? 'lms' : null,
         planned_hours: set ? set.hours : row.credits ? row.credits * HOURS_PER_CREDIT : null,
         planned_source: set ? 'hq' : row.credits ? 'credits' : null,
         planned_by: set?.set_by ?? null,

@@ -23,10 +23,17 @@ export interface PrimeSubjectRow {
   credits: number | null;
   sections: number;
   classes: number;
+  /** Hours taught: HQ's typed hours when set, else the LMS timetable's. */
   total_hours: number | null;
   hours_per_section: number | null;
+  /** Faculty: HQ's typed names when set, else the LMS timetable's. */
   trainers: string | null;
   last_class: string | null;
+  /** The LMS timetable's own hours and faculty. */
+  lms_hours_per_section: number | null;
+  lms_trainers: string | null;
+  taught_source: 'hq' | 'lms' | null;
+  trainers_source: 'hq' | 'lms' | null;
   planned_hours: number | null;
   planned_source: 'hq' | 'credits' | null;
   planned_by: string | null;
@@ -114,3 +121,44 @@ export async function savePlannedHours(input: {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error ?? 'Planned hours could not be saved.');
 }
+
+/** HQ types the hours taught per section and the faculty (null or '' keeps the LMS's own). */
+export async function saveTaught(input: {
+  campusId: number;
+  program: string;
+  admissionYear: number;
+  subject: string;
+  hours: number | null;
+  trainers: string | null;
+}) {
+  const response = await fetch('/api/prime', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...input, field: 'taught' }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error ?? 'Hours taught could not be saved.');
+}
+
+export interface PersonSubject {
+  subject: string;
+  released: number;
+  submitted: number;
+  avg: number | null;
+  classes: number | null;
+  attended: number | null;
+}
+
+/** Some students' PRIME subjects, by username (for the domain-vs-role details). */
+export const usePeopleSubjects = (slugs: string[]) =>
+  useQuery({
+    queryKey: ['prime-people', slugs],
+    enabled: slugs.length > 0,
+    queryFn: async () => {
+      const response = await fetch(`/api/prime?people=${encodeURIComponent(slugs.join(','))}`);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? 'The subjects could not be loaded.');
+      return (data.subjects ?? {}) as Record<string, PersonSubject[]>;
+    },
+    staleTime: 5 * 60_000,
+  });

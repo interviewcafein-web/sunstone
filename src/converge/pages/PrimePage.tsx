@@ -2,7 +2,7 @@
 // batch — tests and assignments, hours planned and taught, AMCAT — and PRIME against placements.
 // Every table downloads as CSV or Excel. Numbers from api/prime.ts.
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   Award,
   BookOpenCheck,
@@ -23,7 +23,7 @@ import { scoreTone } from '@/lib/assessments';
 import { cohortLabel } from '@/lib/cohorts';
 import { DownloadAll, ExportButtons } from '@/components/common/ExportButtons';
 import { type ExportColumn, type ExportSheet } from '@/lib/exportTable';
-import { ROLE_LABELS, formatPay, type PlacementMeasure } from '@/lib/placements';
+import { ROLE_LABELS, formatPay, type FitPerson, type PlacementMeasure } from '@/lib/placements';
 import { cn } from '@/lib/utils';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -31,13 +31,15 @@ import { Empty, Hero, HeroStat, Problem, SectionTitle, heroGrid, panel } from '.
 import {
   primeKey,
   savePlannedHours,
+  saveTaught,
+  usePeopleSubjects,
   usePrime,
   type OptInRow,
   type PrimeAmcatRow,
   type PrimeResponse,
   type PrimeSubjectRow,
 } from '../lib/primeApi';
-import { useRouteSearch, useSetSearch } from '../nav';
+import { Link, useRouteSearch, useSetSearch } from '../nav';
 import type { PrimeSearch, PrimeTab } from '../routes';
 
 const TABS: { id: PrimeTab; label: string; icon: typeof Layers }[] = [
@@ -76,6 +78,11 @@ const shortSubject = (subject: string) => subject.replace(/ Prime Domain$/, '');
 const fmt = (value: number | null | undefined, unit = '') =>
   value == null ? '—' : `${Number(value.toFixed(1)).toLocaleString('en-IN')}${unit}`;
 
+/** Under the page's program and batch filters (the campus is applied by the API). */
+const inView = (row: { program: string; admission_year: number }, search: PrimeSearch) =>
+  (!search.program || row.program === search.program) &&
+  (!search.batch || row.admission_year === search.batch);
+
 export default function PrimePage() {
   const search = useRouteSearch<PrimeSearch>();
   const setSearch = useSetSearch<PrimeSearch>();
@@ -84,12 +91,12 @@ export default function PrimePage() {
   const data = query.data;
 
   const subjects = useMemo(
-    () => (data?.subjects ?? []).filter((row) => !search.program || row.program === search.program),
-    [data, search.program]
+    () => (data?.subjects ?? []).filter((row) => inView(row, search)),
+    [data, search]
   );
   const amcat = useMemo(
-    () => (data?.amcat ?? []).filter((row) => !search.program || row.program === search.program),
-    [data, search.program]
+    () => (data?.amcat ?? []).filter((row) => inView(row, search)),
+    [data, search]
   );
 
   if (query.isPending) return <PageLoader label="Loading the PRIME overview" />;
@@ -97,6 +104,13 @@ export default function PrimePage() {
     return <Problem message={query.error?.message ?? ''} onRetry={() => query.refetch()} />;
 
   const programs = [...new Set(data.subjects.map((row) => row.program))].sort();
+  const batches = [
+    ...new Set(
+      data.subjects
+        .filter((row) => !search.program || row.program === search.program)
+        .map((row) => row.admission_year)
+    ),
+  ].sort((a, b) => b - a);
   const assigned = sum(subjects, (row) => row.assigned);
   const attempted = sum(subjects, (row) => row.attempted);
   const delivered = sum(subjects, (row) => row.total_hours);
@@ -107,7 +121,9 @@ export default function PrimePage() {
     search.campus
       ? data.campuses.find((campus) => campus.id === search.campus)?.name
       : 'All Campuses',
-    search.program,
+    search.program && search.batch
+      ? cohortLabel(search.program, String(search.batch))
+      : (search.program ?? (search.batch ? `${search.batch} batch` : null)),
   ]
     .filter(Boolean)
     .join(' · ');
@@ -143,12 +159,31 @@ export default function PrimePage() {
               <select
                 aria-label="Program"
                 value={search.program ?? ''}
-                onChange={(event) => setSearch({ program: event.target.value || undefined })}
+                onChange={(event) =>
+                  setSearch({ program: event.target.value || undefined, batch: undefined })
+                }
                 className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-white [&>option]:text-slate-900"
               >
                 <option value="">BBA and MBA</option>
                 {programs.map((program) => (
                   <option key={program}>{program}</option>
+                ))}
+              </select>
+            )}
+            {batches.length > 1 && (
+              <select
+                aria-label="Batch"
+                value={search.batch ?? ''}
+                onChange={(event) =>
+                  setSearch({ batch: event.target.value ? Number(event.target.value) : undefined })
+                }
+                className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-white [&>option]:text-slate-900"
+              >
+                <option value="">All Batches</option>
+                {batches.map((year) => (
+                  <option key={year} value={year}>
+                    {search.program ? cohortLabel(search.program, String(year)) : `${year} batch`}
+                  </option>
                 ))}
               </select>
             )}
@@ -172,7 +207,7 @@ export default function PrimePage() {
           />
           <HeroStat
             icon={BookOpenCheck}
-            label="Tests Released"
+            label="Tests Published"
             value={sum(subjects, (row) => row.published)}
           />
           <HeroStat
@@ -319,6 +354,47 @@ function Table({
 
 const td = 'px-2 py-2 text-right tabular-nums';
 
+/**
+ * Subject rows under a bold "Campus · Batch" heading, in the order given (campus, program,
+ * batch, subject, as the API sends them).
+ */
+function ByBatch({
+  rows,
+  colSpan,
+  render,
+}: {
+  rows: PrimeSubjectRow[];
+  colSpan: number;
+  render: (row: PrimeSubjectRow) => ReactNode;
+}) {
+  const groups: { key: string; first: PrimeSubjectRow; rows: PrimeSubjectRow[] }[] = [];
+  for (const row of rows) {
+    const key = `${row.campus_id}|${row.program}|${row.admission_year}`;
+    const last = groups[groups.length - 1];
+    if (last?.key === key) last.rows.push(row);
+    else groups.push({ key, first: row, rows: [row] });
+  }
+  return groups.map((group) => (
+    <Fragment key={group.key}>
+      <tr className="border-b border-slate-200 bg-slate-50 dark:bg-slate-800/50">
+        <td colSpan={colSpan} className="px-2 py-2 font-bold text-slate-900 dark:text-slate-50">
+          {group.first.campus} · {batchOf(group.first)}
+          <span className="ml-2 text-xs font-normal text-slate-500">
+            {group.rows.length} subject{group.rows.length === 1 ? '' : 's'}
+          </span>
+        </td>
+      </tr>
+      {group.rows.map(render)}
+    </Fragment>
+  ));
+}
+
+const subjectCell = (row: PrimeSubjectRow) => (
+  <td className="py-2 pr-2 pl-4 font-medium">{shortSubject(row.subject)}</td>
+);
+const rowKey = (row: PrimeSubjectRow) =>
+  `${row.campus_id}-${row.program}-${row.admission_year}-${row.subject}`;
+
 /** Subject rows summed across campuses and batches. */
 function bySubject(rows: PrimeSubjectRow[]) {
   const groups = new Map<string, PrimeSubjectRow[]>();
@@ -360,7 +436,7 @@ const ROW_COLUMNS: ExportColumn<PrimeSubjectRow>[] = [
   { header: 'Subject', value: (row) => row.subject },
   { header: 'Students', value: (row) => row.students },
   { header: 'Tests created', value: (row) => row.created },
-  { header: 'Tests released', value: (row) => row.published },
+  { header: 'Tests published', value: (row) => row.published },
   { header: 'Assigned (student × test)', value: (row) => row.assigned },
   { header: 'Submitted', value: (row) => row.attempted },
   { header: 'Submitted %', value: (row) => pct(row.attempted, row.assigned) },
@@ -382,9 +458,15 @@ const ROW_COLUMNS: ExportColumn<PrimeSubjectRow>[] = [
           : '',
   },
   { header: 'Hours taught per section', value: (row) => row.hours_per_section },
+  {
+    header: 'Hours taught from',
+    value: (row) =>
+      row.taught_source === 'hq' ? 'Typed by HQ' : row.taught_source === 'lms' ? 'LMS' : '',
+  },
   { header: 'Hours taught (all sections)', value: (row) => row.total_hours },
+  { header: 'LMS hours per section', value: (row) => row.lms_hours_per_section },
   { header: 'Classes', value: (row) => row.classes },
-  { header: 'Trainers', value: (row) => row.trainers },
+  { header: 'Faculty', value: (row) => row.trainers },
   { header: 'Last class', value: (row) => row.last_class },
 ];
 
@@ -393,7 +475,7 @@ const SUBJECT_COLUMNS: ExportColumn<SubjectSummary>[] = [
   { header: 'Campuses', value: (row) => row.campuses },
   { header: 'Campus batches', value: (row) => row.batches },
   { header: 'Students', value: (row) => row.students },
-  { header: 'Tests released', value: (row) => row.published },
+  { header: 'Tests published', value: (row) => row.published },
   { header: 'Submitted %', value: (row) => pct(row.attempted, row.assigned) },
   { header: 'Graded %', value: (row) => pct(row.graded, row.attempted) },
   { header: 'Average score %', value: (row) => row.avg },
@@ -560,7 +642,7 @@ function Overview({ rows, scope }: { rows: PrimeSubjectRow[]; scope: string }) {
         <SectionTitle
           icon={Layers}
           title="By Campus and Batch"
-          description="Each subject at each campus and batch: releases, submissions, scores, modules and attendance."
+          description="Each campus and batch, and its subjects: tests published, submissions, scores, modules, attendance and hours."
           aside={
             <ExportButtons
               name={`prime-domain-overview-${scope}`}
@@ -573,9 +655,9 @@ function Overview({ rows, scope }: { rows: PrimeSubjectRow[]; scope: string }) {
         <div className="mt-3">
           <Table
             head={[
-              'Campus and Batch',
+              'Campus, Batch and Subject',
               'Students',
-              'Released',
+              'Published',
               'Submitted',
               'Avg Score',
               'Modules',
@@ -584,39 +666,38 @@ function Overview({ rows, scope }: { rows: PrimeSubjectRow[]; scope: string }) {
             ]}
             min="56rem"
           >
-            {rows.map((row) => (
-              <tr
-                key={`${row.campus_id}-${row.program}-${row.admission_year}-${row.subject}`}
-                className="border-b border-slate-100 last:border-0"
-              >
-                <td className="py-2 pr-2">
-                  <div className="font-medium">{row.subject}</div>
-                  <div className="text-xs text-slate-500">
-                    {row.campus} · {batchOf(row)}
-                  </div>
-                </td>
-                <td className={td}>{row.students}</td>
-                <td className={td}>
-                  {row.published} / {row.created}
-                </td>
-                <td className={td}>
-                  <Rate value={pct(row.attempted, row.assigned)} />
-                </td>
-                <td className={cn(td, 'font-semibold', scoreTone(row.avg_score))}>
-                  {row.avg_score == null ? '—' : `${row.avg_score}%`}
-                </td>
-                <td className={td}>
-                  {row.modules_started} / {row.modules}
-                </td>
-                <td className={td}>
-                  <Rate value={row.attendance} />
-                </td>
-                <td className={td}>
-                  {fmt(row.hours_per_section)}
-                  {row.planned_hours ? ` / ${fmt(row.planned_hours)}` : ''}
-                </td>
-              </tr>
-            ))}
+            <ByBatch
+              rows={rows}
+              colSpan={8}
+              render={(row) => (
+                <tr key={rowKey(row)} className="border-b border-slate-100 last:border-0">
+                  {subjectCell(row)}
+                  <td className={td}>{row.students}</td>
+                  <td className={td}>
+                    {row.published} / {row.created}
+                  </td>
+                  <td className={td}>
+                    <Rate value={pct(row.attempted, row.assigned)} />
+                  </td>
+                  <td className={cn(td, 'font-semibold', scoreTone(row.avg_score))}>
+                    {row.avg_score == null ? '—' : `${row.avg_score}%`}
+                  </td>
+                  <td className={td}>
+                    {row.modules_started} / {row.modules}
+                  </td>
+                  <td className={td}>
+                    <Rate value={row.attendance} />
+                  </td>
+                  <td className={td}>
+                    {fmt(row.hours_per_section)}
+                    {row.planned_hours ? ` / ${fmt(row.planned_hours)}` : ''}
+                    {row.taught_source === 'hq' && (
+                      <span className="block text-[10px] text-slate-400">typed by HQ</span>
+                    )}
+                  </td>
+                </tr>
+              )}
+            />
           </Table>
         </div>
       </Card>
@@ -681,8 +762,8 @@ function Hours({
           title="Each Campus and Batch"
           description={
             data.canEditPlanned
-              ? 'Planned hours are per section. Change one to set the agreed hours; clear it to go back to the LMS credits.'
-              : 'Planned hours are per section, from the LMS credits unless HQ has set them.'
+              ? 'Hours are per section. Type the planned hours, the hours taught and the faculty where the LMS has none; clear a box to go back to the LMS.'
+              : 'Hours are per section: planned from the LMS credits unless HQ has set them, taught from the LMS timetable unless HQ has typed them.'
           }
           aside={
             <ExportButtons
@@ -702,42 +783,42 @@ function Hours({
               'Taught',
               'Progress',
               'Classes',
-              'Trainers',
+              'Faculty',
               'Last Class',
             ]}
             min="62rem"
           >
-            {rows.map((row) => (
-              <tr
-                key={`${row.campus_id}-${row.program}-${row.admission_year}-${row.subject}`}
-                className="border-b border-slate-100 last:border-0"
-              >
-                <td className="py-2 pr-2">
-                  <div className="font-medium">{shortSubject(row.subject)}</div>
-                  <div className="text-xs text-slate-500">
-                    {row.campus} · {batchOf(row)}
-                  </div>
-                </td>
-                <td className={td}>{row.sections || '—'}</td>
-                <td className={td}>
-                  <PlannedCell row={row} editable={data.canEditPlanned} campus={campus} />
-                </td>
-                <td className={cn(td, 'font-semibold')}>{fmt(row.hours_per_section, ' h')}</td>
-                <td className={td}>
-                  <Rate
-                    value={
-                      row.planned_hours ? pct(row.hours_per_section ?? 0, row.planned_hours) : null
-                    }
-                    tone={false}
-                  />
-                </td>
-                <td className={td}>{row.classes}</td>
-                <td className="max-w-56 px-2 py-2 text-right text-xs text-slate-600">
-                  {row.trainers ?? '—'}
-                </td>
-                <td className={cn(td, 'text-xs text-slate-600')}>{row.last_class ?? '—'}</td>
-              </tr>
-            ))}
+            <ByBatch
+              rows={rows}
+              colSpan={8}
+              render={(row) => (
+                <tr key={rowKey(row)} className="border-b border-slate-100 last:border-0">
+                  {subjectCell(row)}
+                  <td className={td}>{row.sections || '—'}</td>
+                  <td className={td}>
+                    <PlannedCell row={row} editable={data.canEditPlanned} campus={campus} />
+                  </td>
+                  <td className={td}>
+                    <TaughtCell row={row} editable={data.canEditPlanned} campus={campus} />
+                  </td>
+                  <td className={td}>
+                    <Rate
+                      value={
+                        row.planned_hours
+                          ? pct(row.hours_per_section ?? 0, row.planned_hours)
+                          : null
+                      }
+                      tone={false}
+                    />
+                  </td>
+                  <td className={td}>{row.classes}</td>
+                  <td className="px-2 py-2 text-right text-xs text-slate-600">
+                    <FacultyCell row={row} editable={data.canEditPlanned} campus={campus} />
+                  </td>
+                  <td className={cn(td, 'text-xs text-slate-600')}>{row.last_class ?? '—'}</td>
+                </tr>
+              )}
+            />
           </Table>
         </div>
       </Card>
@@ -812,7 +893,174 @@ function PlannedCell({
   );
 }
 
+/** Hours taught per section: the LMS timetable's, or what HQ types where the LMS has none. */
+function TaughtCell({
+  row,
+  editable,
+  campus,
+}: {
+  row: PrimeSubjectRow;
+  editable: boolean;
+  campus?: number;
+}) {
+  const typed = row.taught_source === 'hq';
+  const source = typed
+    ? 'Typed by HQ'
+    : row.lms_hours_per_section != null
+      ? 'From the LMS'
+      : 'Not in the LMS';
+  const shown = row.hours_per_section == null ? '' : fmt(row.hours_per_section);
+  const save = useTaughtSave(row, campus);
+  const [value, setValue] = useState(shown);
+  // Back in step with the saved numbers after a save (or a revert to the LMS).
+  useEffect(() => setValue(shown), [shown]);
+  if (!editable) {
+    return (
+      <span className="inline-flex flex-col items-end">
+        <span className="font-semibold">{fmt(row.hours_per_section, ' h')}</span>
+        <span className="text-[10px] text-slate-400">{source}</span>
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex flex-col items-end">
+      <input
+        aria-label={`Hours taught, ${row.subject}, ${row.campus} ${batchOf(row)}`}
+        inputMode="decimal"
+        value={value}
+        placeholder="Hours"
+        title={
+          row.lms_hours_per_section != null
+            ? `The LMS has ${fmt(row.lms_hours_per_section)} h. Clear the box to go back to it.`
+            : 'The LMS has no classes for this subject: type the hours taught.'
+        }
+        onChange={(event) => setValue(event.target.value)}
+        onBlur={() => {
+          if (value.trim() === shown) return;
+          const hours = value.trim() === '' ? null : Number(value);
+          if (hours !== null && !(hours >= 0 && hours <= 1000)) return save.fail();
+          // Clearing a typed number goes back to the LMS; clearing the LMS's own does nothing.
+          if (hours === null && !typed) return setValue(shown);
+          save.run({ hours, trainers: row.trainers_source === 'hq' ? row.trainers : null });
+        }}
+        onKeyDown={(event) => event.key === 'Enter' && (event.target as HTMLInputElement).blur()}
+        className={cn(
+          'bg-surface w-16 rounded-md border px-1.5 py-0.5 text-right text-sm font-semibold tabular-nums',
+          save.state === 'error'
+            ? 'border-red-400'
+            : typed
+              ? 'border-brand-400'
+              : 'border-slate-300'
+        )}
+      />
+      <span className="text-[10px] text-slate-400">
+        {save.state === 'saving' ? 'Saving…' : save.state === 'error' ? 'Not saved' : source}
+      </span>
+    </span>
+  );
+}
+
+/** The faculty: the LMS timetable's, or the names HQ types where the LMS has none. */
+function FacultyCell({
+  row,
+  editable,
+  campus,
+}: {
+  row: PrimeSubjectRow;
+  editable: boolean;
+  campus?: number;
+}) {
+  const typed = row.trainers_source === 'hq';
+  const save = useTaughtSave(row, campus);
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState('');
+  const source = typed ? 'Typed by HQ' : row.lms_trainers ? 'From the LMS' : 'Not in the LMS';
+  if (editing) {
+    const done = () => {
+      setEditing(false);
+      const trainers = value.trim().replace(/\s+/g, ' ') || null;
+      if (trainers === (row.trainers ?? null)) return;
+      if (trainers === null && !typed) return;
+      save.run({
+        hours: row.taught_source === 'hq' ? row.hours_per_section : null,
+        trainers: trainers === row.lms_trainers ? null : trainers,
+      });
+    };
+    return (
+      <span className="inline-flex flex-col items-end">
+        <input
+          autoFocus
+          aria-label={`Faculty, ${row.subject}, ${row.campus} ${batchOf(row)}`}
+          value={value}
+          placeholder="Faculty names, comma separated"
+          onChange={(event) => setValue(event.target.value)}
+          onBlur={done}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') (event.target as HTMLInputElement).blur();
+            if (event.key === 'Escape') setEditing(false);
+          }}
+          className="bg-surface border-brand-400 w-56 rounded-md border px-1.5 py-0.5 text-right text-xs"
+        />
+        <span className="text-[10px] text-slate-400">
+          Enter to save · clear to go back to the LMS
+        </span>
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex max-w-60 flex-col items-end">
+      <span className={cn(!row.trainers && 'text-slate-400')}>{row.trainers ?? '—'}</span>
+      <span className="flex items-center gap-1.5 text-[10px] text-slate-400">
+        {save.state === 'saving' ? 'Saving…' : save.state === 'error' ? 'Not saved' : source}
+        {editable && (
+          <button
+            type="button"
+            onClick={() => {
+              setValue(row.trainers ?? '');
+              setEditing(true);
+            }}
+            className="text-brand-700 dark:text-brand-300 font-semibold hover:underline"
+          >
+            {row.trainers ? 'Edit' : 'Add'}
+          </button>
+        )}
+      </span>
+    </span>
+  );
+}
+
+function useTaughtSave(row: PrimeSubjectRow, campus?: number) {
+  const client = useQueryClient();
+  const [state, setState] = useState<'idle' | 'saving' | 'error'>('idle');
+  return {
+    state,
+    fail: () => setState('error'),
+    run: async (input: { hours: number | null; trainers: string | null }) => {
+      setState('saving');
+      try {
+        await saveTaught({
+          campusId: row.campus_id,
+          program: row.program,
+          admissionYear: row.admission_year,
+          subject: row.subject,
+          ...input,
+        });
+        await client.invalidateQueries({ queryKey: primeKey(campus) });
+        setState('idle');
+      } catch {
+        setState('error');
+      }
+    },
+  };
+}
+
 // --- Assignments and AMCAT -----------------------------------------------------------------
+
+/** Left out of the subject summary at HQ's request: the boot camp, and tests in no named subject. */
+const HIDDEN_IN_SUMMARY = new Set([
+  'Prime Domain Boot Camp',
+  'PRIME Domain (subject not named in the LMS)',
+]);
 
 function Assignments({
   rows,
@@ -830,7 +1078,7 @@ function Assignments({
         <SectionTitle
           icon={ClipboardCheck}
           title="Assignments by Subject"
-          description="Created in the LMS, released to students, submitted, and graded by the trainer."
+          description="Created in the LMS, published to students, submitted, and graded by the trainer."
           aside={
             <ExportButtons
               name={`prime-domain-assignments-${scope}`}
@@ -845,44 +1093,44 @@ function Assignments({
             head={[
               'Subject',
               'Created',
-              'Released',
-              'Assigned',
+              'Published',
               'Submitted',
               'Graded',
               'Awaiting Grading',
               'Avg Score',
             ]}
-            min="54rem"
+            min="50rem"
           >
-            {summary.map((row) => (
-              <tr key={row.subject} className="border-b border-slate-100 last:border-0">
-                <td className="py-2 pr-2 font-medium">{row.subject}</td>
-                <td className={td}>{row.created.toLocaleString('en-IN')}</td>
-                <td className={td}>{row.published.toLocaleString('en-IN')}</td>
-                <td className={td}>{row.assigned.toLocaleString('en-IN')}</td>
-                <td className={td}>
-                  <Rate value={pct(row.attempted, row.assigned)} />
-                </td>
-                <td className={td}>
-                  <Rate value={pct(row.graded, row.attempted)} tone={false} />
-                </td>
-                <td
-                  className={cn(
-                    td,
-                    row.attempted - row.graded > 0 && 'font-semibold text-amber-600'
-                  )}
-                >
-                  {(row.attempted - row.graded).toLocaleString('en-IN')}
-                </td>
-                <td className={cn(td, 'font-semibold', scoreTone(row.avg))}>
-                  {row.avg == null ? '—' : `${row.avg}%`}
-                </td>
-              </tr>
-            ))}
+            {summary
+              .filter((row) => !HIDDEN_IN_SUMMARY.has(row.subject))
+              .map((row) => (
+                <tr key={row.subject} className="border-b border-slate-100 last:border-0">
+                  <td className="py-2 pr-2 font-medium">{row.subject}</td>
+                  <td className={td}>{row.created.toLocaleString('en-IN')}</td>
+                  <td className={td}>{row.published.toLocaleString('en-IN')}</td>
+                  <td className={td}>
+                    <Rate value={pct(row.attempted, row.assigned)} />
+                  </td>
+                  <td className={td}>
+                    <Rate value={pct(row.graded, row.attempted)} tone={false} />
+                  </td>
+                  <td
+                    className={cn(
+                      td,
+                      row.attempted - row.graded > 0 && 'font-semibold text-amber-600'
+                    )}
+                  >
+                    {(row.attempted - row.graded).toLocaleString('en-IN')}
+                  </td>
+                  <td className={cn(td, 'font-semibold', scoreTone(row.avg))}>
+                    {row.avg == null ? '—' : `${row.avg}%`}
+                  </td>
+                </tr>
+              ))}
           </Table>
           <p className="mt-2 text-xs text-slate-500">
-            Created and released are counted per campus batch. Assigned is every student given a
-            released test; submitted and graded are out of those.
+            Created and published are counted per campus batch. Submitted is out of every student
+            given a published test; graded is out of those submitted.
           </p>
         </div>
       </Card>
@@ -904,39 +1152,33 @@ function Assignments({
             head={[
               'Campus, Batch and Subject',
               'Created',
-              'Released',
+              'Published',
               'Submitted',
               'Graded',
-              'Awaiting',
               'Avg Score',
             ]}
-            min="52rem"
+            min="46rem"
           >
-            {rows.map((row) => (
-              <tr
-                key={`${row.campus_id}-${row.program}-${row.admission_year}-${row.subject}`}
-                className="border-b border-slate-100 last:border-0"
-              >
-                <td className="py-2 pr-2">
-                  <div className="font-medium">{shortSubject(row.subject)}</div>
-                  <div className="text-xs text-slate-500">
-                    {row.campus} · {batchOf(row)}
-                  </div>
-                </td>
-                <td className={td}>{row.created}</td>
-                <td className={td}>{row.published}</td>
-                <td className={td}>
-                  <Rate value={pct(row.attempted, row.assigned)} />
-                </td>
-                <td className={td}>
-                  <Rate value={pct(row.graded, row.attempted)} tone={false} />
-                </td>
-                <td className={td}>{row.attempted - row.graded}</td>
-                <td className={cn(td, 'font-semibold', scoreTone(row.avg_score))}>
-                  {row.avg_score == null ? '—' : `${row.avg_score}%`}
-                </td>
-              </tr>
-            ))}
+            <ByBatch
+              rows={rows}
+              colSpan={6}
+              render={(row) => (
+                <tr key={rowKey(row)} className="border-b border-slate-100 last:border-0">
+                  {subjectCell(row)}
+                  <td className={td}>{row.created}</td>
+                  <td className={td}>{row.published}</td>
+                  <td className={td}>
+                    <Rate value={pct(row.attempted, row.assigned)} />
+                  </td>
+                  <td className={td}>
+                    <Rate value={pct(row.graded, row.attempted)} tone={false} />
+                  </td>
+                  <td className={cn(td, 'font-semibold', scoreTone(row.avg_score))}>
+                    {row.avg_score == null ? '—' : `${row.avg_score}%`}
+                  </td>
+                </tr>
+              )}
+            />
           </Table>
         </div>
       </Card>
@@ -1155,6 +1397,8 @@ function KindToggle({
 
 function PlacementImpact({ data, scope }: { data: PrimeResponse; scope: string }) {
   const [kind, setKind] = useState<'full-time' | 'internship'>('internship');
+  // A cell (domain and role) or a whole domain row, opened to its students.
+  const [picked, setPicked] = useState<{ domain: string; role: string | null } | null>(null);
   const overall = data.optIn.rows.filter((row) => row.overall);
   const perBatch = data.optIn.rows.filter((row) => !row.overall);
   const compared = new Set(perBatch.map((row) => `${row.program}:${row.admission_year}`));
@@ -1307,7 +1551,13 @@ function PlacementImpact({ data, scope }: { data: PrimeResponse; scope: string }
           description="Each student's PRIME domain or career track against the role they were selected for. Outlined cells count as a match."
           aside={
             <span className="flex flex-wrap items-center gap-2">
-              <KindToggle kind={kind} setKind={setKind} />
+              <KindToggle
+                kind={kind}
+                setKind={(next) => {
+                  setKind(next);
+                  setPicked(null);
+                }}
+              />
               {fit && (
                 <ExportButtons
                   name={`prime-domain-vs-role-${kind}-${scope}`}
@@ -1352,7 +1602,14 @@ function PlacementImpact({ data, scope }: { data: PrimeResponse; scope: string }
                   return (
                     <tr key={row.domain} className="border-t border-slate-200">
                       <th scope="row" className="py-2 pr-3 text-left font-medium">
-                        {row.domain}
+                        <button
+                          type="button"
+                          onClick={() => setPicked({ domain: row.domain, role: null })}
+                          className="hover:text-brand-700 text-left hover:underline"
+                          title={`Every student with a PRIME domain of ${row.domain}`}
+                        >
+                          {row.domain}
+                        </button>
                         <span className="ml-1 text-xs font-normal text-slate-400">
                           ({row.offers})
                         </span>
@@ -1362,10 +1619,21 @@ function PlacementImpact({ data, scope }: { data: PrimeResponse; scope: string }
                         const match = (row.matches ?? [row.domain]).includes(column);
                         return (
                           <td key={column} className="px-1 py-1 text-center">
-                            <span
+                            <button
+                              type="button"
+                              disabled={!count}
+                              aria-pressed={
+                                picked?.domain === row.domain && picked?.role === column
+                              }
+                              onClick={() => setPicked({ domain: row.domain, role: column })}
+                              title={count ? 'Show these students' : undefined}
                               className={cn(
-                                'block rounded-md py-1.5 tabular-nums',
+                                'block w-full rounded-md py-1.5 tabular-nums',
                                 match && count > 0 && 'ring-2 ring-emerald-500/70',
+                                count > 0 && 'hover:ring-brand-600 cursor-pointer hover:ring-2',
+                                picked?.domain === row.domain &&
+                                  picked?.role === column &&
+                                  'ring-brand-700 ring-2',
                                 !count && 'text-slate-300'
                               )}
                               style={
@@ -1377,7 +1645,7 @@ function PlacementImpact({ data, scope }: { data: PrimeResponse; scope: string }
                               }
                             >
                               {count || '·'}
-                            </span>
+                            </button>
                           </td>
                         );
                       })}
@@ -1391,11 +1659,192 @@ function PlacementImpact({ data, scope }: { data: PrimeResponse; scope: string }
             </table>
             <p className="mt-2 text-xs text-slate-500">
               Sales and Marketing roles match Revenue Generation and the Business Development track;
-              General Management and Operations roles match the Management Trainee Program.
+              General Management and Operations roles match the Management Trainee Program. Select a
+              number or a domain to see its students.
             </p>
           </div>
         )}
       </Card>
+      {fit && picked && (
+        <FitDetails
+          people={(fit.people ?? []).filter(
+            (person) =>
+              person.domain === picked.domain && (!picked.role || person.role === picked.role)
+          )}
+          domain={picked.domain}
+          role={picked.role}
+          kind={kind}
+          scope={scope}
+          onClose={() => setPicked(null)}
+        />
+      )}
     </>
+  );
+}
+
+/** The students behind a cell of the domain-vs-role grid: their PRIME subjects and the job. */
+function FitDetails({
+  people,
+  domain,
+  role,
+  kind,
+  scope,
+  onClose,
+}: {
+  people: FitPerson[];
+  domain: string;
+  role: string | null;
+  kind: 'full-time' | 'internship';
+  scope: string;
+  onClose: () => void;
+}) {
+  const slugs = useMemo(() => [...new Set(people.map((person) => person.slug))].sort(), [people]);
+  const subjects = usePeopleSubjects(slugs);
+  const bySubject = subjects.data ?? {};
+  const sales = people.filter((person) => person.segment === 'sales').length;
+  const roleLabel = role ? (ROLE_LABELS[role] ?? role) : 'Every Role';
+  const offerWord = kind === 'full-time' ? 'job offers' : 'internships';
+  const subjectText = (slug: string) =>
+    (bySubject[slug] ?? [])
+      .map(
+        (item) =>
+          `${shortSubject(item.subject)}: ${item.avg == null ? '—' : `${item.avg}%`} (${item.submitted}/${item.released} tests${item.classes ? `, ${item.attended}/${item.classes} classes` : ''})`
+      )
+      .join('; ');
+  const sorted = [...people].sort(
+    (a, b) => a.campus.localeCompare(b.campus) || a.name.localeCompare(b.name)
+  );
+  const columns: ExportColumn<FitPerson>[] = [
+    { header: 'Student', value: (row) => row.name },
+    { header: 'Username', value: (row) => row.slug },
+    { header: 'Campus', value: (row) => row.campus },
+    { header: 'Batch', value: (row) => cohortLabel(row.program, String(row.year ?? '')) },
+    { header: 'PRIME domain', value: (row) => row.domain },
+    { header: 'Role group', value: (row) => ROLE_LABELS[row.role] ?? row.role },
+    { header: 'Company', value: (row) => row.company },
+    { header: 'Role', value: (row) => row.designation },
+    { header: 'Sales or core job', value: (row) => (row.segment === 'sales' ? 'Sales' : 'Core') },
+    { header: 'PRIME domain average %', value: (row) => row.measures.domain },
+    { header: 'Communication %', value: (row) => row.measures.comm },
+    { header: 'Aptitude %', value: (row) => row.measures.apt },
+    { header: 'Attendance %', value: (row) => row.measures.attendance },
+    { header: 'PRIME subjects (score, tests, classes)', value: (row) => subjectText(row.slug) },
+  ];
+  return (
+    <Card>
+      <SectionTitle
+        icon={Users}
+        title={`${domain} → ${roleLabel}`}
+        description={`${people.length} ${offerWord}: ${sales} sales and ${people.length - sales} core. Each student's PRIME subjects (average score, tests submitted of those published, classes attended) and the job they took.`}
+        aside={
+          <span className="flex flex-wrap items-center gap-2">
+            <ExportButtons
+              name={`prime-domain-role-${domain}-${roleLabel}-${kind}-${scope}`}
+              sheet="Students"
+              title={`${domain} → ${roleLabel} (${offerWord})`}
+              columns={columns}
+              rows={sorted}
+            />
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600"
+            >
+              Close
+            </button>
+          </span>
+        }
+      />
+      <div className="mt-3 flex flex-wrap gap-2 text-xs">
+        <span className="rounded-full bg-amber-50 px-2.5 py-1 font-semibold text-amber-800">
+          Sales jobs: {sales}
+        </span>
+        <span className="rounded-full bg-sky-50 px-2.5 py-1 font-semibold text-sky-800">
+          Core jobs: {people.length - sales}
+        </span>
+      </div>
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-[60rem] text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
+              <th className="py-2 pr-2 font-semibold">Student</th>
+              <th className="px-2 py-2 font-semibold">Job</th>
+              <th className="px-2 py-2 text-right font-semibold">PRIME Domain</th>
+              <th className="px-2 py-2 text-right font-semibold">Comm</th>
+              <th className="px-2 py-2 text-right font-semibold">Aptitude</th>
+              <th className="px-2 py-2 text-right font-semibold">Attendance</th>
+              <th className="px-2 py-2 font-semibold">PRIME Subjects Taken</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((person, index) => (
+              <tr
+                key={`${person.slug}-${index}`}
+                className="border-b border-slate-100 align-top last:border-0"
+              >
+                <td className="py-2 pr-2">
+                  <Link
+                    to="/s/$slug"
+                    params={{ slug: person.slug }}
+                    className="text-brand-700 dark:text-brand-300 font-semibold hover:underline"
+                  >
+                    {person.name}
+                  </Link>
+                  <div className="text-xs text-slate-500">
+                    {person.campus} · {cohortLabel(person.program, String(person.year ?? ''))}
+                  </div>
+                </td>
+                <td className="px-2 py-2 text-xs">
+                  <div className="font-medium text-slate-800 dark:text-slate-100">
+                    {person.company ?? '—'}
+                  </div>
+                  <div className="text-slate-500">{person.designation ?? ''}</div>
+                  <span
+                    className={cn(
+                      'mt-0.5 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
+                      person.segment === 'sales'
+                        ? 'bg-amber-50 text-amber-800'
+                        : 'bg-sky-50 text-sky-800'
+                    )}
+                  >
+                    {person.segment === 'sales' ? 'Sales' : 'Core'}
+                  </span>
+                </td>
+                {(['domain', 'comm', 'apt', 'attendance'] as const).map((key) => (
+                  <td
+                    key={key}
+                    className={cn(td, 'font-semibold', scoreTone(person.measures[key] ?? null))}
+                  >
+                    {person.measures[key] == null ? '—' : `${person.measures[key]}%`}
+                  </td>
+                ))}
+                <td className="px-2 py-2 text-xs">
+                  {subjects.isPending ? (
+                    <span className="text-slate-400">Loading…</span>
+                  ) : !(bySubject[person.slug] ?? []).length ? (
+                    <span className="text-slate-400">No PRIME subjects</span>
+                  ) : (
+                    <ul className="space-y-0.5">
+                      {bySubject[person.slug].map((item) => (
+                        <li key={item.subject} className="flex flex-wrap gap-x-1.5">
+                          <span className="font-medium">{shortSubject(item.subject)}</span>
+                          <span className={cn('font-semibold', scoreTone(item.avg))}>
+                            {item.avg == null ? '—' : `${item.avg}%`}
+                          </span>
+                          <span className="text-slate-500">
+                            {item.submitted}/{item.released} tests
+                            {item.classes ? ` · ${item.attended}/${item.classes} classes` : ''}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
   );
 }

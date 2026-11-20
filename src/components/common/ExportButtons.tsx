@@ -1,10 +1,17 @@
-// CSV and Excel buttons for a table on the page (src/lib/exportTable.ts). The file holds the
+// CSV, Excel and PDF buttons for a table on the page (src/lib/exportTable.ts). The file holds the
 // rows given, which are the rows on screen with the page's filters applied, not just the ones
 // shown before "Show more".
 
-import { Download, FileSpreadsheet } from 'lucide-react';
+import { useState } from 'react';
+import { Download, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
 
-import { downloadCsv, downloadXlsx, type ExportColumn, type ExportSheet } from '@/lib/exportTable';
+import {
+  downloadCsv,
+  downloadPdf,
+  downloadXlsx,
+  type ExportColumn,
+  type ExportSheet,
+} from '@/lib/exportTable';
 import { cn } from '@/lib/utils';
 
 const button =
@@ -16,6 +23,7 @@ export function ExportButtons<T>({
   columns,
   rows,
   more = [],
+  title,
   className,
 }: {
   /** The file name, without the extension. */
@@ -26,8 +34,11 @@ export function ExportButtons<T>({
   rows: T[];
   /** Further sheets for the Excel file (the CSV holds the first table only). */
   more?: ExportSheet<any>[];
+  /** The PDF's heading; the sheet name when absent. */
+  title?: string;
   className?: string;
 }) {
+  const [making, setMaking] = useState(false);
   const empty = rows.length === 0 && more.every((extra) => extra.rows.length === 0);
   return (
     <span className={cn('flex shrink-0 gap-1.5', className)}>
@@ -50,6 +61,27 @@ export function ExportButtons<T>({
       >
         <FileSpreadsheet className="size-3.5" aria-hidden />
         Excel
+      </button>
+      <button
+        type="button"
+        className={button}
+        disabled={empty || making}
+        title="Download as PDF"
+        onClick={async () => {
+          setMaking(true);
+          try {
+            await downloadPdf(name, title ?? sheet, [{ sheet, columns, rows }, ...more]);
+          } finally {
+            setMaking(false);
+          }
+        }}
+      >
+        {making ? (
+          <Loader2 className="size-3.5 animate-spin" aria-hidden />
+        ) : (
+          <FileText className="size-3.5" aria-hidden />
+        )}
+        PDF
       </button>
     </span>
   );
