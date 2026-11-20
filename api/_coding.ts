@@ -296,6 +296,9 @@ export async function deliveryReport(campusIds: number[] | null) {
   };
 }
 
+/** The PRIME coding programs: the page leaves out anyone else (a few Diploma students). */
+const CODING_PROGRAMS = new Set(['B.Tech', 'BE', 'BCA', 'MCA']);
+
 /** The saved rows narrowed to the campuses a viewer may see (and one campus if asked). */
 export function narrowStudents(
   students: CodingStudent[],
@@ -304,6 +307,7 @@ export function narrowStudents(
 ): CodingStudent[] {
   return students.filter(
     (row) =>
+      CODING_PROGRAMS.has(row.program) &&
       (viewer.campusIds === null ||
         (row.campusId !== null && viewer.campusIds.includes(row.campusId))) &&
       (campusId === null || row.campusId === campusId)

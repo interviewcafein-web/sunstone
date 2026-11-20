@@ -26,7 +26,7 @@ import {
   type CodingStudent,
   type Cycle,
 } from '@/lib/codingDomain';
-import { cohortLabel, compareProgram } from '@/lib/cohorts';
+import { cohortLabel } from '@/lib/cohorts';
 import type { ExportColumn } from '@/lib/exportTable';
 import { cn } from '@/lib/utils';
 
@@ -37,7 +37,6 @@ import {
   Card,
   Delta,
   PlacedBadge,
-  ShowMore,
   Title,
   TrackBadge,
   known,
@@ -45,6 +44,7 @@ import {
   td,
   th,
 } from './amcat-ui';
+import { CampusRows, MiniTable, StudentGroups, compareBatch, groupBy } from './grouped';
 import type { TabProps } from './types';
 
 const SKILLS = [
@@ -52,6 +52,9 @@ const SKILLS = [
   { key: 'a', label: 'Aptitude' },
   { key: 'd', label: 'Domain' },
 ] as const;
+
+/** An AMCAT module outside comms, aptitude and domain shows once this many students took it. */
+const MIN_OTHER = 10;
 
 const batchKey = (row: CodingStudent) => `${row.program}|${row.year ?? ''}`;
 
@@ -78,32 +81,46 @@ export default function AmcatTab(props: TabProps) {
 
 // --- 1. Which batch sat which cycle ---------------------------------------------------------
 
-function Schedule({ data, students, scope }: TabProps) {
-  const rows = useMemo(() => {
-    const groups = new Map<string, CodingStudent[]>();
-    for (const row of students)
-      groups.set(batchKey(row), [...(groups.get(batchKey(row)) ?? []), row]);
-    return [...groups.values()]
-      .map((list) => ({
-        program: list[0].program,
-        year: list[0].year,
-        students: list.length,
-        sat: Object.fromEntries(
-          data.cycles.map((cycle) => [cycle.key, list.filter((row) => row.amcat[cycle.key]).length])
-        ),
+interface ScheduleRow {
+  campus: string;
+  program: string;
+  year: number | null;
+  students: CodingStudent[];
+  sat: Record<string, number>;
+}
+
+function Schedule({ data, students, scope, pass, studentLink }: TabProps) {
+  const groups = useMemo(() => {
+    const summarise = (list: CodingStudent[]): ScheduleRow => ({
+      campus: list[0].campus,
+      program: list[0].program,
+      year: list[0].year,
+      students: list,
+      sat: Object.fromEntries(
+        data.cycles.map((cycle) => [cycle.key, list.filter((row) => row.amcat[cycle.key]).length])
+      ),
+    });
+    return groupBy(students, (row) => row.campus)
+      .map(([campus, list]) => ({
+        campus,
+        total: summarise(list),
+        rows: groupBy(list, batchKey)
+          .map(([, rows]) => summarise(rows))
+          .sort(compareBatch),
       }))
-      .sort((a, b) => compareProgram(a.program, b.program) || (a.year ?? 0) - (b.year ?? 0));
+      .sort((a, b) => a.campus.localeCompare(b.campus));
   }, [data.cycles, students]);
-  type Row = (typeof rows)[number];
-  const columns: ExportColumn<Row>[] = [
+  const rows = groups.flatMap((group) => group.rows);
+  const columns: ExportColumn<ScheduleRow>[] = [
+    { header: 'Campus', value: (row) => row.campus },
     { header: 'Program', value: (row) => row.program },
     { header: 'Batch', value: (row) => cohortLabel(row.program, String(row.year ?? '')) },
-    { header: 'Students', value: (row) => row.students },
+    { header: 'Students', value: (row) => row.students.length },
     ...data.cycles.flatMap((cycle) => [
-      { header: `${cycle.label} sat`, value: (row: Row) => row.sat[cycle.key] },
+      { header: `${cycle.label} sat`, value: (row: ScheduleRow) => row.sat[cycle.key] },
       {
         header: `${cycle.label} sat %`,
-        value: (row: Row) => pct(row.sat[cycle.key], row.students),
+        value: (row: ScheduleRow) => pct(row.sat[cycle.key], row.students.length),
       },
     ]),
   ];
@@ -112,7 +129,7 @@ function Schedule({ data, students, scope }: TabProps) {
       <Title
         icon={CalendarCheck}
         title="AMCAT Cycles"
-        description="Which batches sat each AMCAT cycle, and what share of the batch took it."
+        description="Which batches sat each AMCAT cycle, and what share of the batch took it, college by college. Open a batch to see its students."
         aside={
           <ExportButtons
             name={`amcat-cycles-${scope}`}
@@ -126,7 +143,7 @@ function Schedule({ data, students, scope }: TabProps) {
         <table className="w-full min-w-[36rem] text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
-              <th className="py-2 pr-2 font-semibold">Program and Batch</th>
+              <th className="py-2 pr-2 font-semibold">College, Program and Batch</th>
               <th className={th}>Students</th>
               {data.cycles.map((cycle) => (
                 <th key={cycle.key} className="px-2 py-2 text-center font-semibold">
@@ -135,16 +152,14 @@ function Schedule({ data, students, scope }: TabProps) {
               ))}
             </tr>
           </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr
-                key={`${row.program}${row.year}`}
-                className="border-b border-slate-100 last:border-0"
-              >
-                <td className="py-2 pr-2 font-medium">
-                  {cohortLabel(row.program, String(row.year ?? ''))}
-                </td>
-                <td className={td}>{row.students.toLocaleString('en-IN')}</td>
+          <CampusRows
+            groups={groups}
+            colSpan={data.cycles.length + 2}
+            rowKey={(row) => `${row.program}|${row.year}`}
+            label={(row) => cohortLabel(row.program, String(row.year ?? ''))}
+            cells={(row) => (
+              <>
+                <td className={td}>{row.students.length.toLocaleString('en-IN')}</td>
                 {data.cycles.map((cycle) => {
                   const sat = row.sat[cycle.key];
                   return (
@@ -153,7 +168,7 @@ function Schedule({ data, students, scope }: TabProps) {
                         <span className="inline-flex items-center gap-1.5">
                           <span className="font-bold text-emerald-600">✓</span>
                           <span className="text-xs text-slate-600">
-                            {pct(sat, row.students)}% · {sat}
+                            {pct(sat, row.students.length)}% · {sat}
                           </span>
                         </span>
                       ) : (
@@ -162,9 +177,44 @@ function Schedule({ data, students, scope }: TabProps) {
                     </td>
                   );
                 })}
-              </tr>
-            ))}
-          </tbody>
+              </>
+            )}
+            students={(row) => (
+              <MiniTable
+                rows={[...row.students].sort((a, b) => a.name.localeCompare(b.name))}
+                rowKey={(student) => student.slug}
+                columns={[
+                  {
+                    header: 'Student',
+                    cell: (student) =>
+                      studentLink(
+                        student.slug,
+                        <span className="text-brand-700 dark:text-brand-300 font-semibold hover:underline">
+                          {student.name}
+                        </span>
+                      ),
+                  },
+                  ...data.cycles.map((cycle) => ({
+                    header: `${cycle.label} (Comms · Apt · Domain)`,
+                    cell: (student: CodingStudent) => {
+                      const scores = student.amcat[cycle.key];
+                      return scores ? (
+                        <span className="whitespace-nowrap">
+                          <AmcatScore value={scores.c} pass={pass} />
+                          <span className="text-slate-300"> · </span>
+                          <AmcatScore value={scores.a} pass={pass} />
+                          <span className="text-slate-300"> · </span>
+                          <AmcatScore value={scores.d} pass={pass} />
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">Not taken</span>
+                      );
+                    },
+                  })),
+                ]}
+              />
+            )}
+          />
         </table>
       </div>
     </Card>
@@ -369,27 +419,34 @@ function ModuleAverages({ data, students, cycles, pass, scope }: TabProps) {
       ['Domain', data.skills.domain],
       ['Other', [...others].sort()],
     ];
-    return groups
-      .flatMap(([group, modules]) =>
-        modules.map((module) => {
-          const averages = Object.fromEntries(
-            cycles.map((cycle) => {
-              const values = known(students.map((row) => row.amcat[cycle.key]?.m[module]));
-              return [
-                cycle.key,
-                {
-                  avg: values.length
-                    ? Math.round(values.reduce((a, b) => a + b, 0) / values.length)
-                    : null,
-                  given: values.length,
-                },
-              ];
-            })
-          );
-          return { group, module, averages };
-        })
-      )
-      .filter((row) => Object.values(row.averages).some((value) => value.given > 0));
+    return (
+      groups
+        .flatMap(([group, modules]) =>
+          modules.map((module) => {
+            const averages = Object.fromEntries(
+              cycles.map((cycle) => {
+                const values = known(students.map((row) => row.amcat[cycle.key]?.m[module]));
+                return [
+                  cycle.key,
+                  {
+                    avg: values.length
+                      ? Math.round(values.reduce((a, b) => a + b, 0) / values.length)
+                      : null,
+                    given: values.length,
+                  },
+                ];
+              })
+            );
+            return { group, module, averages };
+          })
+        )
+        // Other modules a handful of students took (sales, finance) are left out.
+        .filter((row) =>
+          Object.values(row.averages).some(
+            (value) => value.given >= (row.group === 'Other' ? MIN_OTHER : 1)
+          )
+        )
+    );
   }, [data.skills, students, cycles]);
   type Row = (typeof rows)[number];
   if (!rows.length || !cycles.length) return null;
@@ -673,10 +730,9 @@ function BandChip({ score }: { score: number | null }) {
   );
 }
 
-function StudentScores({ students, cycle, pass, scope, studentLink }: TabProps) {
+function StudentScores({ students, cycle, pass, scope, search, studentLink }: TabProps) {
   const [q, setQ] = useState('');
   const [sort, setSort] = useState<Sort>('mock');
-  const [limit, setLimit] = useState(50);
   const numbers = useMemo(() => mockNumbers(students), [students]);
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -769,10 +825,7 @@ function StudentScores({ students, cycle, pass, scope, studentLink }: TabProps) 
               <input
                 type="search"
                 value={q}
-                onChange={(event) => {
-                  setQ(event.target.value);
-                  setLimit(50);
-                }}
+                onChange={(event) => setQ(event.target.value)}
                 placeholder="Search by name"
                 className="bg-surface w-52 rounded-full border border-slate-300 py-1.5 pr-3 pl-8 text-sm"
               />
@@ -815,8 +868,19 @@ function StudentScores({ students, cycle, pass, scope, studentLink }: TabProps) 
               )}
             </tr>
           </thead>
-          <tbody>
-            {rows.slice(0, limit).map(({ row, mock, scores, basic }) => (
+          <StudentGroups
+            items={rows}
+            studentOf={itemStudent}
+            allCampuses={!search.campus}
+            colSpan={numbers.length + 3 + (cycle ? 4 : 0)}
+            forceOpen={Boolean(q.trim())}
+            summary={(list) => {
+              const mocks = known(list.map((item) => item.mock));
+              return mocks.length
+                ? `mock average ${Math.round(mocks.reduce((x, y) => x + y, 0) / mocks.length)}%`
+                : 'no mock taken';
+            }}
+            renderRow={({ row, mock, scores, basic }) => (
               <tr key={row.slug} className="border-b border-slate-100 last:border-0">
                 <td className="py-2 pr-2">
                   {studentLink(
@@ -875,14 +939,15 @@ function StudentScores({ students, cycle, pass, scope, studentLink }: TabProps) 
                   </>
                 )}
               </tr>
-            ))}
-          </tbody>
+            )}
+          />
         </table>
       </div>
       {!rows.length && (
         <p className="py-6 text-center text-sm text-slate-500">No students match this search.</p>
       )}
-      <ShowMore left={rows.length - limit} onMore={() => setLimit((current) => current + 200)} />
     </Card>
   );
 }
+
+const itemStudent = (item: { row: CodingStudent }) => item.row;

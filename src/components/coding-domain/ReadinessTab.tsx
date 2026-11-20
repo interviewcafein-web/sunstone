@@ -17,12 +17,13 @@ import {
 import type { ExportColumn } from '@/lib/exportTable';
 import { cn } from '@/lib/utils';
 
+import { CampusRows, MiniTable, StudentGroups, compareBatch, groupBy } from './grouped';
 import type { TabProps } from './types';
 
 const panel = 'shadow-card bg-surface rounded-2xl border border-slate-200';
 const FUNNEL_COLORS = ['#1e40af', '#0284c7', '#0d9488', '#16a34a', '#ca8a04', '#ea580c'];
 const td = 'px-2 py-2 text-right tabular-nums';
-const PAGE = 50;
+const same = (row: CodingStudent) => row;
 
 function Title({
   icon: Icon,
@@ -66,7 +67,7 @@ const rateColor = (value: number | null) =>
 const batchOf = (row: CodingStudent) => cohortLabel(row.program, row.year);
 
 export default function ReadinessTab(props: TabProps) {
-  const { students, data, search, pass, cycle, scope } = props;
+  const { students, data, pass, cycle, scope } = props;
   const ready = (row: CodingStudent) => (cycle ? employable(row.amcat[cycle.key], pass) : null);
   // The funnel is about the placement batches: those in their final year.
   const finalYear = useMemo(
@@ -82,7 +83,7 @@ export default function ReadinessTab(props: TabProps) {
         cycleLabel={cycle?.label}
         pass={pass}
       />
-      <BatchFunnel students={finalYear} allCampuses={!search.campus} scope={scope} />
+      <BatchFunnel students={finalYear} scope={scope} studentLink={props.studentLink} />
       <DomainReadiness
         students={students}
         modules={data.skills.domain}
@@ -246,43 +247,52 @@ function FunnelCard({
   );
 }
 
+interface FunnelRow {
+  campus: string;
+  program: string;
+  year: number | null;
+  students: CodingStudent[];
+  counts: Record<string, number>;
+}
+
 function BatchFunnel({
   students,
-  allCampuses,
   scope,
+  studentLink,
 }: {
   students: CodingStudent[];
-  allCampuses: boolean;
   scope: string;
+  studentLink: TabProps['studentLink'];
 }) {
-  const rows = useMemo(() => {
-    const groups = new Map<string, CodingStudent[]>();
-    for (const row of students) {
-      const key = `${allCampuses ? row.campus : ''}|${row.program}|${row.year ?? ''}`;
-      groups.set(key, [...(groups.get(key) ?? []), row]);
-    }
-    return [...groups.values()]
-      .map((list) => ({
-        campus: list[0].campus,
-        program: list[0].program,
-        year: list[0].year,
-        counts: Object.fromEntries(
-          FUNNEL.map((stage) => [stage.key, list.filter((row) => stage.test(row)).length])
-        ) as Record<string, number>,
+  const groups = useMemo(() => {
+    const summarise = (list: CodingStudent[]): FunnelRow => ({
+      campus: list[0].campus,
+      program: list[0].program,
+      year: list[0].year,
+      students: list,
+      counts: Object.fromEntries(
+        FUNNEL.map((stage) => [stage.key, list.filter((row) => stage.test(row)).length])
+      ),
+    });
+    return groupBy(students, (row) => row.campus)
+      .map(([campus, list]) => ({
+        campus,
+        total: summarise(list),
+        rows: groupBy(list, (row) => `${row.program}|${row.year ?? ''}`)
+          .map(([, rows]) => summarise(rows))
+          .sort(compareBatch),
       }))
-      .sort(
-        (a, b) =>
-          a.campus.localeCompare(b.campus) ||
-          compareProgram(a.program, b.program) ||
-          (b.year ?? 0) - (a.year ?? 0)
-      );
-  }, [students, allCampuses]);
-  type Row = (typeof rows)[number];
-  const columns: ExportColumn<Row>[] = [
-    ...(allCampuses ? [{ header: 'Campus', value: (row: Row) => row.campus }] : []),
+      .sort((a, b) => a.campus.localeCompare(b.campus));
+  }, [students]);
+  const rows = groups.flatMap((group) => group.rows);
+  const columns: ExportColumn<FunnelRow>[] = [
+    { header: 'Campus', value: (row) => row.campus },
     { header: 'Program', value: (row) => row.program },
     { header: 'Batch', value: (row) => cohortLabel(row.program, row.year) },
-    ...FUNNEL.map((stage) => ({ header: stage.label, value: (row: Row) => row.counts[stage.key] })),
+    ...FUNNEL.map((stage) => ({
+      header: stage.label,
+      value: (row: FunnelRow) => row.counts[stage.key],
+    })),
     { header: 'Offer rate %', value: (row) => pct(row.counts.offered, row.counts.registered) },
   ];
   if (!rows.length) return null;
@@ -291,7 +301,7 @@ function BatchFunnel({
       <Title
         icon={Layers}
         title="Funnel by Batch"
-        description="Each stage of the funnel for every placement (final-year) batch in view."
+        description="Each stage of the funnel for every placement (final-year) batch, college by college. Open a batch to see its students."
         aside={
           <ExportButtons
             name={`prime-coding-funnel-by-batch-${scope}`}
@@ -305,7 +315,7 @@ function BatchFunnel({
         <table className="w-full min-w-[48rem] text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
-              <th className="py-2 pr-2 font-semibold">Batch</th>
+              <th className="py-2 pr-2 font-semibold">College, Program and Batch</th>
               {FUNNEL.map((stage) => (
                 <th key={stage.key} className="px-2 py-2 text-right font-semibold">
                   {stage.label}
@@ -314,28 +324,76 @@ function BatchFunnel({
               <th className="px-2 py-2 text-right font-semibold">Offer Rate</th>
             </tr>
           </thead>
-          <tbody>
-            {rows.map((row) => {
+          <CampusRows
+            groups={groups}
+            colSpan={FUNNEL.length + 2}
+            rowKey={(row) => `${row.program}|${row.year}`}
+            label={(row) => cohortLabel(row.program, row.year)}
+            cells={(row) => {
               const rate = pct(row.counts.offered, row.counts.registered);
               return (
-                <tr
-                  key={`${row.campus}|${row.program}|${row.year}`}
-                  className="border-b border-slate-100 last:border-0"
-                >
-                  <td className="py-2 pr-2">
-                    <div className="font-medium">{cohortLabel(row.program, row.year)}</div>
-                    {allCampuses && <div className="text-xs text-slate-500">{row.campus}</div>}
-                  </td>
+                <>
                   {FUNNEL.map((stage) => (
                     <td key={stage.key} className={td}>
                       {row.counts[stage.key].toLocaleString('en-IN')}
                     </td>
                   ))}
                   <td className={cn(td, 'font-semibold')}>{rate == null ? '—' : `${rate}%`}</td>
-                </tr>
+                </>
               );
-            })}
-          </tbody>
+            }}
+            students={(row) => (
+              <MiniTable
+                rows={[...row.students].sort(
+                  (a, b) =>
+                    FUNNEL.findIndex((s) => s.key === stageOf(b).key) -
+                      FUNNEL.findIndex((s) => s.key === stageOf(a).key) ||
+                    a.name.localeCompare(b.name)
+                )}
+                rowKey={(student) => student.slug}
+                columns={[
+                  {
+                    header: 'Student',
+                    cell: (student) =>
+                      studentLink(
+                        student.slug,
+                        <span className="text-brand-700 dark:text-brand-300 font-semibold hover:underline">
+                          {student.name}
+                        </span>
+                      ),
+                  },
+                  {
+                    header: 'Stage',
+                    cell: (student) => (
+                      <Chip className={STAGE_TONES[stageOf(student).key]}>
+                        {stageOf(student).label}
+                      </Chip>
+                    ),
+                  },
+                  {
+                    header: 'Eligible For',
+                    right: true,
+                    cell: (student) => student.pipeline.eligible || '—',
+                  },
+                  { header: 'Applied', right: true, cell: (s) => s.pipeline.applied || '—' },
+                  {
+                    header: 'Shortlisted',
+                    right: true,
+                    cell: (s) => s.pipeline.shortlisted || '—',
+                  },
+                  { header: 'Interviews', right: true, cell: (s) => s.pipeline.interviews || '—' },
+                  {
+                    header: 'Offer Status',
+                    cell: (student) => (
+                      <span className={student.placed ? 'font-medium text-emerald-700' : ''}>
+                        {offerStatus(student)}
+                      </span>
+                    ),
+                  },
+                ]}
+              />
+            )}
+          />
         </table>
       </div>
     </section>
@@ -474,12 +532,12 @@ function StudentsCard({
   students,
   cycle,
   scope,
+  search,
   studentLink,
   ready,
 }: TabProps & { ready: (row: CodingStudent) => boolean | null }) {
   const [stage, setStage] = useState<string | null>(null);
   const [q, setQ] = useState('');
-  const [limit, setLimit] = useState(PAGE);
   const cycleKey = cycle?.key;
 
   const rows = useMemo(() => {
@@ -551,10 +609,7 @@ function StudentsCard({
         <button
           type="button"
           aria-pressed={!stage}
-          onClick={() => {
-            setStage(null);
-            setLimit(PAGE);
-          }}
+          onClick={() => setStage(null)}
           className={cn(
             'rounded-full border px-3 py-1 text-xs font-semibold',
             !stage ? 'border-brand-700 bg-brand-700 text-white' : 'border-slate-200 text-slate-600'
@@ -567,10 +622,7 @@ function StudentsCard({
             key={item.key}
             type="button"
             aria-pressed={stage === item.key}
-            onClick={() => {
-              setStage(stage === item.key ? null : item.key);
-              setLimit(PAGE);
-            }}
+            onClick={() => setStage(stage === item.key ? null : item.key)}
             className={cn(
               'rounded-full border px-3 py-1 text-xs font-semibold',
               stage === item.key
@@ -589,10 +641,7 @@ function StudentsCard({
           <input
             type="search"
             value={q}
-            onChange={(event) => {
-              setQ(event.target.value);
-              setLimit(PAGE);
-            }}
+            onChange={(event) => setQ(event.target.value)}
             placeholder="Search name or company"
             className="bg-surface w-60 rounded-full border border-slate-300 py-1.5 pr-3 pl-8 text-sm"
           />
@@ -619,8 +668,18 @@ function StudentsCard({
                 <th className="px-2 py-2 font-semibold">Offer Status</th>
               </tr>
             </thead>
-            <tbody>
-              {rows.slice(0, limit).map((row) => {
+            <StudentGroups
+              items={rows}
+              studentOf={same}
+              allCampuses={!search.campus}
+              colSpan={9}
+              forceOpen={Boolean(q.trim())}
+              summary={(list) => {
+                const offered = list.filter((row) => row.placed).length;
+                const interviewed = list.filter((row) => row.pipeline.interviews > 0).length;
+                return `${interviewed} interviewed · ${offered} offered`;
+              }}
+              renderRow={(row) => {
                 const isReady = ready(row);
                 const current = stageOf(row);
                 const domain = coding(row);
@@ -707,20 +766,9 @@ function StudentsCard({
                     </td>
                   </tr>
                 );
-              })}
-            </tbody>
+              }}
+            />
           </table>
-        </div>
-      )}
-      {rows.length > limit && (
-        <div className="mt-3 text-center">
-          <button
-            type="button"
-            onClick={() => setLimit((current) => current + PAGE * 4)}
-            className="text-brand-700 rounded-full border border-slate-200 px-3 py-1 text-sm font-semibold"
-          >
-            Show More ({rows.length - limit} left)
-          </button>
         </div>
       )}
       <p className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">

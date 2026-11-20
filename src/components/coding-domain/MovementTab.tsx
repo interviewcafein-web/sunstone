@@ -36,23 +36,15 @@ import {
   movementOf,
   pct,
   type CodingStudent,
+  type Cycle,
   type Movement,
 } from '@/lib/codingDomain';
 import { cohortLabel, compareProgram } from '@/lib/cohorts';
 import type { ExportColumn } from '@/lib/exportTable';
 import { cn } from '@/lib/utils';
 
-import {
-  AmcatScore,
-  BRAND,
-  Card,
-  PlacedBadge,
-  ShowMore,
-  Title,
-  TrackBadge,
-  td,
-  th,
-} from './amcat-ui';
+import { AmcatScore, BRAND, Card, PlacedBadge, Title, TrackBadge, td, th } from './amcat-ui';
+import { CampusRows, MiniTable, StudentGroups, compareBatch, groupBy } from './grouped';
 import type { TabProps } from './types';
 
 type Level = 'basic' | 'overall';
@@ -218,7 +210,15 @@ export default function MovementTab(props: TabProps) {
       {previous && current && moves.some((item) => item.move) && (
         <>
           <ByProgram moves={moves} scope={scope} />
-          <ByBatch moves={moves} scope={scope} />
+          <ByBatch
+            moves={moves}
+            scope={scope}
+            pass={pass}
+            level={level}
+            previous={previous}
+            current={current}
+            studentLink={props.studentLink}
+          />
         </>
       )}
 
@@ -360,40 +360,69 @@ function ByProgram({ moves, scope }: { moves: Moves; scope: string }) {
   );
 }
 
-function ByBatch({ moves, scope }: { moves: Moves; scope: string }) {
-  const rows = useMemo(() => {
-    const groups = new Map<string, Moves>();
-    for (const item of moves) {
-      if (!item.move) continue;
-      const key = `${item.row.campus}|${item.row.program}|${item.row.year}`;
-      groups.set(key, [...(groups.get(key) ?? []), item]);
-    }
-    return [...groups.values()]
-      .map((list) => {
-        const n = (move: Movement) => list.filter((item) => item.move === move).length;
-        return {
-          campus: list[0].row.campus,
-          program: list[0].row.program,
-          year: list[0].row.year ?? 0,
-          batch: batchOf(list[0].row),
-          compared: list.length,
-          up: n('up'),
-          down: n('down'),
-          stayYes: n('stay-yes'),
-          stayNo: n('stay-no'),
-          net: n('up') - n('down'),
-        };
-      })
-      .sort(
-        (a, b) =>
-          a.campus.localeCompare(b.campus) ||
-          compareProgram(a.program, b.program) ||
-          a.year - b.year
-      );
+interface BatchMoves {
+  campus: string;
+  program: string;
+  year: number | null;
+  batch: string;
+  items: Moves;
+  compared: number;
+  up: number;
+  down: number;
+  stayYes: number;
+  stayNo: number;
+  net: number;
+}
+
+function ByBatch({
+  moves,
+  scope,
+  pass,
+  level,
+  previous,
+  current,
+  studentLink,
+}: {
+  moves: Moves;
+  scope: string;
+  pass: number;
+  level: Level;
+  previous: Cycle;
+  current: Cycle;
+  studentLink: TabProps['studentLink'];
+}) {
+  const groups = useMemo(() => {
+    const summarise = (list: Moves): BatchMoves => {
+      const n = (move: Movement) => list.filter((item) => item.move === move).length;
+      return {
+        campus: list[0].row.campus,
+        program: list[0].row.program,
+        year: list[0].row.year,
+        batch: batchOf(list[0].row),
+        items: list,
+        compared: list.length,
+        up: n('up'),
+        down: n('down'),
+        stayYes: n('stay-yes'),
+        stayNo: n('stay-no'),
+        net: n('up') - n('down'),
+      };
+    };
+    const compared = moves.filter((item) => item.move);
+    return groupBy(compared, (item) => item.row.campus)
+      .map(([campus, list]) => ({
+        campus,
+        total: summarise(list),
+        rows: groupBy(list, (item) => `${item.row.program}|${item.row.year ?? ''}`)
+          .map(([, rows]) => summarise(rows))
+          .sort(compareBatch),
+      }))
+      .sort((a, b) => a.campus.localeCompare(b.campus));
   }, [moves]);
-  type Row = (typeof rows)[number];
-  const columns: ExportColumn<Row>[] = [
+  const rows = groups.flatMap((group) => group.rows);
+  const columns: ExportColumn<BatchMoves>[] = [
     { header: 'Campus', value: (row) => row.campus },
+    { header: 'Program', value: (row) => row.program },
     { header: 'Batch', value: (row) => row.batch },
     { header: 'Compared', value: (row) => row.compared },
     { header: 'Upward', value: (row) => row.up },
@@ -402,12 +431,25 @@ function ByBatch({ moves, scope }: { moves: Moves; scope: string }) {
     { header: 'No → No', value: (row) => row.stayNo },
     { header: 'Net change', value: (row) => row.net },
   ];
+  const scores = (item: Moves[number], key: string) => {
+    const value = item.row.amcat[key];
+    return (
+      <span className="whitespace-nowrap">
+        <AmcatScore value={value?.c} pass={pass} />
+        <span className="text-slate-300"> · </span>
+        <AmcatScore value={value?.a} pass={pass} />
+        <span className="text-slate-300"> · </span>
+        <AmcatScore value={value?.d} pass={pass} />{' '}
+        <b className="text-[11px]">{yesNo(employable(value, pass, level))}</b>
+      </span>
+    );
+  };
   return (
     <Card>
       <Title
         icon={Users}
-        title="By Campus and Batch"
-        description="Net change is students who moved up less those who moved down."
+        title="By College, Program and Batch"
+        description="Net change is students who moved up less those who moved down. Open a batch to see its students."
         aside={
           <ExportButtons
             name={`cohort-movement-by-batch-${scope}`}
@@ -417,11 +459,11 @@ function ByBatch({ moves, scope }: { moves: Moves; scope: string }) {
           />
         }
       />
-      <div className="max-h-[28rem] overflow-auto">
+      <div className="overflow-x-auto">
         <table className="w-full min-w-[40rem] text-sm">
-          <thead className="bg-surface sticky top-0">
+          <thead>
             <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
-              <th className="py-2 pr-2 font-semibold">Campus and Batch</th>
+              <th className="py-2 pr-2 font-semibold">College, Program and Batch</th>
               <th className={th}>Compared</th>
               <th className={th}>Upward</th>
               <th className={th}>Downward</th>
@@ -430,16 +472,13 @@ function ByBatch({ moves, scope }: { moves: Moves; scope: string }) {
               <th className={th}>Net</th>
             </tr>
           </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr
-                key={`${row.campus}${row.batch}`}
-                className="border-b border-slate-100 last:border-0"
-              >
-                <td className="py-2 pr-2">
-                  <div className="font-medium">{row.campus}</div>
-                  <div className="text-xs text-slate-500">{row.batch}</div>
-                </td>
+          <CampusRows
+            groups={groups}
+            colSpan={7}
+            rowKey={(row) => `${row.program}|${row.year}`}
+            label={(row) => row.batch}
+            cells={(row) => (
+              <>
                 <td className={td}>{row.compared}</td>
                 <td className={cn(td, 'text-emerald-600')}>{row.up}</td>
                 <td className={cn(td, 'text-red-600')}>{row.down}</td>
@@ -454,9 +493,40 @@ function ByBatch({ moves, scope }: { moves: Moves; scope: string }) {
                 >
                   {row.net > 0 ? `+${row.net}` : row.net}
                 </td>
-              </tr>
-            ))}
-          </tbody>
+              </>
+            )}
+            students={(row) => (
+              <MiniTable
+                rows={[...row.items].sort(
+                  (a, b) =>
+                    MOVE_ORDER.indexOf(a.move) - MOVE_ORDER.indexOf(b.move) ||
+                    a.row.name.localeCompare(b.row.name)
+                )}
+                rowKey={(item) => item.row.slug}
+                columns={[
+                  {
+                    header: 'Student',
+                    cell: (item) =>
+                      studentLink(
+                        item.row.slug,
+                        <span className="text-brand-700 dark:text-brand-300 font-semibold hover:underline">
+                          {item.row.name}
+                        </span>
+                      ),
+                  },
+                  {
+                    header: `${previous.label} (Comms · Apt · Domain · Employable)`,
+                    cell: (item) => scores(item, previous.key),
+                  },
+                  {
+                    header: `${current.label} (Comms · Apt · Domain · Employable)`,
+                    cell: (item) => scores(item, current.key),
+                  },
+                  { header: 'Movement', cell: (item) => <MovementChip move={item.move} /> },
+                ]}
+              />
+            )}
+          />
         </table>
       </div>
     </Card>
@@ -493,6 +563,7 @@ function StudentTable({
   cycles,
   pass,
   scope,
+  search,
   studentLink,
   moves,
   previousKey,
@@ -505,7 +576,6 @@ function StudentTable({
   level: Level;
 }) {
   const [filter, setFilter] = useState<Filter>('all');
-  const [limit, setLimit] = useState(50);
   const [picked, setPicked] = useState<string | null>(null);
   const moveOf = useMemo(() => new Map(moves.map((item) => [item.row.slug, item.move])), [moves]);
   const rows = useMemo(
@@ -590,10 +660,7 @@ function StudentTable({
               key={item.key}
               type="button"
               aria-pressed={filter === item.key}
-              onClick={() => {
-                setFilter(item.key);
-                setLimit(50);
-              }}
+              onClick={() => setFilter(item.key)}
               className={cn(
                 'rounded-full border px-3 py-1 text-xs font-semibold',
                 filter === item.key
@@ -631,8 +698,17 @@ function StudentTable({
                 <th className={th}>Mock Avg</th>
               </tr>
             </thead>
-            <tbody>
-              {rows.slice(0, limit).map(({ row, move, mock }) => (
+            <StudentGroups
+              items={rows}
+              studentOf={itemStudent}
+              allCampuses={!search.campus}
+              colSpan={cycles.length + 4}
+              summary={(list) => {
+                const up = list.filter((item) => item.move === 'up').length;
+                const down = list.filter((item) => item.move === 'down').length;
+                return `▲ ${up} upward · ▼ ${down} downward`;
+              }}
+              renderRow={({ row, move, mock }) => (
                 <tr
                   key={row.slug}
                   onClick={() => setPicked(row.slug === picked ? null : row.slug)}
@@ -701,14 +777,13 @@ function StudentTable({
                     {mock == null ? '—' : `${mock}%`}
                   </td>
                 </tr>
-              ))}
-            </tbody>
+              )}
+            />
           </table>
         </div>
         {!rows.length && (
           <p className="py-6 text-center text-sm text-slate-500">No students in this group.</p>
         )}
-        <ShowMore left={rows.length - limit} onMore={() => setLimit((current) => current + 200)} />
       </Card>
       {pickedRow && (
         <History_
@@ -722,6 +797,8 @@ function StudentTable({
     </>
   );
 }
+
+const itemStudent = (item: { row: CodingStudent }) => item.row;
 
 function History_({
   row,

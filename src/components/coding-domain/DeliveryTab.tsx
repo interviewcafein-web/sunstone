@@ -2,7 +2,7 @@
 // the delivery tracker (a read-only copy, scripts/sync-delivery.ts), section by section, topic by
 // topic and trainer by trainer.
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useCallback, useMemo, useState, type ReactNode } from 'react';
 import {
   BookOpenCheck,
   CalendarClock,
@@ -24,6 +24,7 @@ import {
 import type { ExportColumn } from '@/lib/exportTable';
 import { cn } from '@/lib/utils';
 
+import { CampusRows, Chevron, MiniTable, compareBatch, groupBy, useFold } from './grouped';
 import type { TabProps } from './types';
 
 const panel = 'shadow-card bg-surface rounded-2xl border border-slate-200';
@@ -94,7 +95,7 @@ export default function DeliveryTab({ data, search, setSearch, scope }: TabProps
     [data.campuses]
   );
   const allCampuses = !search.campus;
-  const campusName = (code: string) => nameOf.get(code) ?? code;
+  const campusName = useCallback((code: string) => nameOf.get(code) ?? code, [nameOf]);
 
   const inScope = (row: { program: string; batch_year: number }) =>
     (!search.program || row.program === search.program) &&
@@ -153,12 +154,7 @@ export default function DeliveryTab({ data, search, setSearch, scope }: TabProps
         {sectionSelect}
       </div>
       <Summary sections={sections} />
-      <SectionsTable
-        sections={sections}
-        allCampuses={allCampuses}
-        campusName={campusName}
-        scope={scope}
-      />
+      <SectionsTable sections={sections} campusName={campusName} scope={scope} />
       <Topics
         sections={sections}
         topics={delivery.topics}
@@ -284,12 +280,10 @@ const verification = (row: { verified: number; pending: number; rejected: number
 
 function SectionsTable({
   sections,
-  allCampuses,
   campusName,
   scope,
 }: {
   sections: DeliverySection[];
-  allCampuses: boolean;
   campusName: (code: string) => string;
   scope: string;
 }) {
@@ -304,6 +298,52 @@ function SectionsTable({
     pending: sum((row) => row.pending),
     rejected: sum((row) => row.rejected),
   };
+  // Each college in bold with its totals, its sections under it.
+  const groups = useMemo(
+    () =>
+      groupBy(sections, (row) => row.campus_code)
+        .map(([code, rows]) => {
+          const add = (pick: (row: DeliverySection) => number) =>
+            rows.reduce((total, row) => total + pick(row), 0);
+          const total: DeliverySection = {
+            campus_code: code,
+            program: '',
+            batch_year: 0,
+            // The college row shows how many sections it has here.
+            section: String(rows.length),
+            students: add((row) => row.students ?? 0) || null,
+            planned: add((row) => row.planned),
+            allocated: add((row) => row.allocated),
+            verified: add((row) => row.verified),
+            pending: add((row) => row.pending),
+            rejected: add((row) => row.rejected),
+            verified_hours: add((row) => row.verified_hours),
+            pending_hours: add((row) => row.pending_hours),
+            rejected_hours: add((row) => row.rejected_hours),
+            class_minutes: null,
+            attendance: null,
+            last_class: rows.reduce<string | null>(
+              (last, row) =>
+                row.last_class && (!last || row.last_class > last) ? row.last_class : last,
+              null
+            ),
+            trainers: null,
+          };
+          return {
+            campus: campusName(code),
+            total,
+            rows: [...rows].sort(
+              (a, b) =>
+                compareBatch(
+                  { program: a.program, year: a.batch_year },
+                  { program: b.program, year: b.batch_year }
+                ) || (a.section ?? '').localeCompare(b.section ?? '')
+            ),
+          };
+        })
+        .sort((a, b) => a.campus.localeCompare(b.campus)),
+    [sections, campusName]
+  );
   const columns: ExportColumn<DeliverySection>[] = [
     { header: 'Campus', value: (row) => campusName(row.campus_code) },
     { header: 'Campus code', value: (row) => row.campus_code },
@@ -340,8 +380,8 @@ function SectionsTable({
     <section className={cn(panel, 'p-5')}>
       <Title
         icon={Layers}
-        title="Program × Batch × Section"
-        description="Target hours against classes verified, waiting for verification and rejected, section by section."
+        title="College × Program × Batch × Section"
+        description="Target hours against classes verified, waiting for verification and rejected, college by college and section by section."
         aside={
           <ExportButtons
             name={`prime-coding-delivery-sections-${scope}`}
@@ -355,7 +395,7 @@ function SectionsTable({
         <table className="w-full min-w-[64rem] text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
-              <th className="py-2 pr-2 font-semibold">Batch and Section</th>
+              <th className="py-2 pr-2 font-semibold">College, Batch and Section</th>
               <th className="px-2 py-2 text-right font-semibold">Students</th>
               <th className="px-2 py-2 text-right font-semibold">Target h</th>
               <th className="px-2 py-2 text-right font-semibold">Verified h</th>
@@ -367,18 +407,18 @@ function SectionsTable({
               <th className="px-2 py-2 text-right font-semibold">Last Class</th>
             </tr>
           </thead>
-          <tbody>
-            {sections.map((row) => (
-              <tr key={sectionKey(row)} className="border-b border-slate-100 last:border-0">
-                <td className="py-2 pr-2">
-                  <div className="font-medium">
-                    {cohortLabel(row.program, row.batch_year)}
-                    {row.section ? ` · ${row.section}` : ''}
-                  </div>
-                  {allCampuses && (
-                    <div className="text-xs text-slate-500">{campusName(row.campus_code)}</div>
-                  )}
-                </td>
+          <CampusRows
+            groups={groups}
+            colSpan={10}
+            rowKey={sectionKey}
+            label={(row) => (
+              <>
+                {cohortLabel(row.program, row.batch_year)}
+                {row.section ? ` · ${row.section}` : ''}
+              </>
+            )}
+            cells={(row, campus) => (
+              <>
                 <td className={td}>{row.students ?? '—'}</td>
                 <td className={td}>{row.planned || '—'}</td>
                 <td className={cn(td, 'font-semibold')}>{hours(row.verified_hours)}</td>
@@ -392,11 +432,15 @@ function SectionsTable({
                 <td className={td}>
                   <Rate value={verification(row)} />
                 </td>
-                <td className="max-w-48 px-2 py-2 text-xs text-slate-600">{row.trainers ?? '—'}</td>
-                <td className={cn(td, 'text-xs text-slate-600')}>{day(row.last_class)}</td>
-              </tr>
-            ))}
-          </tbody>
+                <td className="max-w-48 px-2 py-2 text-xs font-normal text-slate-600">
+                  {campus ? `${row.section} sections` : (row.trainers ?? '—')}
+                </td>
+                <td className={cn(td, 'text-xs font-normal text-slate-600')}>
+                  {day(row.last_class)}
+                </td>
+              </>
+            )}
+          />
           <tfoot>
             <tr className="border-t-2 border-slate-200 bg-slate-50 font-semibold dark:bg-slate-800/40">
               <td className="py-2 pr-2">Total ({sections.length} sections)</td>
@@ -458,6 +502,7 @@ function Topics({
   }, [topics, sections]);
   const names = [...curricula.keys()].sort();
   const [picked, setPicked] = useState<string | null>(null);
+  const opened = useFold(false);
   const curriculum = picked && curricula.has(picked) ? picked : names[0];
   const entry = curriculum ? curricula.get(curriculum)! : null;
 
@@ -500,6 +545,16 @@ function Topics({
   };
   const coverage = (covered: number, total: number) => pct(covered, total);
   const perSection = cols.length <= PER_SECTION_LIMIT;
+  // Opening a topic lists every college and section, in college order.
+  const bySection = [...cols].sort(
+    (a, b) =>
+      campusName(a.campus_code).localeCompare(campusName(b.campus_code)) ||
+      compareBatch(
+        { program: a.program, year: a.batch_year },
+        { program: b.program, year: b.batch_year }
+      ) ||
+      (a.section ?? '').localeCompare(b.section ?? '')
+  );
 
   // Long format for the download: one row per topic and section.
   const long = entry.topics.flatMap((topic) =>
@@ -573,7 +628,7 @@ function Topics({
         {cols.length === 1 ? '' : 's'}
         {perSection
           ? ''
-          : '. Too many sections to show side by side: averages shown, every section is in the download.'}
+          : '. Too many sections to show side by side: averages shown. Open a topic to see every college and section.'}
       </p>
       <div className="overflow-x-auto">
         {perSection ? (
@@ -713,25 +768,100 @@ function Topics({
                   cells.reduce((sum, c) => sum + (coverage(c.covered, topic.subtopics) ?? 0), 0) /
                     Math.max(cells.length, 1)
                 );
+                const open = opened.isOpen(topic.topic);
                 return (
-                  <tr key={topic.topic} className="border-b border-slate-100 last:border-0">
-                    <td className="py-2 pr-2">
-                      <span className="mr-1.5 text-xs text-slate-400 tabular-nums">
-                        {topic.topic_order}
-                      </span>
-                      {topic.topic}
-                    </td>
-                    <td className={td}>{topic.subtopics}</td>
-                    <td className={td}>
-                      {started} / {cols.length}
-                    </td>
-                    <td className={td}>{cells.reduce((sum, c) => sum + c.verified, 0)}</td>
-                    <td className={td}>{cells.reduce((sum, c) => sum + c.pending, 0)}</td>
-                    <td className={td}>{cells.reduce((sum, c) => sum + c.rejected, 0)}</td>
-                    <td className={td}>
-                      <Rate value={avg} />
-                    </td>
-                  </tr>
+                  <Fragment key={topic.topic}>
+                    <tr
+                      onClick={() => opened.toggle(topic.topic)}
+                      className={cn(
+                        'cursor-pointer border-b border-slate-100 hover:bg-slate-50 dark:hover:bg-slate-800/30',
+                        open && 'bg-brand-50/40 dark:bg-brand-900/10'
+                      )}
+                    >
+                      <td className="py-2 pr-2">
+                        <button
+                          type="button"
+                          aria-expanded={open}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            opened.toggle(topic.topic);
+                          }}
+                          className="flex items-center gap-1.5 text-left"
+                        >
+                          <Chevron open={open} />
+                          <span className="text-xs text-slate-400 tabular-nums">
+                            {topic.topic_order}
+                          </span>
+                          {topic.topic}
+                        </button>
+                      </td>
+                      <td className={td}>{topic.subtopics}</td>
+                      <td className={td}>
+                        {started} / {cols.length}
+                      </td>
+                      <td className={td}>{cells.reduce((sum, c) => sum + c.verified, 0)}</td>
+                      <td className={td}>{cells.reduce((sum, c) => sum + c.pending, 0)}</td>
+                      <td className={td}>{cells.reduce((sum, c) => sum + c.rejected, 0)}</td>
+                      <td className={td}>
+                        <Rate value={avg} />
+                      </td>
+                    </tr>
+                    {open && (
+                      <tr className="border-b border-slate-100">
+                        <td
+                          colSpan={7}
+                          className="bg-slate-50/60 px-3 py-3 pl-8 dark:bg-slate-900/30"
+                        >
+                          <MiniTable
+                            rows={bySection.map((row) => ({ row, ...cell(row, topic) }))}
+                            rowKey={(item) => sectionKey(item.row)}
+                            columns={[
+                              {
+                                header: 'College',
+                                cell: (item) => (
+                                  <b className="text-slate-800 dark:text-slate-100">
+                                    {campusName(item.row.campus_code)}
+                                  </b>
+                                ),
+                              },
+                              {
+                                header: 'Batch and Section',
+                                cell: (item) =>
+                                  `${cohortLabel(item.row.program, item.row.batch_year)}${item.row.section ? ` · ${item.row.section}` : ''}`,
+                              },
+                              {
+                                header: 'Verified',
+                                right: true,
+                                cell: (item) => item.verified || '·',
+                              },
+                              {
+                                header: 'Pending',
+                                right: true,
+                                cell: (item) => item.pending || '·',
+                              },
+                              {
+                                header: 'Rejected',
+                                right: true,
+                                cell: (item) => item.rejected || '·',
+                              },
+                              {
+                                header: 'Subtopics Covered',
+                                right: true,
+                                cell: (item) => `${item.covered} / ${topic.subtopics}`,
+                              },
+                              {
+                                header: 'Coverage',
+                                right: true,
+                                cell: (item) => (
+                                  <Rate value={coverage(item.covered, topic.subtopics) ?? 0} />
+                                ),
+                              },
+                            ]}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -762,6 +892,17 @@ function Topics({
 
 // --- Trainers -------------------------------------------------------------------------------
 
+interface TrainerRow {
+  trainer: string;
+  campus: string;
+  sections: string[];
+  verified: number;
+  pending: number;
+  rejected: number;
+  hours: number;
+  last: string | null;
+}
+
 function Trainers({
   rows,
   campusName,
@@ -771,44 +912,51 @@ function Trainers({
   campusName: (code: string) => string;
   scope: string;
 }) {
-  const trainers = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        trainer: string;
-        sections: string[];
-        verified: number;
-        pending: number;
-        rejected: number;
-        hours: number;
-        last: string | null;
-      }
-    >();
-    for (const row of rows) {
-      const entry = map.get(row.trainer) ?? {
-        trainer: row.trainer,
-        sections: [],
-        verified: 0,
-        pending: 0,
-        rejected: 0,
-        hours: 0,
-        last: null,
-      };
-      entry.sections.push(
-        `${row.campus_code} ${cohortLabel(row.program, row.batch_year)}${row.section ? ` ${row.section}` : ''}`
-      );
+  // One row per trainer at each college, colleges in bold with their totals.
+  const groups = useMemo(() => {
+    const blank = (trainer: string, campus: string): TrainerRow => ({
+      trainer,
+      campus,
+      sections: [],
+      verified: 0,
+      pending: 0,
+      rejected: 0,
+      hours: 0,
+      last: null,
+    });
+    const add = (entry: TrainerRow, row: TrainerRow | (typeof rows)[number], section?: string) => {
+      if (section) entry.sections.push(section);
       entry.verified += row.verified;
       entry.pending += row.pending;
       entry.rejected += row.rejected;
       entry.hours += row.hours;
-      if (row.last_logged && (!entry.last || row.last_logged > entry.last))
-        entry.last = row.last_logged;
-      map.set(row.trainer, entry);
-    }
-    return [...map.values()].sort((a, b) => b.hours - a.hours);
-  }, [rows]);
-  type Row = (typeof trainers)[number];
-  const columns: ExportColumn<Row>[] = [
+      const last = 'last' in row ? row.last : row.last_logged;
+      if (last && (!entry.last || last > entry.last)) entry.last = last;
+    };
+    return groupBy(rows, (row) => row.campus_code)
+      .map(([code, list]) => {
+        const campus = campusName(code);
+        const byTrainer = new Map<string, TrainerRow>();
+        for (const row of list) {
+          const entry = byTrainer.get(row.trainer) ?? blank(row.trainer, campus);
+          add(
+            entry,
+            row,
+            `${cohortLabel(row.program, row.batch_year)}${row.section ? ` ${row.section}` : ''}`
+          );
+          byTrainer.set(row.trainer, entry);
+        }
+        const trainers = [...byTrainer.values()].sort((x, y) => y.hours - x.hours);
+        const total = blank(`${trainers.length} trainers`, campus);
+        for (const trainer of trainers) add(total, trainer);
+        total.sections = [`${trainers.length} trainer${trainers.length === 1 ? '' : 's'}`];
+        return { campus, total, rows: trainers };
+      })
+      .sort((x, y) => x.campus.localeCompare(y.campus));
+  }, [rows, campusName]);
+  const trainers = groups.flatMap((group) => group.rows);
+  const columns: ExportColumn<TrainerRow>[] = [
+    { header: 'Campus', value: (row) => row.campus },
     { header: 'Trainer', value: (row) => row.trainer },
     { header: 'Sections taught', value: (row) => row.sections.join('; ') },
     { header: 'Verified classes', value: (row) => row.verified },
@@ -823,7 +971,7 @@ function Trainers({
       <Title
         icon={UserRound}
         title="Trainer-wise Delivery"
-        description="Classes each trainer logged in the tracker, and how many were verified."
+        description="Classes each trainer logged in the tracker at each college, and how many were verified."
         aside={
           <ExportButtons
             name={`prime-coding-trainers-${scope}`}
@@ -840,7 +988,7 @@ function Trainers({
           <table className="w-full min-w-[52rem] text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
-                <th className="py-2 pr-2 font-semibold">Trainer</th>
+                <th className="py-2 pr-2 font-semibold">College and Trainer</th>
                 <th className="px-2 py-2 font-semibold">Sections</th>
                 <th className="px-2 py-2 text-right font-semibold">Verified</th>
                 <th className="px-2 py-2 text-right font-semibold">Hours</th>
@@ -850,15 +998,16 @@ function Trainers({
                 <th className="px-2 py-2 text-right font-semibold">Last Logged</th>
               </tr>
             </thead>
-            <tbody>
-              {trainers.map((row) => (
-                <tr key={row.trainer} className="border-b border-slate-100 last:border-0">
-                  <td className="py-2 pr-2 font-medium">{row.trainer}</td>
+            <CampusRows
+              groups={groups}
+              colSpan={8}
+              rowKey={(row) => row.trainer}
+              label={(row) => row.trainer}
+              cells={(row) => (
+                <>
                   <td
-                    className="max-w-72 px-2 py-2 text-xs text-slate-600"
-                    title={row.sections
-                      .map((s) => s.replace(/^(\S+)/, (code) => campusName(code)))
-                      .join('\n')}
+                    className="max-w-72 px-2 py-2 text-xs font-normal text-slate-600"
+                    title={row.sections.join('\n')}
                   >
                     {row.sections.slice(0, 4).join(', ')}
                     {row.sections.length > 4 ? ` +${row.sections.length - 4} more` : ''}
@@ -870,10 +1019,10 @@ function Trainers({
                   <td className={td}>
                     <Rate value={verification(row)} />
                   </td>
-                  <td className={cn(td, 'text-xs text-slate-600')}>{day(row.last)}</td>
-                </tr>
-              ))}
-            </tbody>
+                  <td className={cn(td, 'text-xs font-normal text-slate-600')}>{day(row.last)}</td>
+                </>
+              )}
+            />
           </table>
         </div>
       )}
