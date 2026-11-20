@@ -65,6 +65,19 @@ export interface SubjectRow {
   last_class: string | null;
 }
 
+/** The AMCAT practice modules in the LMS (the AMCAT console): one row per campus, batch, module. */
+export interface AmcatModuleRow {
+  campus_id: number;
+  campus: string;
+  program: string;
+  admission_year: number;
+  module: number;
+  /** Students it was published to, those who submitted it, and their average score %. */
+  given: number;
+  took: number;
+  avg: number | null;
+}
+
 export interface AmcatRow {
   campus_id: number;
   campus: string;
@@ -78,7 +91,11 @@ export interface AmcatRow {
 }
 
 /** Per campus, program, batch and subject, for everyone (narrowed per viewer by the caller). */
-export async function primeRows(): Promise<{ subjects: SubjectRow[]; amcat: AmcatRow[] }> {
+export async function primeRows(): Promise<{
+  subjects: SubjectRow[];
+  amcat: AmcatRow[];
+  amcatModules: AmcatModuleRow[];
+}> {
   const subjectsQuery = db().query(
     `with roster as (
        select lms_user_id, campus_id, campus, program, admission_year from students
@@ -206,7 +223,32 @@ export async function primeRows(): Promise<{ subjects: SubjectRow[]; amcat: Amca
      left join sections x using (campus_id, program, admission_year)
      order by c.campus, c.program, c.admission_year`
   );
-  const [subjects, amcat] = await together([subjectsQuery, amcatQuery]);
+  // The AMCAT console: "AMCAT Module 1" to "Module 5", published in the PRIME subjects.
+  const modulesQuery = db().query(
+    `with roster as (
+       select lms_user_id, campus_id, campus, program, admission_year from students
+       where on_platform and campus_id is not null and admission_year is not null),
+     mods as (
+       select id, (regexp_match(name, '(?i)module[^0-9]*([0-9]+)'))[1]::int as module
+       from lms_tests where category = 'amcat_mock' and name ~* 'module[^0-9]*[0-9]'),
+     given as (
+       select distinct r.campus_id, r.campus, r.program, r.admission_year, m.module, m.id as test_id,
+              r.lms_user_id
+       from mods m
+       join lms_test_releases rl on rl.test_id = m.id and rl.visible and rl.release_at <= ${NOW}
+       join lms_section_students ss on ss.section_id = rl.section_id
+       join roster r on r.lms_user_id = ss.lms_user_id)
+     select g.campus_id, g.campus, g.program, g.admission_year, g.module,
+            count(distinct g.lms_user_id)::int as given,
+            count(distinct g.lms_user_id) filter (where tr.submitted)::int as took,
+            round(avg(${scorePct('tr', 't')}) filter (where tr.submitted))::int as avg
+     from given g
+     join lms_tests t on t.id = g.test_id
+     left join lms_test_results tr on tr.test_id = g.test_id and tr.lms_user_id = g.lms_user_id
+     group by 1, 2, 3, 4, 5
+     order by g.campus, g.program, g.admission_year, g.module`
+  );
+  const [subjects, amcat, amcatModules] = await together([subjectsQuery, amcatQuery, modulesQuery]);
   return {
     subjects: subjects.map((row) => ({
       ...row,
@@ -218,6 +260,12 @@ export async function primeRows(): Promise<{ subjects: SubjectRow[]; amcat: Amca
       admission_year: Number(row.admission_year),
       campus_id: Number(row.campus_id),
     })) as AmcatRow[],
+    amcatModules: amcatModules.map((row) => ({
+      ...row,
+      admission_year: Number(row.admission_year),
+      campus_id: Number(row.campus_id),
+      module: Number(row.module),
+    })) as AmcatModuleRow[],
   };
 }
 

@@ -190,6 +190,8 @@ async function handler(request: Request, context?: WaitUntil): Promise<Response>
       campuses,
       subjects,
       amcat: narrow(rows.amcat, viewer, campusId),
+      // Older saved copies (before the AMCAT console) have none.
+      amcatModules: narrow(rows.amcatModules ?? [], viewer, campusId),
       optIn,
       placement,
       hoursPerCredit: HOURS_PER_CREDIT,

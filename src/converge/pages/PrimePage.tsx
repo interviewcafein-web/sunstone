@@ -35,6 +35,7 @@ import {
   usePeopleSubjects,
   usePrime,
   type OptInRow,
+  type PrimeAmcatModuleRow,
   type PrimeAmcatRow,
   type PrimeResponse,
   type PrimeSubjectRow,
@@ -96,6 +97,10 @@ export default function PrimePage() {
   );
   const amcat = useMemo(
     () => (data?.amcat ?? []).filter((row) => inView(row, search)),
+    [data, search]
+  );
+  const amcatModules = useMemo(
+    () => (data?.amcatModules ?? []).filter((row) => inView(row, search)),
     [data, search]
   );
 
@@ -189,7 +194,7 @@ export default function PrimePage() {
             )}
             <DownloadAll
               name={`converge-prime-domain-${scope}`}
-              sheets={() => allSheets(data, subjects, amcat)}
+              sheets={() => allSheets(data, subjects, amcat, amcatModules)}
             />
           </div>
         }
@@ -269,7 +274,9 @@ export default function PrimePage() {
             <Hours rows={subjects} data={data} scope={scope} campus={search.campus} />
           )}
           {tab === 'assignments' && <Assignments rows={subjects} data={data} scope={scope} />}
-          {tab === 'amcat' && <Amcat rows={amcat} data={data} scope={scope} />}
+          {tab === 'amcat' && (
+            <Amcat rows={amcat} modules={amcatModules} data={data} scope={scope} />
+          )}
           {tab === 'placements' && <PlacementImpact data={data} scope={scope} />}
         </div>
       )}
@@ -528,7 +535,8 @@ function sectionsOf(rows: PrimeAmcatRow[]) {
 function allSheets(
   data: PrimeResponse,
   subjects: PrimeSubjectRow[],
-  amcat: PrimeAmcatRow[]
+  amcat: PrimeAmcatRow[],
+  modules: PrimeAmcatModuleRow[]
 ): ExportSheet<any>[] {
   const fit = data.placement.flatMap((entry) =>
     (entry.fit?.rows ?? []).map((row) => ({
@@ -540,7 +548,12 @@ function allSheets(
   return [
     { sheet: 'Subjects', columns: SUBJECT_COLUMNS, rows: bySubject(subjects) },
     { sheet: 'Campus batches', columns: ROW_COLUMNS, rows: subjects },
-    { sheet: 'AMCAT', columns: AMCAT_COLUMNS(sectionsOf(amcat)), rows: amcat },
+    {
+      sheet: 'AMCAT console',
+      columns: CONSOLE_COLUMNS(moduleNumbers(modules)),
+      rows: consoleBatches(modules),
+    },
+    { sheet: 'Actual AMCAT', columns: AMCAT_COLUMNS(sectionsOf(amcat)), rows: amcat },
     { sheet: 'Opt-in vs not', columns: OPT_IN_COLUMNS, rows: data.optIn.rows },
     {
       sheet: 'Domain vs role',
@@ -1191,12 +1204,181 @@ function Assignments({
   );
 }
 
+/** The AMCAT console modules (1, 2, …) present in these rows. */
+const moduleNumbers = (rows: PrimeAmcatModuleRow[]) =>
+  [...new Set(rows.map((row) => row.module))].sort((a, b) => a - b);
+
+interface ConsoleBatch {
+  campus: string;
+  program: string;
+  admission_year: number;
+  modules: Record<number, PrimeAmcatModuleRow>;
+}
+
+/** One row per campus and batch, with each module's numbers. */
+function consoleBatches(rows: PrimeAmcatModuleRow[]): ConsoleBatch[] {
+  const map = new Map<string, ConsoleBatch>();
+  for (const row of rows) {
+    const key = `${row.campus_id}|${row.program}|${row.admission_year}`;
+    const entry = map.get(key) ?? {
+      campus: row.campus,
+      program: row.program,
+      admission_year: row.admission_year,
+      modules: {},
+    };
+    entry.modules[row.module] = row;
+    map.set(key, entry);
+  }
+  return [...map.values()];
+}
+
+/** The average of a batch's module averages, weighted by how many took each. */
+const consoleAverage = (batch: ConsoleBatch) =>
+  weighted(
+    Object.values(batch.modules),
+    (row) => row.avg,
+    (row) => row.took
+  );
+
+const CONSOLE_COLUMNS = (numbers: number[]): ExportColumn<ConsoleBatch>[] => [
+  { header: 'Campus', value: (row) => row.campus },
+  { header: 'Program', value: (row) => row.program },
+  { header: 'Batch', value: (row) => batchOf(row) },
+  ...numbers.flatMap((n) => [
+    { header: `Module ${n} average %`, value: (row: ConsoleBatch) => row.modules[n]?.avg ?? null },
+    { header: `Module ${n} took`, value: (row: ConsoleBatch) => row.modules[n]?.took ?? null },
+    {
+      header: `Module ${n} published to`,
+      value: (row: ConsoleBatch) => row.modules[n]?.given ?? null,
+    },
+  ]),
+  { header: 'All modules average %', value: consoleAverage },
+];
+
+/** The AMCAT console: the AMCAT practice modules students take in the LMS. */
+function AmcatConsole({ rows, scope }: { rows: PrimeAmcatModuleRow[]; scope: string }) {
+  const numbers = moduleNumbers(rows);
+  const batches = consoleBatches(rows);
+  const overall = numbers.map((n) => {
+    const list = rows.filter((row) => row.module === n);
+    return {
+      n,
+      given: sum(list, (row) => row.given),
+      took: sum(list, (row) => row.took),
+      avg: weighted(
+        list,
+        (row) => row.avg,
+        (row) => row.took
+      ),
+    };
+  });
+  // Batches under a bold campus heading.
+  const campuses = [...new Set(batches.map((batch) => batch.campus))];
+  return (
+    <Card>
+      <SectionTitle
+        icon={ClipboardCheck}
+        title="AMCAT Console (LMS Practice Modules)"
+        description="The AMCAT practice modules students take in the LMS, Module 1 to 5: the average score of those who took each, and how many of the students it was published to took it. These are practice tests, not the actual AMCAT."
+        aside={
+          rows.length > 0 && (
+            <ExportButtons
+              name={`prime-domain-amcat-console-${scope}`}
+              sheet="AMCAT console"
+              columns={CONSOLE_COLUMNS(numbers)}
+              rows={batches}
+            />
+          )
+        }
+      />
+      {!rows.length ? (
+        <p className="mt-3 text-sm text-slate-500">
+          No AMCAT practice modules have been published to these batches in the LMS yet.
+        </p>
+      ) : (
+        <>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {overall.map((module) => (
+              <div key={module.n} className="rounded-xl border border-slate-200 p-3">
+                <p className="text-xs font-semibold text-slate-500">Module {module.n}</p>
+                <p className={cn('text-2xl font-bold tabular-nums', scoreTone(module.avg))}>
+                  {module.avg == null ? '—' : `${module.avg}%`}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {module.took.toLocaleString('en-IN')} of {module.given.toLocaleString('en-IN')}{' '}
+                  took it ({pct(module.took, module.given) ?? 0}%)
+                </p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4">
+            <Table
+              head={['Campus and Batch', ...numbers.map((n) => `Module ${n}`), 'Average']}
+              min={`${24 + numbers.length * 8}rem`}
+            >
+              {campuses.map((campus) => (
+                <Fragment key={campus}>
+                  <tr className="border-b border-slate-200 bg-slate-50 dark:bg-slate-800/50">
+                    <td
+                      colSpan={numbers.length + 2}
+                      className="px-2 py-2 font-bold text-slate-900 dark:text-slate-50"
+                    >
+                      {campus}
+                    </td>
+                  </tr>
+                  {batches
+                    .filter((batch) => batch.campus === campus)
+                    .map((batch) => {
+                      const average = consoleAverage(batch);
+                      return (
+                        <tr
+                          key={`${campus}-${batch.program}-${batch.admission_year}`}
+                          className="border-b border-slate-100 last:border-0"
+                        >
+                          <td className="py-2 pr-2 pl-4 font-medium">{batchOf(batch)}</td>
+                          {numbers.map((n) => {
+                            const module = batch.modules[n];
+                            return (
+                              <td key={n} className={td}>
+                                {module ? (
+                                  <span className="inline-flex flex-col items-end">
+                                    <span className={cn('font-semibold', scoreTone(module.avg))}>
+                                      {module.avg == null ? '—' : `${module.avg}%`}
+                                    </span>
+                                    <span className="text-[11px] text-slate-500">
+                                      {module.took}/{module.given} took
+                                    </span>
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-300">Not published</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                          <td className={cn(td, 'font-bold', scoreTone(average))}>
+                            {average == null ? '—' : `${average}%`}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </Fragment>
+              ))}
+            </Table>
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
+
 function Amcat({
   rows,
+  modules,
   data,
   scope,
 }: {
   rows: PrimeAmcatRow[];
+  modules: PrimeAmcatModuleRow[];
   data: PrimeResponse;
   scope: string;
 }) {
@@ -1206,15 +1388,16 @@ function Amcat({
   const took = sum(rows, (row) => row.with_sitting);
   return (
     <>
+      <AmcatConsole rows={modules} scope={scope} />
       <Card>
         <SectionTitle
           icon={Award}
-          title="AMCAT by Campus and Batch"
-          description={`${took.toLocaleString('en-IN')} of ${students.toLocaleString('en-IN')} students have taken AMCAT (${pct(took, students) ?? 0}%). Scores are from each student's latest sitting.`}
+          title="Actual AMCAT by Campus and Batch"
+          description={`The actual AMCAT exam (organisation level), from AMCAT's own results. ${took.toLocaleString('en-IN')} of ${students.toLocaleString('en-IN')} students have taken it (${pct(took, students) ?? 0}%). Scores are from each student's latest sitting.`}
           aside={
             <ExportButtons
-              name={`prime-domain-amcat-${scope}`}
-              sheet="AMCAT"
+              name={`prime-domain-actual-amcat-${scope}`}
+              sheet="Actual AMCAT"
               columns={AMCAT_COLUMNS(sections)}
               rows={rows}
             />

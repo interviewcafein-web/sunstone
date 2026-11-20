@@ -51,6 +51,18 @@ export interface PrimeAmcatRow {
   sections: Record<string, number> | null;
 }
 
+/** An AMCAT console module (LMS practice test) at a campus and batch. */
+export interface PrimeAmcatModuleRow {
+  campus_id: number;
+  campus: string;
+  program: string;
+  admission_year: number;
+  module: number;
+  given: number;
+  took: number;
+  avg: number | null;
+}
+
 export interface OptInRow {
   opted_in: boolean;
   program: string | null;
@@ -68,6 +80,7 @@ export interface PrimeResponse {
   campuses: { id: number; name: string }[];
   subjects: PrimeSubjectRow[];
   amcat: PrimeAmcatRow[];
+  amcatModules: PrimeAmcatModuleRow[];
   optIn: {
     minSide: number;
     rows: OptInRow[];
